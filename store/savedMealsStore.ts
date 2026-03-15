@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { MealType } from './foodStore';
+import { useFoodStore } from './foodStore';
 
 export interface SavedMealItem {
   id: string;
@@ -23,18 +25,37 @@ export interface SavedMeal {
   timesUsed: number;
 }
 
+export interface SavedFood {
+  id: string;
+  name: string;
+  calories_100g: number;
+  protein_100g: number;
+  carbs_100g: number;
+  fat_100g: number;
+  createdAt: string;
+  timesUsed: number;
+}
+
 interface SavedMealsState {
   meals: SavedMeal[];
+  foods: SavedFood[];
   saveMeal: (name: string, items: SavedMealItem[]) => Promise<void>;
+  saveFood: (food: Omit<SavedFood, 'id' | 'createdAt' | 'timesUsed'>) => Promise<void>;
   deleteMeal: (id: string) => Promise<void>;
+  deleteFood: (id: string) => Promise<void>;
   incrementUsage: (id: string) => Promise<void>;
+  incrementFoodUsage: (id: string) => Promise<void>;
+  addMealToLog: (meal: SavedMeal, mealType: MealType) => void;
+  addFoodToLog: (food: SavedFood, quantity: number, mealType: MealType) => void;
   loadFromStorage: () => Promise<void>;
 }
 
-const STORAGE_KEY = 'caltracker_saved_meals';
+const MEALS_KEY = 'caltracker_saved_meals';
+const FOODS_KEY = 'caltracker_saved_foods';
 
 export const useSavedMealsStore = create<SavedMealsState>((set, get) => ({
   meals: [],
+  foods: [],
 
   saveMeal: async (name, items) => {
     const totals = items.reduce(
@@ -57,28 +78,91 @@ export const useSavedMealsStore = create<SavedMealsState>((set, get) => ({
       createdAt: new Date().toISOString(),
       timesUsed: 0,
     };
-    const meals = [meal, ...get().meals];
+    const meals = [meal, ...get().meals].sort((a, b) => b.timesUsed - a.timesUsed);
     set({ meals });
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(meals));
+    await AsyncStorage.setItem(MEALS_KEY, JSON.stringify(meals));
+  },
+
+  saveFood: async (foodData) => {
+    const food: SavedFood = {
+      id: Date.now().toString(),
+      ...foodData,
+      createdAt: new Date().toISOString(),
+      timesUsed: 0,
+    };
+    const foods = [food, ...get().foods].sort((a, b) => b.timesUsed - a.timesUsed);
+    set({ foods });
+    await AsyncStorage.setItem(FOODS_KEY, JSON.stringify(foods));
   },
 
   deleteMeal: async (id) => {
     const meals = get().meals.filter((m) => m.id !== id);
     set({ meals });
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(meals));
+    await AsyncStorage.setItem(MEALS_KEY, JSON.stringify(meals));
+  },
+
+  deleteFood: async (id) => {
+    const foods = get().foods.filter((f) => f.id !== id);
+    set({ foods });
+    await AsyncStorage.setItem(FOODS_KEY, JSON.stringify(foods));
   },
 
   incrementUsage: async (id) => {
-    if (!get().meals.some((m) => m.id === id)) return;
-    const meals = get().meals.map((m) =>
-      m.id === id ? { ...m, timesUsed: m.timesUsed + 1 } : m
-    );
+    const meals = get().meals
+      .map((m) => (m.id === id ? { ...m, timesUsed: m.timesUsed + 1 } : m))
+      .sort((a, b) => b.timesUsed - a.timesUsed);
     set({ meals });
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(meals));
+    await AsyncStorage.setItem(MEALS_KEY, JSON.stringify(meals));
+  },
+
+  incrementFoodUsage: async (id) => {
+    const foods = get().foods
+      .map((f) => (f.id === id ? { ...f, timesUsed: f.timesUsed + 1 } : f))
+      .sort((a, b) => b.timesUsed - a.timesUsed);
+    set({ foods });
+    await AsyncStorage.setItem(FOODS_KEY, JSON.stringify(foods));
+  },
+
+  addMealToLog: (meal, mealType) => {
+    const addFood = useFoodStore.getState().addFood;
+    meal.items.forEach((item) => {
+      addFood({
+        name: item.name,
+        quantity_g: item.quantity_g,
+        calories: item.calories,
+        protein_g: item.protein_g,
+        carbs_g: item.carbs_g,
+        fat_g: item.fat_g,
+        meal: mealType,
+      });
+    });
+    get().incrementUsage(meal.id);
+  },
+
+  addFoodToLog: (food, quantity, mealType) => {
+    const addFood = useFoodStore.getState().addFood;
+    const factor = quantity / 100;
+    addFood({
+      name: food.name,
+      quantity_g: quantity,
+      calories: Math.round(food.calories_100g * factor),
+      protein_g: Math.round(food.protein_100g * factor * 10) / 10,
+      carbs_g: Math.round(food.carbs_100g * factor * 10) / 10,
+      fat_g: Math.round(food.fat_100g * factor * 10) / 10,
+      meal: mealType,
+    });
+    get().incrementFoodUsage(food.id);
   },
 
   loadFromStorage: async () => {
-    const raw = await AsyncStorage.getItem(STORAGE_KEY);
-    if (raw) set({ meals: JSON.parse(raw) as SavedMeal[] });
+    try {
+      const rawMeals = await AsyncStorage.getItem(MEALS_KEY);
+      const rawFoods = await AsyncStorage.getItem(FOODS_KEY);
+      const meals = rawMeals ? (JSON.parse(rawMeals) as SavedMeal[]) : [];
+      const foods = rawFoods ? (JSON.parse(rawFoods) as SavedFood[]) : [];
+      set({ meals, foods });
+    } catch {
+      // ignore
+    }
   },
 }));
