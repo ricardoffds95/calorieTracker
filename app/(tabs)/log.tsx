@@ -857,6 +857,17 @@ export default function LogScreen() {
           {/* ── AI Tab ──────────────────────────────────────────────────── */}
           {mode === 'ai' && (
             <View style={styles.section}>
+              {(aiText.length > 0 || selectedPhoto || editableItems.length > 0) && (
+                <TouchableOpacity
+                  style={styles.clearBtn}
+                  onPress={() => { setAiText(''); setSelectedPhoto(null); setEditableItems([]); setAiError(null); }}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Feather name="x" size={13} color={Colors.textSecondary} />
+                  <Text style={styles.clearBtnTxt}>Limpar tudo</Text>
+                </TouchableOpacity>
+              )}
               <View style={{ position: 'relative' }}>
                 <TextInput
                   style={[styles.textArea, selectedPhoto && { paddingRight: 100 }]}
@@ -1362,6 +1373,8 @@ const styles = StyleSheet.create({
   title: { fontSize: Typography.xxl, color: Colors.textPrimary, fontWeight: FontWeight.bold, marginBottom: Spacing.sm },
   contextPill: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: Colors.primaryLight, borderRadius: Radius.pill, paddingHorizontal: Spacing.md, paddingVertical: 7, alignSelf: 'flex-start', marginBottom: Spacing.md, borderWidth: 1, borderColor: Colors.primary + '30' },
   contextPillTxt: { fontSize: Typography.sm, color: Colors.primary, fontWeight: FontWeight.semibold },
+  clearBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-end' },
+  clearBtnTxt: { fontSize: Typography.xs, color: Colors.textSecondary },
   modeToggle: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F0F4FF', borderRadius: 50, padding: 4, marginHorizontal: 16, marginVertical: 12 },
   modeBtn: { flex: 1, paddingVertical: 8, paddingHorizontal: 6, borderRadius: 50, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 3 },
   modeBtnActive: { backgroundColor: Colors.primary, ...Shadow.card },
