@@ -7,7 +7,6 @@ import { ptBR } from 'date-fns/locale';
 import { useFood } from '../../hooks/useFood';
 import { useDailyGoals } from '../../hooks/useDailyGoals';
 import MacroRing from '../../components/MacroRing';
-import DailySummary from '../../components/DailySummary';
 import MealSection from '../../components/MealSection';
 import { Colors, Typography, FontWeight, Spacing, Radius, Shadow } from '../../constants/theme';
 import { MealType, DiaryEntry, useFoodStore } from '../../store/foodStore';
@@ -38,7 +37,6 @@ export default function DashboardScreen() {
   const fadeAnim0 = useRef(new Animated.Value(0)).current;
   const fadeAnim1 = useRef(new Animated.Value(0)).current;
   const fadeAnim2 = useRef(new Animated.Value(0)).current;
-  const fadeAnim3 = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.spring(fabAnim, { toValue: 1, friction: 5, tension: 60, useNativeDriver: true }).start();
@@ -46,7 +44,6 @@ export default function DashboardScreen() {
       Animated.timing(fadeAnim0, { toValue: 1, duration: 500, useNativeDriver: true }),
       Animated.timing(fadeAnim1, { toValue: 1, duration: 500, useNativeDriver: true }),
       Animated.timing(fadeAnim2, { toValue: 1, duration: 500, useNativeDriver: true }),
-      Animated.timing(fadeAnim3, { toValue: 1, duration: 500, useNativeDriver: true }),
     ]).start();
   }, []);
 
@@ -73,18 +70,8 @@ export default function DashboardScreen() {
           />
         </Animated.View>
 
-        {/* Daily Summary */}
-        <Animated.View style={{ opacity: fadeAnim2, marginBottom: Spacing.lg }}>
-          <DailySummary
-            calories={totals.calories} calorieGoal={goals.calories}
-            protein={totals.protein} proteinGoal={goals.protein}
-            carbs={totals.carbs} carbsGoal={goals.carbs}
-            fat={totals.fat} fatGoal={goals.fat}
-          />
-        </Animated.View>
-
         {/* Meals */}
-        <Animated.View style={{ opacity: fadeAnim3 }}>
+        <Animated.View style={{ opacity: fadeAnim2 }}>
           <Text style={styles.sectionTitle}>Refeições</Text>
           {MEALS.map(meal => {
             const items = meals[meal];
