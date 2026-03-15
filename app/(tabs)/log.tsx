@@ -1176,7 +1176,26 @@ export default function LogScreen() {
                             <TouchableOpacity style={styles.qtyBtn} onPress={() => setSavedMealDoses(d => ({ ...d, [savedMeal.id]: Math.max(0.5, parseFloat(((d[savedMeal.id] ?? 1) - 0.5).toFixed(1))) }))}>
                               <Text style={styles.qtyBtnTxt}>-</Text>
                             </TouchableOpacity>
-                            <Text style={styles.dosesTxt}>{(savedMealDoses[savedMeal.id] ?? 1) % 1 === 0 ? `${savedMealDoses[savedMeal.id] ?? 1}` : `${savedMealDoses[savedMeal.id] ?? 1}`} dose{(savedMealDoses[savedMeal.id] ?? 1) !== 1 ? 's' : ''}</Text>
+                            <TextInput
+                              style={styles.dosesTxt}
+                              value={String(savedMealDoses[savedMeal.id] ?? 1)}
+                              onChangeText={(v) => {
+                                const parsed = parseFloat(v);
+                                if (!isNaN(parsed) && parsed > 0) {
+                                  setSavedMealDoses(d => ({ ...d, [savedMeal.id]: parsed }));
+                                } else if (v === '' || v === '.') {
+                                  setSavedMealDoses(d => ({ ...d, [savedMeal.id]: 0 }));
+                                }
+                              }}
+                              onBlur={() => {
+                                const val = savedMealDoses[savedMeal.id];
+                                if (!val || isNaN(val) || val <= 0) {
+                                  setSavedMealDoses(d => ({ ...d, [savedMeal.id]: 1 }));
+                                }
+                              }}
+                              keyboardType="decimal-pad"
+                              selectTextOnFocus
+                            />
                             <TouchableOpacity style={styles.qtyBtn} onPress={() => setSavedMealDoses(d => ({ ...d, [savedMeal.id]: parseFloat(((d[savedMeal.id] ?? 1) + 0.5).toFixed(1)) }))}>
                               <Text style={styles.qtyBtnTxt}>+</Text>
                             </TouchableOpacity>
@@ -1516,7 +1535,7 @@ const styles = StyleSheet.create({
   savedCardLeft: { flex: 1, gap: 4 },
   savedCardActions: { alignItems: 'center', gap: 4 },
   dosesRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  dosesTxt: { fontSize: Typography.xs, color: Colors.textSecondary, minWidth: 52, textAlign: 'center' },
+  dosesTxt: { fontSize: Typography.xs, color: Colors.textSecondary, minWidth: 52, textAlign: 'center', borderBottomWidth: 1, borderBottomColor: Colors.border, paddingVertical: 1 },
   savedCardName: { fontSize: Typography.base, color: Colors.textPrimary, fontWeight: FontWeight.bold },
   savedCardMeta: { fontSize: Typography.sm, color: Colors.textSecondary },
   savedMacroPills: { flexDirection: 'row', gap: 6, marginTop: 4 },
