@@ -1,11 +1,10 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
   ScrollView,
-  FlatList,
   ActivityIndicator,
   StyleSheet,
   KeyboardAvoidingView,
@@ -104,7 +103,6 @@ export default function LogScreen() {
   const [searchResults, setSearchResults] = useState<FoodSearchResult[]>([]);
   const [fromCache, setFromCache] = useState(false);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
-  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Photo tab
   const [photoLoading, setPhotoLoading] = useState(false);
@@ -169,16 +167,6 @@ export default function LogScreen() {
 
   // ── Search handlers ──────────────────────────────────────────────────────────
 
-  const handleSearchChange = useCallback((text: string) => {
-    setSearchText(text);
-    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-    searchDebounceRef.current = setTimeout(() => {
-      if (text.trim().length >= 2) {
-        runSearch(text);
-      }
-    }, 500);
-  }, []);
-
   const runSearch = async (q: string) => {
     setSearchLoading(true);
     setSearchError(null);
@@ -194,10 +182,15 @@ export default function LogScreen() {
     }
   };
 
-  const handleSearchSubmit = () => {
-    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-    runSearch(searchText);
-  };
+  useEffect(() => {
+    if (searchText.trim().length < 2) return;
+    const id = setTimeout(() => runSearch(searchText), 500);
+    return () => clearTimeout(id);
+  }, [searchText]);
+
+  const handleSearchChange = (text: string) => setSearchText(text);
+
+  const handleSearchSubmit = () => runSearch(searchText);
 
   const saveSearchItem = (result: FoodSearchResult) => {
     const qty = quantities[result.id] ?? 100;
@@ -587,13 +580,10 @@ export default function LogScreen() {
                   <Text style={styles.emptyText}>Ainda não tens refeições guardadas</Text>
                 </View>
               ) : (
-                <FlatList
-                  data={savedMealsStore.meals}
-                  keyExtractor={(item) => item.id}
-                  scrollEnabled={false}
-                  contentContainerStyle={{ gap: Spacing.sm }}
-                  renderItem={({ item: savedMeal }) => (
+                <View style={{ gap: Spacing.sm }}>
+                  {savedMealsStore.meals.map((savedMeal) => (
                     <TouchableOpacity
+                      key={savedMeal.id}
                       activeOpacity={0.8}
                       onLongPress={() => confirmDeleteMeal(savedMeal)}
                       style={styles.savedCard}
@@ -629,8 +619,8 @@ export default function LogScreen() {
                         <Text style={styles.addPillBtnTxt}>Adicionar</Text>
                       </TouchableOpacity>
                     </TouchableOpacity>
-                  )}
-                />
+                  ))}
+                </View>
               )}
             </View>
           )}

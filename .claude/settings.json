@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx expo:*)",
+      "Skill(claude-api)",
+      "Skill(claude-api:*)",
+      "Bash(ls /c/Users/ricar/calTracker/*.js /c/Users/ricar/calTracker/*.json)",
+      "Bash(npx tsc:*)",
+      "Bash(git config:*)",
+      "Bash(git commit:*)",
+      "Bash(npx create-expo-app@latest . --template blank-typescript --no-install)",
+      "Read(//c/Users/ricar/**)",
+      "Bash(npx create-expo-app@latest caltracker_temp --template blank-typescript --no-install)",
+      "Bash(node -e \":*)",
+      "Bash(grep -l dangerouslyAllowBrowser /c/Users/ricar/calTracker/node_modules/@anthropic-ai/sdk/*.d.ts)",
+      "Bash(ls \"/c/Users/ricar/calTracker/app/\\(tabs\\)/\")",
+      "Bash(ls /c/Users/ricar/calTracker/app/\\\\\\(tabs\\\\\\)/)",
+      "Bash(node -e \"const p = require\\(''/c/Users/ricar/calTracker/package.json''\\); console.log\\(''expo:'', p.dependencies.expo\\); console.log\\(''expo-router:'', p.dependencies[''expo-router'']\\); console.log\\(''react-native:'', p.dependencies[''react-native'']\\); console.log\\(''react:'', p.dependencies[''react'']\\);\")",
+      "Bash(git add:*)",
+      "Bash(node -e \"console.log\\(require\\(''./node_modules/expo/package.json''\\).version\\)\")",
+      "Bash(node -e \"console.log\\(require\\(''./node_modules/react-native/package.json''\\).version\\)\")",
+      "Bash(node -e \"console.log\\(require\\(''./node_modules/expo-router/package.json''\\).version\\)\")",
+      "Bash(git rm:*)",
+      "Read(//tmp/**)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\ricar\\calTracker\\app",
+      "C:\\Users\\ricar\\caltracker_temp"
+    ]
+  }
+}

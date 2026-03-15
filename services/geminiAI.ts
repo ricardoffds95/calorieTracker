@@ -19,13 +19,11 @@ function parseGeminiResponse(text: string): GeminiParsedItem[] {
   return JSON.parse(clean) as GeminiParsedItem[];
 }
 
-export async function parseFoodWithAI(input: string): Promise<GeminiParsedItem[]> {
+async function callGemini(contents: unknown): Promise<GeminiParsedItem[]> {
   const response = await fetch(GEMINI_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: SYSTEM_PROMPT + '\n\n' + input }] }],
-    }),
+    body: JSON.stringify({ contents }),
   });
   if (!response.ok) throw new Error(`Gemini API error: ${response.status}`);
   const data = await response.json();
@@ -33,21 +31,15 @@ export async function parseFoodWithAI(input: string): Promise<GeminiParsedItem[]
   return parseGeminiResponse(text);
 }
 
-export async function analyzeFoodImage(base64Image: string): Promise<GeminiParsedItem[]> {
-  const response = await fetch(GEMINI_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{
-        parts: [
-          { text: SYSTEM_PROMPT },
-          { inline_data: { mime_type: 'image/jpeg', data: base64Image } },
-        ],
-      }],
-    }),
-  });
-  if (!response.ok) throw new Error(`Gemini API error: ${response.status}`);
-  const data = await response.json();
-  const text = data.candidates[0].content.parts[0].text as string;
-  return parseGeminiResponse(text);
+export function parseFoodWithAI(input: string): Promise<GeminiParsedItem[]> {
+  return callGemini([{ parts: [{ text: SYSTEM_PROMPT + '\n\n' + input }] }]);
+}
+
+export function analyzeFoodImage(base64Image: string): Promise<GeminiParsedItem[]> {
+  return callGemini([{
+    parts: [
+      { text: SYSTEM_PROMPT },
+      { inline_data: { mime_type: 'image/jpeg', data: base64Image } },
+    ],
+  }]);
 }

@@ -37,14 +37,23 @@ export const useSavedMealsStore = create<SavedMealsState>((set, get) => ({
   meals: [],
 
   saveMeal: async (name, items) => {
+    const totals = items.reduce(
+      (acc, i) => ({
+        calories: acc.calories + i.calories,
+        protein: acc.protein + i.protein_g,
+        carbs: acc.carbs + i.carbs_g,
+        fat: acc.fat + i.fat_g,
+      }),
+      { calories: 0, protein: 0, carbs: 0, fat: 0 }
+    );
     const meal: SavedMeal = {
       id: Date.now().toString(),
       name,
       items,
-      totalCalories: items.reduce((s, i) => s + i.calories, 0),
-      totalProtein: items.reduce((s, i) => s + i.protein_g, 0),
-      totalCarbs: items.reduce((s, i) => s + i.carbs_g, 0),
-      totalFat: items.reduce((s, i) => s + i.fat_g, 0),
+      totalCalories: totals.calories,
+      totalProtein: totals.protein,
+      totalCarbs: totals.carbs,
+      totalFat: totals.fat,
       createdAt: new Date().toISOString(),
       timesUsed: 0,
     };
@@ -60,6 +69,7 @@ export const useSavedMealsStore = create<SavedMealsState>((set, get) => ({
   },
 
   incrementUsage: async (id) => {
+    if (!get().meals.some((m) => m.id === id)) return;
     const meals = get().meals.map((m) =>
       m.id === id ? { ...m, timesUsed: m.timesUsed + 1 } : m
     );
