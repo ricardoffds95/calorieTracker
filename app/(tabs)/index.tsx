@@ -10,7 +10,7 @@ import MacroRing from '../../components/MacroRing';
 import DailySummary from '../../components/DailySummary';
 import MealSection from '../../components/MealSection';
 import { Colors, Typography, FontWeight, Spacing, Radius, Shadow } from '../../constants/theme';
-import { MealType } from '../../store/foodStore';
+import { MealType, useFoodStore } from '../../store/foodStore';
 import { useRouter } from 'expo-router';
 
 const MEALS: MealType[] = ['breakfast', 'lunch', 'dinner', 'snacks'];
@@ -20,6 +20,8 @@ export default function DashboardScreen() {
   const router = useRouter();
   const { getTodayTotals, getTodayMeals, removeFood } = useFood();
   const { goals, name } = useDailyGoals();
+  // Subscribe directly to logs so MacroRing/charts re-render after edits
+  useFoodStore(s => s.logs);
   const totals = getTodayTotals();
   const meals = getTodayMeals();
 
