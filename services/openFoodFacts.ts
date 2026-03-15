@@ -109,9 +109,7 @@ export async function searchFood(query: string): Promise<{ results: FoodSearchRe
   const encoded = encodeURIComponent(normalized);
   const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encoded}&search_simple=1&action=process&json=1&fields=code,product_name,product_name_pt,product_name_en,brands,nutriments,serving_size&lc=pt&page_size=20`;
 
-  const response = await fetch(url, {
-    headers: { 'User-Agent': 'CalTracker/1.0 (caltracker@example.com)' },
-  });
+  const response = await fetch(url);
 
   if (!response.ok) {
     throw new Error(`Erro ao procurar alimento: ${response.status}`);
@@ -132,7 +130,7 @@ export async function searchFood(query: string): Promise<{ results: FoodSearchRe
 
 export async function searchByBarcode(barcode: string, type?: string): Promise<FoodSearchResult | null> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 6000);
+  const timeout = setTimeout(() => controller.abort(), 12000);
 
   try {
     let lookup = barcode;
@@ -148,12 +146,9 @@ export async function searchByBarcode(barcode: string, type?: string): Promise<F
       }
     }
 
-    const url = `https://world.openfoodfacts.org/api/v2/product/${lookup}?fields=product_name,product_name_pt,product_name_en,product_name_es,product_name_fr,brands,nutriments,serving_size&lc=pt`;
+    const url = `https://world.openfoodfacts.org/api/v0/product/${lookup}.json`;
 
-    const res = await fetch(url, {
-      signal: controller.signal,
-      headers: { 'User-Agent': 'CalTracker/1.0 (caltracker@example.com)' },
-    });
+    const res = await fetch(url, { signal: controller.signal });
     clearTimeout(timeout);
 
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -171,7 +166,7 @@ export async function searchByBarcode(barcode: string, type?: string): Promise<F
   } catch (error: unknown) {
     clearTimeout(timeout);
     if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('Ligação lenta. Tenta novamente.');
+      throw new Error('Produto não encontrado. Tenta pesquisar pelo nome.');
     }
     throw error;
   }
