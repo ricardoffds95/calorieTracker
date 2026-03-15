@@ -18,8 +18,22 @@ export interface GeminiParsedItem {
 }
 
 function parseGeminiResponse(text: string): GeminiParsedItem[] {
-  const clean = text.replace(/```json\n?|```\n?/g, '').trim();
-  return JSON.parse(clean) as GeminiParsedItem[];
+  // Strip markdown fences then find the JSON array boundaries
+  let clean = text.replace(/```json\n?|```\n?/g, '').trim();
+  const start = clean.indexOf('[');
+  const end = clean.lastIndexOf(']');
+  if (start !== -1 && end !== -1 && end > start) {
+    clean = clean.slice(start, end + 1);
+  }
+  try {
+    const parsed = JSON.parse(clean);
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      throw new Error('empty');
+    }
+    return parsed as GeminiParsedItem[];
+  } catch {
+    throw new Error('Não foi possível interpretar a resposta. Tenta descrever os alimentos de forma mais simples.');
+  }
 }
 
 async function fetchWithTimeout(url: string, options: RequestInit, ms = 8000): Promise<Response> {
@@ -59,7 +73,7 @@ export async function parseFoodWithAI(input: string): Promise<GeminiParsedItem[]
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       contents: [{ parts: [{ text: TEXT_PROMPT + '\nInput: ' + input }] }],
-      generationConfig: { maxOutputTokens: 200, temperature: 0.1, topP: 0.8, topK: 10 },
+      generationConfig: { maxOutputTokens: 512, temperature: 0.1, topP: 0.8, topK: 10 },
     }),
   });
   if (!response.ok) {
@@ -81,7 +95,7 @@ export async function analyzeFoodImage(base64Image: string): Promise<GeminiParse
           { inline_data: { mime_type: 'image/jpeg', data: base64Image } },
         ],
       }],
-      generationConfig: { maxOutputTokens: 300, temperature: 0.1, topP: 0.8, topK: 10 },
+      generationConfig: { maxOutputTokens: 600, temperature: 0.1, topP: 0.8, topK: 10 },
     }),
   });
   if (!response.ok) {
