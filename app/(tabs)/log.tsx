@@ -198,27 +198,50 @@ function MacroPreviewCard({ calories, protein, carbs, fat }: { calories: number;
 
 // ─── Barcode validation ───────────────────────────────────────────────────────
 
-const REQUIRED_CONSISTENT_SCANS = 3;
+const CHECKSUM_TYPES = ['ean13', 'ean8', 'upc_a'];
 
 function validateEAN13(barcode: string): boolean {
-  if (barcode.length !== 13) return false;
   let sum = 0;
   for (let i = 0; i < 12; i++) {
     const digit = parseInt(barcode[i]);
     sum += i % 2 === 0 ? digit : digit * 3;
   }
-  const checkDigit = (10 - (sum % 10)) % 10;
-  return checkDigit === parseInt(barcode[12]);
+  return (10 - (sum % 10)) % 10 === parseInt(barcode[12]);
+}
+
+function validateEAN8(barcode: string): boolean {
+  let sum = 0;
+  for (let i = 0; i < 7; i++) {
+    const digit = parseInt(barcode[i]);
+    sum += i % 2 === 0 ? digit * 3 : digit;
+  }
+  return (10 - (sum % 10)) % 10 === parseInt(barcode[7]);
+}
+
+function validateUPCA(barcode: string): boolean {
+  let sum = 0;
+  for (let i = 0; i < 11; i++) {
+    const digit = parseInt(barcode[i]);
+    sum += i % 2 === 0 ? digit * 3 : digit;
+  }
+  return (10 - (sum % 10)) % 10 === parseInt(barcode[11]);
 }
 
 function isValidBarcode(data: string, type: string): boolean {
+  if (!data || data.trim().length === 0) return false;
   const onlyDigits = /^\d+$/.test(data);
-  if (type === 'ean13') return onlyDigits && data.length === 13 && validateEAN13(data);
-  if (type === 'ean8') return onlyDigits && data.length === 8;
-  if (type === 'upc_a') return onlyDigits && data.length === 12;
-  if (type === 'upc_e') return onlyDigits && data.length >= 6 && data.length <= 8;
-  if (type === 'code128' || type === 'code39') return data.length >= 4;
-  return false;
+  switch (type) {
+    case 'ean13':    return onlyDigits && data.length === 13 && validateEAN13(data);
+    case 'ean8':     return onlyDigits && data.length === 8 && validateEAN8(data);
+    case 'upc_a':    return onlyDigits && data.length === 12 && validateUPCA(data);
+    case 'upc_e':    return onlyDigits && data.length >= 6 && data.length <= 8;
+    case 'code128':  return data.length >= 1 && data.length <= 48;
+    case 'code39':   return /^[A-Z0-9\-\. $\/\+%]+$/.test(data) && data.length >= 1;
+    case 'itf14':    return onlyDigits && data.length === 14;
+    case 'codabar':  return data.length >= 4;
+    case 'datamatrix': case 'pdf417': case 'aztec': case 'qr': return data.length >= 1;
+    default:         return data.length >= 4;
+  }
 }
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
@@ -335,6 +358,10 @@ export default function LogScreen() {
       setScanConfidence(0);
       setScanned(false);
       setIsProcessing(false);
+      // Pre-warm API connection
+      fetch('https://world.openfoodfacts.org/api/v2/product/5449000000996.json?fields=product_name', {
+        headers: { 'User-Agent': 'CalTracker/1.0 (caltracker@example.com)' },
+      }).catch(() => {});
       const anim = Animated.loop(
         Animated.sequence([
           Animated.timing(scanLineAnim, { toValue: 1, duration: 1800, useNativeDriver: true }),
@@ -471,16 +498,17 @@ export default function LogScreen() {
     setScannerVisible(true);
   };
 
-  const lookupBarcode = useCallback(async (data: string) => {
-    setScannerVisible(false);
+  const lookupBarcode = useCallback(async (data: string, type?: string) => {
+    // Keep scanner open showing "isProcessing" state while API responds
     try {
-      const food = await searchByBarcode(data);
+      const food = await searchByBarcode(data, type);
       if (food) { setSearchResults([food]); setFromCache(false); setBarcodeError(null); }
       else { setSearchResults([]); setBarcodeError('Produto não encontrado. Tenta pesquisar pelo nome.'); }
-    } catch {
-      setBarcodeError('Erro ao procurar produto.');
+    } catch (e: unknown) {
+      setBarcodeError(e instanceof Error ? e.message : 'Erro ao procurar produto.');
     } finally {
       setIsProcessing(false);
+      setScannerVisible(false);
     }
   }, []);
 
@@ -488,43 +516,51 @@ export default function LogScreen() {
     if (scanned || isProcessing) return;
     if (!isValidBarcode(data, type)) return;
 
-    scanBuffer.current.push(data);
-    if (scanBuffer.current.length > 5) scanBuffer.current = scanBuffer.current.slice(-5);
-
-    const count = scanBuffer.current.filter(b => b === data).length;
-    if (count < REQUIRED_CONSISTENT_SCANS) {
-      setScanConfidence(count);
+    // Checksum-validated types → trust on first valid read
+    if (CHECKSUM_TYPES.includes(type)) {
+      scanBuffer.current = [];
+      setScanned(true);
+      setIsProcessing(true);
+      setScanConfidence(3);
+      await lookupBarcode(data, type);
       return;
     }
+
+    // Other types → require 2 consistent reads
+    scanBuffer.current.push(data);
+    if (scanBuffer.current.length > 3) scanBuffer.current = scanBuffer.current.slice(-3);
+
+    const count = scanBuffer.current.filter(b => b === data).length;
+    setScanConfidence(count);
+    if (count < 2) return;
 
     scanBuffer.current = [];
     setScanned(true);
     setIsProcessing(true);
-    await lookupBarcode(data);
+    await lookupBarcode(data, type);
   }, [scanned, isProcessing, lookupBarcode]);
 
   const handleManualEntry = () => {
     if (Platform.OS === 'ios') {
       Alert.prompt(
         'Código de barras',
-        'Introduz o código manualmente',
+        'Introduz o código do produto',
         [
           { text: 'Cancelar', style: 'cancel' },
           {
             text: 'Pesquisar',
-            onPress: async (barcode?: string) => {
-              if (barcode && barcode.trim().length >= 8) {
-                setScannerVisible(false);
+            onPress: async (value?: string) => {
+              if (value && value.trim().length >= 4) {
                 setScanned(true);
                 setIsProcessing(true);
-                await lookupBarcode(barcode.trim());
+                await lookupBarcode(value.trim(), 'manual');
               }
             },
           },
         ],
         'plain-text',
         '',
-        'numeric'
+        'default'
       );
     } else {
       setScannerVisible(false);
@@ -1085,31 +1121,48 @@ export default function LogScreen() {
       {/* Barcode Scanner Modal */}
       <Modal visible={scannerVisible} transparent={false} animationType="slide" onRequestClose={() => setScannerVisible(false)}>
         <View style={scanStyles.container}>
-          <CameraView style={StyleSheet.absoluteFill} facing="back" enableTorch={torchEnabled} onBarcodeScanned={handleBarcodeScan} barcodeScannerSettings={{ barcodeTypes: ['ean13', 'ean8'] }} />
+          <CameraView
+            style={StyleSheet.absoluteFill}
+            facing="back"
+            enableTorch={torchEnabled}
+            onBarcodeScanned={scanned ? undefined : handleBarcodeScan}
+            barcodeScannerSettings={{
+              barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e', 'code128', 'code39', 'itf14', 'codabar', 'datamatrix', 'pdf417', 'aztec', 'qr'],
+            }}
+          />
           <View style={scanStyles.overlay}>
             <View style={scanStyles.overlayTop} />
             <View style={scanStyles.overlayMiddle}>
               <View style={scanStyles.overlaySide} />
               <View style={scanStyles.frame}>
-                <View style={[scanStyles.corner, scanStyles.cornerTL]} />
-                <View style={[scanStyles.corner, scanStyles.cornerTR]} />
-                <View style={[scanStyles.corner, scanStyles.cornerBL]} />
-                <View style={[scanStyles.corner, scanStyles.cornerBR]} />
+                <View style={[scanStyles.corner, scanStyles.cornerTL, isProcessing && { borderColor: '#4CAF50' }]} />
+                <View style={[scanStyles.corner, scanStyles.cornerTR, isProcessing && { borderColor: '#4CAF50' }]} />
+                <View style={[scanStyles.corner, scanStyles.cornerBL, isProcessing && { borderColor: '#4CAF50' }]} />
+                <View style={[scanStyles.corner, scanStyles.cornerBR, isProcessing && { borderColor: '#4CAF50' }]} />
                 <Animated.View style={[scanStyles.scanLine, { transform: [{ translateY: scanLineAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 240] }) }] }]} />
               </View>
               <View style={scanStyles.overlaySide} />
             </View>
             <View style={scanStyles.overlayBottom}>
-              <Text style={scanStyles.hint}>Aponta para o código de barras</Text>
-              <View style={{ flexDirection: 'row', gap: 8, marginTop: 16 }}>
-                {[1, 2, 3].map(i => (
-                  <View key={i} style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: i <= scanConfidence ? Colors.primary : 'rgba(255,255,255,0.3)' }} />
-                ))}
-              </View>
-              <TouchableOpacity onPress={handleManualEntry} style={{ marginTop: 24, flexDirection: 'row', alignItems: 'center', gap: 8 }} activeOpacity={0.7}>
-                <Feather name="edit-3" size={14} color="rgba(255,255,255,0.6)" />
-                <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13 }}>Introduzir código manualmente</Text>
-              </TouchableOpacity>
+              {isProcessing ? (
+                <View style={{ alignItems: 'center', gap: 10 }}>
+                  <ActivityIndicator color="#4CAF50" size="small" />
+                  <Text style={[scanStyles.hint, { color: '#4CAF50' }]}>Código lido! A pesquisar...</Text>
+                </View>
+              ) : (
+                <>
+                  <Text style={scanStyles.hint}>Aponta para o código de barras</Text>
+                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 16 }}>
+                    {[1, 2, 3].map(i => (
+                      <View key={i} style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: i <= scanConfidence ? Colors.primary : 'rgba(255,255,255,0.3)' }} />
+                    ))}
+                  </View>
+                  <TouchableOpacity onPress={handleManualEntry} style={{ marginTop: 24, flexDirection: 'row', alignItems: 'center', gap: 8 }} activeOpacity={0.7}>
+                    <Feather name="edit-3" size={14} color="rgba(255,255,255,0.6)" />
+                    <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13 }}>Introduzir código manualmente</Text>
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
           </View>
           <View style={[scanStyles.topBar, { paddingTop: insets.top + 8 }]}>

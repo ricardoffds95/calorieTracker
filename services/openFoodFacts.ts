@@ -16,6 +16,8 @@ interface OFFProduct {
   product_name?: string;
   product_name_pt?: string;
   product_name_en?: string;
+  product_name_es?: string;
+  product_name_fr?: string;
   brands?: string;
   serving_size?: string;
   nutriments?: Record<string, number>;
@@ -56,11 +58,18 @@ async function setCache(store: CacheStore): Promise<void> {
 
 export function mapProduct(p: any): FoodSearchResult {
   const nutriments = p.nutriments || {};
-  const name = p.product_name || p.product_name_pt || p.product_name_en || '';
+  const name = (
+    p.product_name_pt ||
+    p.product_name_en ||
+    p.product_name_es ||
+    p.product_name_fr ||
+    p.product_name ||
+    ''
+  ).trim();
 
   const kcal = nutriments['energy-kcal_100g']
     ?? nutriments['energy-kcal']
-    ?? (nutriments['energy_100g'] ? nutriments['energy_100g'] / 4.184 : 0);
+    ?? (nutriments['energy_100g'] ? Math.round(nutriments['energy_100g'] / 4.184) : 0);
 
   const protein = nutriments['proteins_100g']
     ?? nutriments['protein_100g']
@@ -121,21 +130,50 @@ export async function searchFood(query: string): Promise<{ results: FoodSearchRe
   return { results, fromCache: false };
 }
 
-export async function searchByBarcode(barcode: string): Promise<FoodSearchResult | null> {
+export async function searchByBarcode(barcode: string, type?: string): Promise<FoodSearchResult | null> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 6000);
+
   try {
-    const url = `https://world.openfoodfacts.org/api/v0/product/${barcode}.json`;
+    let lookup = barcode;
+
+    // For QR codes, try to extract a numeric product barcode
+    if (type === 'qr') {
+      const numberMatch = barcode.match(/\d{8,14}/);
+      if (numberMatch) {
+        lookup = numberMatch[0];
+      } else {
+        clearTimeout(timeout);
+        return null;
+      }
+    }
+
+    const url = `https://world.openfoodfacts.org/api/v2/product/${lookup}?fields=product_name,product_name_pt,product_name_en,product_name_es,product_name_fr,brands,nutriments,serving_size&lc=pt`;
+
     const res = await fetch(url, {
+      signal: controller.signal,
       headers: { 'User-Agent': 'CalTracker/1.0 (caltracker@example.com)' },
     });
+    clearTimeout(timeout);
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
     const data = await res.json();
+
     if (data.status === 1 && data.product) {
-      const mapped = mapProduct(data.product);
+      const product = { ...data.product, code: lookup };
+      const mapped = mapProduct(product);
       if (!mapped.name.trim()) return null;
+      if (mapped.calories_100g === 0 && mapped.protein_100g === 0 && mapped.carbs_100g === 0) return null;
       return mapped;
     }
     return null;
-  } catch {
-    return null;
+  } catch (error: unknown) {
+    clearTimeout(timeout);
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Ligação lenta. Tenta novamente.');
+    }
+    throw error;
   }
 }
 
