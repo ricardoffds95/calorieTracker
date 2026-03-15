@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,7 +10,7 @@ import MacroRing from '../../components/MacroRing';
 import DailySummary from '../../components/DailySummary';
 import MealSection from '../../components/MealSection';
 import { Colors, Typography, FontWeight, Spacing, Radius, Shadow } from '../../constants/theme';
-import { MealType, useFoodStore } from '../../store/foodStore';
+import { MealType, DiaryEntry, useFoodStore } from '../../store/foodStore';
 import { useRouter } from 'expo-router';
 
 const MEALS: MealType[] = ['breakfast', 'lunch', 'dinner', 'snacks'];
@@ -18,12 +18,21 @@ const MEALS: MealType[] = ['breakfast', 'lunch', 'dinner', 'snacks'];
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { getTodayTotals, getTodayMeals, removeFood } = useFood();
+  const { removeFood } = useFood();
   const { goals, name } = useDailyGoals();
-  // Subscribe directly to logs so MacroRing/charts re-render after edits
-  useFoodStore(s => s.logs);
-  const totals = getTodayTotals();
-  const meals = getTodayMeals();
+  const todayISO = format(new Date(), 'yyyy-MM-dd');
+  const todayLog = useFoodStore(s => s.logs[todayISO]);
+  const meals = useMemo(
+    () => todayLog?.meals ?? { breakfast: [], lunch: [], dinner: [], snacks: [] } as Record<MealType, DiaryEntry[]>,
+    [todayLog]
+  );
+  const totals = useMemo(() => {
+    const all = (Object.values(meals) as DiaryEntry[][]).flat();
+    return all.reduce((acc, e) => e.type === 'meal'
+      ? { calories: acc.calories + e.totalCalories, protein: acc.protein + e.totalProtein, carbs: acc.carbs + e.totalCarbs, fat: acc.fat + e.totalFat }
+      : { calories: acc.calories + e.calories, protein: acc.protein + e.protein_g, carbs: acc.carbs + e.carbs_g, fat: acc.fat + e.fat_g },
+      { calories: 0, protein: 0, carbs: 0, fat: 0 });
+  }, [todayLog]);
 
   const fabAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim0 = useRef(new Animated.Value(0)).current;
@@ -41,7 +50,7 @@ export default function DashboardScreen() {
     ]).start();
   }, []);
 
-  const today = format(new Date(), "EEEE, d 'de' MMMM", { locale: ptBR });
+  const todayISODisplay = format(new Date(), "EEEE, d 'de' MMMM", { locale: ptBR });
   const greeting = name ? `Olá, ${name}` : 'Olá';
 
   return (
@@ -50,7 +59,7 @@ export default function DashboardScreen() {
         {/* Header */}
         <Animated.View style={{ opacity: fadeAnim0 }}>
           <Text style={styles.greeting}>{greeting}</Text>
-          <Text style={styles.date}>{today}</Text>
+          <Text style={styles.date}>{todayISODisplay}</Text>
           <Text style={styles.title}>Hoje</Text>
         </Animated.View>
 
@@ -78,7 +87,6 @@ export default function DashboardScreen() {
         <Animated.View style={{ opacity: fadeAnim3 }}>
           <Text style={styles.sectionTitle}>Refeições</Text>
           {MEALS.map(meal => {
-            const today = format(new Date(), 'yyyy-MM-dd');
             const items = meals[meal];
             const mealCalories = items.reduce((sum, entry) => sum + (entry.type === 'meal' ? entry.totalCalories : entry.calories), 0);
             return (
@@ -87,9 +95,9 @@ export default function DashboardScreen() {
                 meal={meal}
                 items={items}
                 totalCalories={mealCalories}
-                date={today}
+                date={todayISO}
                 onAddFood={() => router.push({ pathname: '/(tabs)/log', params: { mealContext: meal, timestamp: Date.now().toString() } })}
-                onRemoveFood={(id) => removeFood(id, today)}
+                onRemoveFood={(id) => removeFood(id, todayISO)}
               />
             );
           })}
