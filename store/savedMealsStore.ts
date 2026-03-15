@@ -44,6 +44,8 @@ interface SavedMealsState {
   saveFood: (food: Omit<SavedFood, 'id' | 'createdAt' | 'timesUsed'>) => Promise<{ duplicate: boolean }>;
   replaceMeal: (id: string, name: string, items: SavedMealItem[]) => Promise<void>;
   renameMeal: (id: string, newName: string) => Promise<void>;
+  editMeal: (id: string, updates: Partial<Pick<SavedMeal, 'name' | 'totalCalories' | 'totalProtein' | 'totalCarbs' | 'totalFat'>>) => Promise<void>;
+  editFood: (id: string, updates: Partial<Pick<SavedFood, 'name' | 'calories_100g' | 'protein_100g' | 'carbs_100g' | 'fat_100g'>>) => Promise<void>;
   deleteMeal: (id: string) => Promise<void>;
   deleteFood: (id: string) => Promise<void>;
   incrementUsage: (id: string) => Promise<void>;
@@ -129,6 +131,18 @@ export const useSavedMealsStore = create<SavedMealsState>((set, get) => ({
       .sort((a, b) => b.timesUsed - a.timesUsed);
     set({ meals });
     await AsyncStorage.setItem(MEALS_KEY, JSON.stringify(meals));
+  },
+
+  editMeal: async (id, updates) => {
+    const meals = get().meals.map(m => m.id === id ? { ...m, ...updates } : m);
+    set({ meals });
+    await AsyncStorage.setItem(MEALS_KEY, JSON.stringify(meals));
+  },
+
+  editFood: async (id, updates) => {
+    const foods = get().foods.map(f => f.id === id ? { ...f, ...updates } : f);
+    set({ foods });
+    await AsyncStorage.setItem(FOODS_KEY, JSON.stringify(foods));
   },
 
   renameMeal: async (id, newName) => {

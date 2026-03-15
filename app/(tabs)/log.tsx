@@ -434,6 +434,10 @@ export default function LogScreen() {
   const [renamingMealId, setRenamingMealId] = useState<string | null>(null);
   const [renameText, setRenameText] = useState('');
 
+  // ── Saved edit modal ─────────────────────────────────────────────────────
+  type SavedEditState = { kind: 'meal' | 'food'; id: string; name: string; calories: string; protein: string; carbs: string; fat: string } | null;
+  const [savedEdit, setSavedEdit] = useState<SavedEditState>(null);
+
   // ── Scanner animation ─────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -711,6 +715,33 @@ export default function LogScreen() {
     if (!renameText.trim() || !renamingMealId) return;
     await savedStore.renameMeal(renamingMealId, renameText.trim());
     setRenamingMealId(null);
+  };
+
+  const openSavedMealEdit = (m: SavedMeal) => setSavedEdit({
+    kind: 'meal', id: m.id, name: m.name,
+    calories: String(m.totalCalories), protein: String(m.totalProtein),
+    carbs: String(m.totalCarbs), fat: String(m.totalFat),
+  });
+
+  const openSavedFoodEdit = (f: SavedFood) => setSavedEdit({
+    kind: 'food', id: f.id, name: f.name,
+    calories: String(f.calories_100g), protein: String(f.protein_100g),
+    carbs: String(f.carbs_100g), fat: String(f.fat_100g),
+  });
+
+  const confirmSavedEdit = async () => {
+    if (!savedEdit || !savedEdit.name.trim()) return;
+    const cal = parseFloat(savedEdit.calories) || 0;
+    const prot = parseFloat(savedEdit.protein) || 0;
+    const carb = parseFloat(savedEdit.carbs) || 0;
+    const fat = parseFloat(savedEdit.fat) || 0;
+    if (savedEdit.kind === 'meal') {
+      await savedStore.editMeal(savedEdit.id, { name: savedEdit.name.trim(), totalCalories: cal, totalProtein: prot, totalCarbs: carb, totalFat: fat });
+    } else {
+      await savedStore.editFood(savedEdit.id, { name: savedEdit.name.trim(), calories_100g: cal, protein_100g: prot, carbs_100g: carb, fat_100g: fat });
+    }
+    setSavedEdit(null);
+    showToast('Guardado!');
   };
 
   const confirmDeleteFood = (food: SavedFood) => {
@@ -1131,6 +1162,9 @@ export default function LogScreen() {
                           </View>
                         </View>
                         <View style={styles.savedCardActions}>
+                          <TouchableOpacity onPress={() => openSavedMealEdit(savedMeal)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ marginBottom: 6 }}>
+                            <Feather name="edit-2" size={15} color={Colors.textDisabled} />
+                          </TouchableOpacity>
                           <TouchableOpacity onPress={() => confirmDeleteMeal(savedMeal)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ marginBottom: 6 }}>
                             <Feather name="trash-2" size={16} color={Colors.textDisabled} />
                           </TouchableOpacity>
@@ -1175,6 +1209,9 @@ export default function LogScreen() {
                           </View>
                         </View>
                         <View style={styles.savedCardActions}>
+                          <TouchableOpacity onPress={() => openSavedFoodEdit(food)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ marginBottom: 6 }}>
+                            <Feather name="edit-2" size={15} color={Colors.textDisabled} />
+                          </TouchableOpacity>
                           <TouchableOpacity onPress={() => confirmDeleteFood(food)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ marginBottom: 6 }}>
                             <Feather name="trash-2" size={16} color={Colors.textDisabled} />
                           </TouchableOpacity>
@@ -1245,6 +1282,47 @@ export default function LogScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Saved Edit Modal */}
+      {savedEdit && (
+        <Modal visible transparent animationType="fade" onRequestClose={() => setSavedEdit(null)}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalBox}>
+              <Text style={styles.modalTitle}>Editar {savedEdit.kind === 'meal' ? 'refeição' : 'alimento'}</Text>
+              <Text style={styles.manualLabel}>Nome</Text>
+              <TextInput style={styles.manualInput} value={savedEdit.name} onChangeText={v => setSavedEdit(s => s && ({ ...s, name: v }))} autoFocus />
+              <View style={styles.manualRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.manualLabel}>{savedEdit.kind === 'food' ? 'kcal / 100g' : 'Calorias (kcal)'}</Text>
+                  <TextInput style={styles.manualInput} keyboardType="numeric" value={savedEdit.calories} onChangeText={v => setSavedEdit(s => s && ({ ...s, calories: v }))} />
+                </View>
+              </View>
+              <View style={styles.manualRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.manualLabel}>{savedEdit.kind === 'food' ? 'Proteína/100g' : 'Proteína (g)'}</Text>
+                  <TextInput style={styles.manualInput} keyboardType="numeric" value={savedEdit.protein} onChangeText={v => setSavedEdit(s => s && ({ ...s, protein: v }))} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.manualLabel}>{savedEdit.kind === 'food' ? 'Hidratos/100g' : 'Hidratos (g)'}</Text>
+                  <TextInput style={styles.manualInput} keyboardType="numeric" value={savedEdit.carbs} onChangeText={v => setSavedEdit(s => s && ({ ...s, carbs: v }))} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.manualLabel}>{savedEdit.kind === 'food' ? 'Gordura/100g' : 'Gordura (g)'}</Text>
+                  <TextInput style={styles.manualInput} keyboardType="numeric" value={savedEdit.fat} onChangeText={v => setSavedEdit(s => s && ({ ...s, fat: v }))} />
+                </View>
+              </View>
+              <View style={styles.modalButtons}>
+                <TouchableOpacity style={[styles.modalBtn, styles.modalBtnCancel]} onPress={() => setSavedEdit(null)} activeOpacity={0.7}>
+                  <Text style={styles.modalBtnCancelTxt}>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.modalBtn, styles.modalBtnConfirm, !savedEdit.name.trim() && { opacity: 0.4 }]} onPress={confirmSavedEdit} activeOpacity={0.7} disabled={!savedEdit.name.trim()}>
+                  <Text style={styles.modalBtnConfirmTxt}>Guardar</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
 
       {/* Barcode Scanner Modal */}
       <Modal visible={scannerVisible} transparent={false} animationType="slide" onRequestClose={() => setScannerVisible(false)}>
