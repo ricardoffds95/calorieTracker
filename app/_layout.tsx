@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts, DMSans_400Regular, DMSans_500Medium, DMSans_600SemiBold, DMSans_700Bold } from '@expo-google-fonts/dm-sans';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFoodStore } from '../store/foodStore';
@@ -27,10 +28,10 @@ export default function RootLayout() {
   if (!fontsLoaded) return null;
 
   return (
-    <>
+    <SafeAreaProvider>
       <AppInit />
       <StatusBar style="dark" />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#FFFFFF' } }} />
-    </>
+    </SafeAreaProvider>
   );
 }

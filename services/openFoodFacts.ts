@@ -121,6 +121,24 @@ export async function searchFood(query: string): Promise<{ results: FoodSearchRe
   return { results, fromCache: false };
 }
 
+export async function searchByBarcode(barcode: string): Promise<FoodSearchResult | null> {
+  try {
+    const url = `https://world.openfoodfacts.org/api/v0/product/${barcode}.json`;
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'CalTracker/1.0 (caltracker@example.com)' },
+    });
+    const data = await res.json();
+    if (data.status === 1 && data.product) {
+      const mapped = mapProduct(data.product);
+      if (!mapped.name.trim()) return null;
+      return mapped;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export function calculateNutrientsForQuantity(
   food: FoodSearchResult,
   quantity_g: number
