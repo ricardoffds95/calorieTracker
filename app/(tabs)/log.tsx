@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -202,21 +202,21 @@ export default function LogScreen() {
   const insets = useSafeAreaInsets();
   const { addFood } = useFood();
   const savedStore = useSavedMealsStore();
-  const params = useLocalSearchParams<{ mealContext?: string }>();
+  const params = useLocalSearchParams<{ mealContext?: string; timestamp?: string }>();
 
   // ── Meal context ────────────────────────────────────────────────────────
-  const [contextCleared, setContextCleared] = useState(false);
+  const [activeMeal, setActiveMeal] = useState<MealType | null>(null);
 
-  useFocusEffect(useCallback(() => {
-    setContextCleared(false);
-  }, []));
-
-  const activeMeal: MealType | null = useMemo(() => {
-    if (contextCleared) return null;
-    const p = params.mealContext;
-    if (p && VALID_MEAL_TYPES.includes(p as MealType)) return p as MealType;
-    return null;
-  }, [params.mealContext, contextCleared]);
+  useFocusEffect(
+    useCallback(() => {
+      const p = params.mealContext;
+      if (p && VALID_MEAL_TYPES.includes(p as MealType)) {
+        setActiveMeal(p as MealType);
+      } else {
+        setActiveMeal(null);
+      }
+    }, [params.mealContext, params.timestamp])
+  );
 
   // ── Toast ────────────────────────────────────────────────────────────────
   const [toast, setToast] = useState({ visible: false, message: '', color: Colors.success });
@@ -604,28 +604,26 @@ export default function LogScreen() {
             <View style={styles.contextPill}>
               <Feather name={MEAL_ICONS[activeMeal]} size={14} color={Colors.primary} />
               <Text style={styles.contextPillTxt}>A adicionar ao {MEAL_DISPLAY[activeMeal]}</Text>
-              <TouchableOpacity onPress={() => setContextCleared(true)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <TouchableOpacity onPress={() => setActiveMeal(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <Feather name="x" size={14} color={Colors.primary} />
               </TouchableOpacity>
             </View>
           )}
 
           {/* Mode Toggle */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: Spacing.md }}>
-            <View style={styles.modeToggle}>
-              {([
-                { key: 'ai', icon: 'zap', label: 'IA' },
-                { key: 'search', icon: 'search', label: 'Pesquisar' },
-                { key: 'manual', icon: 'edit-3', label: 'Manual' },
-                { key: 'saved', icon: 'bookmark', label: 'Guardados' },
-              ] as { key: InputMode; icon: any; label: string }[]).map(({ key, icon, label }) => (
-                <TouchableOpacity key={key} style={[styles.modeBtn, mode === key && styles.modeBtnActive]} onPress={() => setMode(key)} activeOpacity={0.7}>
-                  <Feather name={icon} size={14} color={mode === key ? Colors.white : Colors.textSecondary} />
-                  <Text style={[styles.modeBtnTxt, mode === key && styles.modeBtnTxtActive]}>{label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </ScrollView>
+          <View style={styles.modeToggle}>
+            {([
+              { key: 'ai', icon: 'zap', label: 'IA' },
+              { key: 'search', icon: 'search', label: 'Pesquisar' },
+              { key: 'manual', icon: 'edit-3', label: 'Manual' },
+              { key: 'saved', icon: 'bookmark', label: 'Guardados' },
+            ] as { key: InputMode; icon: any; label: string }[]).map(({ key, icon, label }) => (
+              <TouchableOpacity key={key} style={[styles.modeBtn, mode === key && styles.modeBtnActive]} onPress={() => setMode(key)} activeOpacity={0.7}>
+                <Feather name={icon} size={14} color={mode === key ? Colors.white : Colors.textSecondary} />
+                <Text style={[styles.modeBtnTxt, mode === key && styles.modeBtnTxtActive]}>{label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
 
           {/* ── AI Tab ──────────────────────────────────────────────────── */}
           {mode === 'ai' && (
@@ -1111,8 +1109,8 @@ const styles = StyleSheet.create({
   title: { fontSize: Typography.xxl, color: Colors.textPrimary, fontWeight: FontWeight.bold, marginBottom: Spacing.sm },
   contextPill: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: Colors.primaryLight, borderRadius: Radius.pill, paddingHorizontal: Spacing.md, paddingVertical: 7, alignSelf: 'flex-start', marginBottom: Spacing.md, borderWidth: 1, borderColor: Colors.primary + '30' },
   contextPillTxt: { fontSize: Typography.sm, color: Colors.primary, fontWeight: FontWeight.semibold },
-  modeToggle: { flexDirection: 'row', backgroundColor: Colors.backgroundSubtle, borderRadius: Radius.lg, padding: 4, gap: 3, borderWidth: 1, borderColor: Colors.border },
-  modeBtn: { paddingVertical: Spacing.sm, paddingHorizontal: Spacing.sm + 2, borderRadius: Radius.md, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 4 },
+  modeToggle: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', alignSelf: 'center', backgroundColor: '#F0F4FF', borderRadius: 50, padding: 4, marginHorizontal: 16, marginVertical: 12 },
+  modeBtn: { flex: 1, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 50, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 4 },
   modeBtnActive: { backgroundColor: Colors.primary, ...Shadow.card },
   modeBtnTxt: { fontSize: Typography.xs, color: Colors.textSecondary, fontWeight: FontWeight.medium },
   modeBtnTxtActive: { color: Colors.white, fontWeight: FontWeight.bold },

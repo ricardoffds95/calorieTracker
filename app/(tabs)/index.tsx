@@ -84,7 +84,7 @@ export default function DashboardScreen() {
                 meal={meal}
                 items={items}
                 totalCalories={mealCalories}
-                onAddFood={() => router.push({ pathname: '/(tabs)/log', params: { mealContext: meal } })}
+                onAddFood={() => router.push({ pathname: '/(tabs)/log', params: { mealContext: meal, timestamp: Date.now().toString() } })}
                 onRemoveFood={(id) => removeFood(id, new Date().toISOString().split('T')[0])}
               />
             );

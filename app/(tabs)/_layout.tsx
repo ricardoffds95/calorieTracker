@@ -1,10 +1,11 @@
-import { Tabs } from 'expo-router';
+import { Tabs, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Typography, FontWeight } from '../../constants/theme';
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
 
   return (
     <Tabs
@@ -38,6 +39,11 @@ export default function TabLayout() {
         options={{
           title: 'Registar',
           tabBarIcon: ({ color }) => <Feather name="plus-circle" size={22} color={color} />,
+        }}
+        listeners={{
+          tabPress: () => {
+            router.navigate({ pathname: '/(tabs)/log', params: {} });
+          },
         }}
       />
       <Tabs.Screen
