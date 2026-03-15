@@ -1,131 +1,55 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, Animated, StyleSheet } from 'react-native';
-import { Colors, Typography, FontWeight, Spacing, Radius } from '../constants/theme';
-import { MacroColors } from '../constants/theme';
+import { View, Text, StyleSheet, Animated } from 'react-native';
+import { Colors, Typography, FontWeight, Spacing, Radius, Shadow, MacroColors } from '../constants/theme';
 
-interface MacroBarProps {
-  label: string;
-  current: number;
-  goal: number;
-  color: string;
-  unit?: string;
+interface DailySummaryProps {
+  calories: number; calorieGoal: number;
+  protein: number; proteinGoal: number;
+  carbs: number; carbsGoal: number;
+  fat: number; fatGoal: number;
 }
 
-function MacroBar({ label, current, goal, color, unit = 'g' }: MacroBarProps) {
+function Bar({ label, value, goal, color, unit }: { label: string; value: number; goal: number; color: string; unit: string }) {
   const anim = useRef(new Animated.Value(0)).current;
-  const pct = goal > 0 ? Math.min(current / goal, 1) : 0;
-
+  const pct = Math.min(value / Math.max(goal, 1), 1);
   useEffect(() => {
-    Animated.timing(anim, {
-      toValue: pct,
-      duration: 700,
-      useNativeDriver: false,
-    }).start();
+    Animated.timing(anim, { toValue: pct, duration: 800, useNativeDriver: false }).start();
   }, [pct]);
-
   const width = anim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
-
   return (
     <View style={styles.barRow}>
       <View style={styles.barHeader}>
         <Text style={styles.barLabel}>{label}</Text>
-        <Text style={styles.barValues}>
-          <Text style={{ color }}>{Math.round(current)}</Text>
-          <Text style={styles.barGoal}> / {goal}{unit}</Text>
-        </Text>
+        <Text style={styles.barValue}>{Math.round(value)}{unit} <Text style={styles.barGoal}>/ {goal}{unit}</Text></Text>
       </View>
       <View style={styles.track}>
-        <Animated.View
-          style={[
-            styles.fill,
-            {
-              width,
-              backgroundColor: color,
-              opacity: pct > 1.05 ? 1 : 0.85,
-            },
-          ]}
-        />
+        <Animated.View style={[styles.fill, { width, backgroundColor: color }]} />
       </View>
     </View>
   );
 }
 
-interface Props {
-  calories: number;
-  calorieGoal: number;
-  protein: number;
-  proteinGoal: number;
-  carbs: number;
-  carbsGoal: number;
-  fat: number;
-  fatGoal: number;
-}
-
-export function DailySummary({ calories, calorieGoal, protein, proteinGoal, carbs, carbsGoal, fat, fatGoal }: Props) {
+export default function DailySummary({ calories, calorieGoal, protein, proteinGoal, carbs, carbsGoal, fat, fatGoal }: DailySummaryProps) {
   return (
-    <View style={styles.container}>
-      <MacroBar
-        label="Proteína"
-        current={protein}
-        goal={proteinGoal}
-        color={MacroColors.protein}
-      />
-      <MacroBar
-        label="Hidratos"
-        current={carbs}
-        goal={carbsGoal}
-        color={MacroColors.carbs}
-      />
-      <MacroBar
-        label="Gordura"
-        current={fat}
-        goal={fatGoal}
-        color={MacroColors.fat}
-      />
-      <MacroBar
-        label="Calorias"
-        current={calories}
-        goal={calorieGoal}
-        color={MacroColors.calories}
-        unit=" kcal"
-      />
+    <View style={styles.card}>
+      <Bar label="Proteína" value={protein} goal={proteinGoal} color={MacroColors.protein} unit="g" />
+      <Bar label="Hidratos" value={carbs} goal={carbsGoal} color={MacroColors.carbs} unit="g" />
+      <Bar label="Gordura" value={fat} goal={fatGoal} color={MacroColors.fat} unit="g" />
+      <Bar label="Calorias" value={calories} goal={calorieGoal} color={Colors.textPrimary} unit="kcal" />
     </View>
   );
 }
 
+// Named export for backward compatibility
+export { DailySummary };
+
 const styles = StyleSheet.create({
-  container: {
-    gap: Spacing.sm,
-  },
-  barRow: {
-    gap: 4,
-  },
-  barHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  barLabel: {
-    fontSize: Typography.sm,
-    color: Colors.textMuted,
-    fontWeight: FontWeight.medium,
-  },
-  barValues: {
-    fontSize: Typography.sm,
-    color: Colors.text,
-  },
-  barGoal: {
-    color: Colors.textDisabled,
-    fontWeight: FontWeight.regular,
-  },
-  track: {
-    height: 6,
-    backgroundColor: Colors.surface2,
-    borderRadius: Radius.full,
-    overflow: 'hidden',
-  },
-  fill: {
-    height: '100%',
-    borderRadius: Radius.full,
-  },
+  card: { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.lg, borderWidth: 1, borderColor: Colors.border, ...Shadow.card, gap: Spacing.md },
+  barRow: { gap: 6 },
+  barHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  barLabel: { fontSize: Typography.sm, fontWeight: FontWeight.medium, color: Colors.textSecondary },
+  barValue: { fontSize: Typography.sm, fontWeight: FontWeight.semibold, color: Colors.textPrimary },
+  barGoal: { fontWeight: FontWeight.regular, color: Colors.textDisabled },
+  track: { height: 6, backgroundColor: Colors.border, borderRadius: 3, overflow: 'hidden' },
+  fill: { height: '100%', borderRadius: 3 },
 });

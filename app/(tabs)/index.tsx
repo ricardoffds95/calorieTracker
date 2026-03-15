@@ -1,228 +1,121 @@
-import React, { useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  Animated,
-  StyleSheet,
-  StatusBar,
-  SafeAreaView,
-} from 'react-native';
-import { useRouter } from 'expo-router';
+import React, { useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useFood } from '../../hooks/useFood';
 import { useDailyGoals } from '../../hooks/useDailyGoals';
-import { MacroRing } from '../../components/MacroRing';
-import { DailySummary } from '../../components/DailySummary';
-import { MealSection } from '../../components/MealSection';
+import MacroRing from '../../components/MacroRing';
+import DailySummary from '../../components/DailySummary';
+import MealSection from '../../components/MealSection';
 import { Colors, Typography, FontWeight, Spacing, Radius, Shadow } from '../../constants/theme';
 import { MealType } from '../../store/foodStore';
+import { useRouter } from 'expo-router';
 
 const MEALS: MealType[] = ['breakfast', 'lunch', 'dinner', 'snacks'];
 
 export default function DashboardScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { getTodayTotals, getTodayMeals, removeFood } = useFood();
-  const { name, goals } = useDailyGoals();
-
+  const { goals, name } = useDailyGoals();
   const totals = getTodayTotals();
   const meals = getTodayMeals();
 
-  const today = format(new Date(), "EEEE, d 'de' MMMM", { locale: ptBR });
-  const hour = new Date().getHours();
-  const greeting =
-    hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
-
-  // Staggered fade-in animations
-  const anims = useRef(
-    Array.from({ length: 5 }, () => new Animated.Value(0))
-  ).current;
+  const fabAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim0 = useRef(new Animated.Value(0)).current;
+  const fadeAnim1 = useRef(new Animated.Value(0)).current;
+  const fadeAnim2 = useRef(new Animated.Value(0)).current;
+  const fadeAnim3 = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    const animations = anims.map((anim, i) =>
-      Animated.timing(anim, {
-        toValue: 1,
-        duration: 400,
-        delay: i * 80,
-        useNativeDriver: true,
-      })
-    );
-    Animated.stagger(80, animations).start();
+    Animated.spring(fabAnim, { toValue: 1, friction: 5, tension: 60, useNativeDriver: true }).start();
+    Animated.stagger(80, [
+      Animated.timing(fadeAnim0, { toValue: 1, duration: 500, useNativeDriver: true }),
+      Animated.timing(fadeAnim1, { toValue: 1, duration: 500, useNativeDriver: true }),
+      Animated.timing(fadeAnim2, { toValue: 1, duration: 500, useNativeDriver: true }),
+      Animated.timing(fadeAnim3, { toValue: 1, duration: 500, useNativeDriver: true }),
+    ]).start();
   }, []);
 
-  const fabScale = useRef(new Animated.Value(1)).current;
-  const handleFabPress = () => {
-    Animated.sequence([
-      Animated.spring(fabScale, { toValue: 0.88, useNativeDriver: true }),
-      Animated.spring(fabScale, { toValue: 1, useNativeDriver: true }),
-    ]).start();
-    router.push('/(tabs)/log');
-  };
+  const today = format(new Date(), "EEEE, d 'de' MMMM", { locale: ptBR });
+  const greeting = name ? `Olá, ${name}` : 'Olá';
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor={Colors.background} />
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Header */}
-        <Animated.View style={[styles.header, { opacity: anims[0], transform: [{ translateY: anims[0].interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }] }]}>
-          <View>
-            <Text style={styles.greeting}>
-              {greeting}, <Text style={styles.name}>{name}</Text>
-            </Text>
-            <Text style={styles.date}>{today}</Text>
-          </View>
-          <TouchableOpacity
-            style={styles.avatarBtn}
-            onPress={() => router.push('/(tabs)/profile')}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.avatarEmoji}>👤</Text>
-          </TouchableOpacity>
+        <Animated.View style={{ opacity: fadeAnim0 }}>
+          <Text style={styles.greeting}>{greeting}</Text>
+          <Text style={styles.date}>{today}</Text>
+          <Text style={styles.title}>Hoje</Text>
         </Animated.View>
 
         {/* Macro Ring */}
-        <Animated.View style={[styles.ringContainer, { opacity: anims[1], transform: [{ scale: anims[1].interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] }) }] }]}>
+        <Animated.View style={[styles.ringCard, { opacity: fadeAnim1 }]}>
           <MacroRing
-            calories={totals.calories}
-            calorieGoal={goals.calories}
-            protein={totals.protein}
-            proteinGoal={goals.protein}
-            carbs={totals.carbs}
-            carbsGoal={goals.carbs}
-            fat={totals.fat}
-            fatGoal={goals.fat}
-            size={230}
+            calories={totals.calories} calorieGoal={goals.calories}
+            protein={totals.protein} proteinGoal={goals.protein}
+            carbs={totals.carbs} carbsGoal={goals.carbs}
+            fat={totals.fat} fatGoal={goals.fat}
           />
         </Animated.View>
 
-        {/* Progress bars */}
-        <Animated.View style={[styles.card, { opacity: anims[2], transform: [{ translateY: anims[2].interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }] }]}>
-          <Text style={styles.sectionTitle}>Progresso de hoje</Text>
+        {/* Daily Summary */}
+        <Animated.View style={{ opacity: fadeAnim2, marginBottom: Spacing.lg }}>
           <DailySummary
-            calories={totals.calories}
-            calorieGoal={goals.calories}
-            protein={totals.protein}
-            proteinGoal={goals.protein}
-            carbs={totals.carbs}
-            carbsGoal={goals.carbs}
-            fat={totals.fat}
-            fatGoal={goals.fat}
+            calories={totals.calories} calorieGoal={goals.calories}
+            protein={totals.protein} proteinGoal={goals.protein}
+            carbs={totals.carbs} carbsGoal={goals.carbs}
+            fat={totals.fat} fatGoal={goals.fat}
           />
         </Animated.View>
 
         {/* Meals */}
-        <Animated.View style={{ opacity: anims[3], transform: [{ translateY: anims[3].interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }] }}>
-          <Text style={[styles.sectionTitle, { marginBottom: Spacing.sm }]}>Refeições</Text>
-          {MEALS.map((meal) => (
-            <MealSection
-              key={meal}
-              meal={meal}
-              items={meals[meal]}
-              onRemove={removeFood}
-            />
-          ))}
+        <Animated.View style={{ opacity: fadeAnim3 }}>
+          <Text style={styles.sectionTitle}>Refeições</Text>
+          {MEALS.map(meal => {
+            const items = meals[meal];
+            const mealCalories = items.reduce((sum, item) => sum + item.calories, 0);
+            return (
+              <MealSection
+                key={meal}
+                meal={meal}
+                items={items}
+                totalCalories={mealCalories}
+                onAddFood={() => router.push('/log')}
+                onRemoveFood={(id) => removeFood(id, new Date().toISOString().split('T')[0])}
+              />
+            );
+          })}
         </Animated.View>
-
         <View style={{ height: 100 }} />
       </ScrollView>
 
       {/* FAB */}
-      <Animated.View style={[styles.fabContainer, { transform: [{ scale: fabScale }] }]}>
-        <TouchableOpacity style={styles.fab} onPress={handleFabPress} activeOpacity={0.85}>
-          <Text style={styles.fabIcon}>+</Text>
+      <Animated.View style={[styles.fab, { transform: [{ scale: fabAnim }], bottom: insets.bottom + 80 }]}>
+        <TouchableOpacity
+          style={styles.fabBtn}
+          onPress={() => router.push('/log')}
+          activeOpacity={0.85}
+        >
+          <Feather name="plus" size={24} color={Colors.white} />
         </TouchableOpacity>
       </Animated.View>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  scroll: {
-    flex: 1,
-  },
-  content: {
-    paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.md,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: Spacing.xl,
-  },
-  greeting: {
-    fontSize: Typography.xl,
-    color: Colors.textMuted,
-    fontWeight: FontWeight.regular,
-  },
-  name: {
-    color: Colors.text,
-    fontWeight: FontWeight.bold,
-  },
-  date: {
-    fontSize: Typography.sm,
-    color: Colors.textDisabled,
-    marginTop: 2,
-    textTransform: 'capitalize',
-  },
-  avatarBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  avatarEmoji: {
-    fontSize: 20,
-  },
-  ringContainer: {
-    alignItems: 'center',
-    marginBottom: Spacing.xl,
-  },
-  card: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.lg,
-    padding: Spacing.md,
-    marginBottom: Spacing.md,
-    ...Shadow.sm,
-  },
-  sectionTitle: {
-    fontSize: Typography.base,
-    color: Colors.text,
-    fontWeight: FontWeight.semibold,
-    marginBottom: Spacing.md,
-  },
-  fabContainer: {
-    position: 'absolute',
-    bottom: 90,
-    right: Spacing.lg,
-  },
-  fab: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: Colors.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...Shadow.accent,
-  },
-  fabIcon: {
-    fontSize: 32,
-    color: Colors.background,
-    fontWeight: FontWeight.bold,
-    lineHeight: 36,
-  },
+  container: { flex: 1, backgroundColor: Colors.background },
+  scroll: { flex: 1 },
+  content: { padding: Spacing.lg },
+  greeting: { fontSize: Typography.sm, color: Colors.textSecondary, marginBottom: 2 },
+  date: { fontSize: Typography.sm, color: Colors.textDisabled, marginBottom: Spacing.sm },
+  title: { fontSize: Typography.xxl, fontWeight: FontWeight.bold, color: Colors.textPrimary, marginBottom: Spacing.xl },
+  ringCard: { backgroundColor: Colors.surface, borderRadius: Radius.xl, padding: Spacing.xl, borderWidth: 1, borderColor: Colors.border, alignItems: 'center', marginBottom: Spacing.lg, ...Shadow.card },
+  sectionTitle: { fontSize: Typography.base, fontWeight: FontWeight.semibold, color: Colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: Spacing.sm },
+  fab: { position: 'absolute', right: Spacing.xl },
+  fabBtn: { width: 56, height: 56, borderRadius: 28, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center', ...Shadow.strong },
 });

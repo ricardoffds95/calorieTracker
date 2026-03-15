@@ -1,38 +1,43 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { FoodItem } from '../store/foodStore';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { Colors, Typography, FontWeight, Spacing, Radius, Shadow } from '../constants/theme';
 import { MacroColors } from '../constants/theme';
 
-interface Props {
-  item: FoodItem;
-  onRemove?: (id: string) => void;
+interface FoodCardProps {
+  name: string;
+  quantity_g: number;
+  calories: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+  onRemove?: () => void;
 }
 
-export function FoodCard({ item, onRemove }: Props) {
+export default function FoodCard({ name, quantity_g, calories, protein_g, carbs_g, fat_g, onRemove }: FoodCardProps) {
   return (
     <View style={styles.card}>
       <View style={styles.left}>
-        <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
-        <Text style={styles.quantity}>{item.quantity_g}g</Text>
+        <Text style={styles.name} numberOfLines={1}>{name}</Text>
+        <Text style={styles.quantity}>{quantity_g}g</Text>
+        <View style={styles.macros}>
+          {[
+            { label: 'P', value: protein_g, color: MacroColors.protein },
+            { label: 'C', value: carbs_g, color: MacroColors.carbs },
+            { label: 'G', value: fat_g, color: MacroColors.fat },
+          ].map(m => (
+            <View key={m.label} style={[styles.badge, { backgroundColor: m.color + '15', borderColor: m.color + '40' }]}>
+              <Text style={[styles.badgeText, { color: m.color }]}>{m.label} {Math.round(m.value)}g</Text>
+            </View>
+          ))}
+        </View>
       </View>
-
-      <View style={styles.macros}>
-        <MacroBadge value={item.protein_g} color={MacroColors.protein} label="P" />
-        <MacroBadge value={item.carbs_g} color={MacroColors.carbs} label="C" />
-        <MacroBadge value={item.fat_g} color={MacroColors.fat} label="G" />
-      </View>
-
       <View style={styles.right}>
-        <Text style={styles.calories}>{item.calories}</Text>
+        <Text style={styles.calories}>{Math.round(calories)}</Text>
         <Text style={styles.kcal}>kcal</Text>
         {onRemove && (
-          <TouchableOpacity
-            onPress={() => onRemove(item.id)}
-            activeOpacity={0.7}
-            style={styles.removeBtn}
-          >
-            <Text style={styles.removeTxt}>✕</Text>
+          <TouchableOpacity onPress={onRemove} style={styles.removeBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Feather name="trash-2" size={15} color={Colors.textDisabled} />
           </TouchableOpacity>
         )}
       </View>
@@ -40,81 +45,29 @@ export function FoodCard({ item, onRemove }: Props) {
   );
 }
 
-function MacroBadge({ value, color, label }: { value: number; color: string; label: string }) {
-  return (
-    <View style={[styles.badge, { borderColor: color + '40' }]}>
-      <Text style={[styles.badgeLabel, { color }]}>{label}</Text>
-      <Text style={styles.badgeValue}>{Math.round(value * 10) / 10}g</Text>
-    </View>
-  );
-}
+// Named export for backward compatibility with old FoodCard usage
+export { FoodCard };
 
 const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface2,
+    backgroundColor: Colors.surface,
     borderRadius: Radius.md,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm + 2,
-    marginBottom: Spacing.xs,
-    ...Shadow.sm,
-  },
-  left: {
-    flex: 1,
-    marginRight: Spacing.sm,
-  },
-  name: {
-    fontSize: Typography.base,
-    color: Colors.text,
-    fontWeight: FontWeight.medium,
-  },
-  quantity: {
-    fontSize: Typography.xs,
-    color: Colors.textMuted,
-    marginTop: 2,
-  },
-  macros: {
-    flexDirection: 'row',
-    gap: 6,
-    marginRight: Spacing.sm,
-  },
-  badge: {
+    padding: Spacing.md,
     borderWidth: 1,
-    borderRadius: Radius.sm,
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    alignItems: 'center',
+    borderColor: Colors.border,
+    marginVertical: 4,
+    ...Shadow.card,
   },
-  badgeLabel: {
-    fontSize: 9,
-    fontWeight: FontWeight.bold,
-    letterSpacing: 0.5,
-  },
-  badgeValue: {
-    fontSize: 10,
-    color: Colors.text,
-    fontWeight: FontWeight.medium,
-  },
-  right: {
-    alignItems: 'flex-end',
-    minWidth: 48,
-  },
-  calories: {
-    fontSize: Typography.md,
-    color: Colors.accent,
-    fontWeight: FontWeight.bold,
-  },
-  kcal: {
-    fontSize: Typography.xs,
-    color: Colors.textMuted,
-  },
-  removeBtn: {
-    marginTop: 4,
-    padding: 2,
-  },
-  removeTxt: {
-    fontSize: Typography.xs,
-    color: Colors.textDisabled,
-  },
+  left: { flex: 1, marginRight: Spacing.md },
+  name: { fontSize: Typography.base, fontWeight: FontWeight.semibold, color: Colors.textPrimary, marginBottom: 2 },
+  quantity: { fontSize: Typography.sm, color: Colors.textSecondary, marginBottom: 6 },
+  macros: { flexDirection: 'row', gap: 4 },
+  badge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 1 },
+  badgeText: { fontSize: Typography.xs, fontWeight: FontWeight.medium },
+  right: { alignItems: 'flex-end', gap: 2 },
+  calories: { fontSize: Typography.md, fontWeight: FontWeight.bold, color: Colors.textPrimary },
+  kcal: { fontSize: Typography.xs, color: Colors.textSecondary },
+  removeBtn: { marginTop: 6 },
 });

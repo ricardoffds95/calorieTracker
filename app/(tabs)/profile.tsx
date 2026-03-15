@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,25 +6,26 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
-  SafeAreaView,
-  StatusBar,
   Alert,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Feather } from '@expo/vector-icons';
 import { useDailyGoals } from '../../hooks/useDailyGoals';
 import { GoalMode } from '../../store/goalsStore';
 import { calculateMacrosFromCalories, GOAL_PRESETS } from '../../constants/macros';
 import { Colors, Typography, FontWeight, Spacing, Radius, Shadow } from '../../constants/theme';
 import { MacroColors } from '../../constants/theme';
 
-type GoalOption = { key: GoalMode; label: string; desc: string; emoji: string };
+type GoalOption = { key: GoalMode; label: string; desc: string; icon: 'trending-down' | 'minus' | 'trending-up' };
 
 const GOAL_OPTIONS: GoalOption[] = [
-  { key: 'cut', label: 'Perder peso', desc: 'Défice calórico', emoji: '📉' },
-  { key: 'maintain', label: 'Manter peso', desc: 'Calorias de manutenção', emoji: '⚖️' },
-  { key: 'bulk', label: 'Ganhar massa', desc: 'Excedente calórico', emoji: '📈' },
+  { key: 'cut', label: 'Perder peso', desc: 'Défice calórico', icon: 'trending-down' },
+  { key: 'maintain', label: 'Manter peso', desc: 'Calorias de manutenção', icon: 'minus' },
+  { key: 'bulk', label: 'Ganhar massa', desc: 'Excedente calórico', icon: 'trending-up' },
 ];
 
 export default function ProfileScreen() {
+  const insets = useSafeAreaInsets();
   const { name, goalMode, goals, setName, setGoalMode, setGoals, updateCaloriesAndRecalculate } = useDailyGoals();
 
   const [localName, setLocalName] = useState(name);
@@ -39,7 +40,7 @@ export default function ProfileScreen() {
     Math.round((goals.fat * 9 / goals.calories) * 100).toString()
   );
 
-  const recalcFromGoalMode = (mode: GoalMode, cals: number) => {
+  const recalcFromGoalMode = (mode: GoalMode) => {
     const preset = GOAL_PRESETS[mode];
     setLocalProteinPct(Math.round(preset.proteinPct * 100).toString());
     setLocalCarbsPct(Math.round(preset.carbsPct * 100).toString());
@@ -48,7 +49,7 @@ export default function ProfileScreen() {
 
   const handleGoalModeChange = (mode: GoalMode) => {
     setGoalMode(mode);
-    recalcFromGoalMode(mode, parseInt(localCalories) || 2000);
+    recalcFromGoalMode(mode);
   };
 
   const handleSave = () => {
@@ -82,11 +83,13 @@ export default function ProfileScreen() {
     return calculateMacrosFromCalories(cals, pPct, cPct, fPct);
   })();
 
+  const totalPct = (parseInt(localProteinPct) || 0) + (parseInt(localCarbsPct) || 0) + (parseInt(localFatPct) || 0);
+  const pctOk = Math.abs(totalPct - 100) < 3;
+
   return (
-    <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor={Colors.background} />
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Text style={styles.title}>Perfil & Objetivos</Text>
+        <Text style={styles.title}>Perfil e Objetivos</Text>
 
         {/* Name */}
         <View style={styles.card}>
@@ -111,7 +114,9 @@ export default function ProfileScreen() {
                 onPress={() => handleGoalModeChange(opt.key)}
                 activeOpacity={0.7}
               >
-                <Text style={styles.goalEmoji}>{opt.emoji}</Text>
+                <View style={[styles.goalIconBox, goalMode === opt.key && styles.goalIconBoxActive]}>
+                  <Feather name={opt.icon} size={16} color={goalMode === opt.key ? Colors.primary : Colors.textSecondary} />
+                </View>
                 <Text style={[styles.goalLabel, goalMode === opt.key && styles.goalLabelActive]}>
                   {opt.label}
                 </Text>
@@ -129,7 +134,7 @@ export default function ProfileScreen() {
               style={styles.adjBtn}
               onPress={() => setLocalCalories(Math.max(500, (parseInt(localCalories) || 2000) - 50).toString())}
             >
-              <Text style={styles.adjBtnTxt}>−</Text>
+              <Text style={styles.adjBtnTxt}>-</Text>
             </TouchableOpacity>
             <TextInput
               style={styles.calorieInput}
@@ -171,19 +176,8 @@ export default function ProfileScreen() {
           />
           <Text style={styles.totalPct}>
             Total:{' '}
-            <Text style={{
-              color:
-                Math.abs(
-                  (parseInt(localProteinPct) || 0) +
-                  (parseInt(localCarbsPct) || 0) +
-                  (parseInt(localFatPct) || 0) - 100
-                ) < 3
-                  ? Colors.accent
-                  : Colors.accent2,
-            }}>
-              {(parseInt(localProteinPct) || 0) +
-                (parseInt(localCarbsPct) || 0) +
-                (parseInt(localFatPct) || 0)}%
+            <Text style={{ color: pctOk ? Colors.success : MacroColors.fat, fontWeight: FontWeight.bold }}>
+              {totalPct}%
             </Text>
           </Text>
         </View>
@@ -192,7 +186,7 @@ export default function ProfileScreen() {
         <View style={[styles.card, styles.previewCard]}>
           <Text style={styles.fieldLabel}>Pré-visualização</Text>
           <View style={styles.previewRow}>
-            <PreviewMacro label="Calorias" value={previewGoals.calories} unit="kcal" color={Colors.accent} />
+            <PreviewMacro label="Calorias" value={previewGoals.calories} unit="kcal" color={Colors.primary} />
             <PreviewMacro label="Proteína" value={previewGoals.protein} unit="g" color={MacroColors.protein} />
             <PreviewMacro label="Hidratos" value={previewGoals.carbs} unit="g" color={MacroColors.carbs} />
             <PreviewMacro label="Gordura" value={previewGoals.fat} unit="g" color={MacroColors.fat} />
@@ -201,12 +195,13 @@ export default function ProfileScreen() {
 
         {/* Save */}
         <TouchableOpacity style={styles.saveBtn} onPress={handleSave} activeOpacity={0.8}>
+          <Feather name="check" size={18} color={Colors.white} />
           <Text style={styles.saveBtnTxt}>Guardar objetivos</Text>
         </TouchableOpacity>
 
         <View style={{ height: 40 }} />
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -217,7 +212,7 @@ function MacroPctInput({ label, color, value, onChange }: { label: string; color
       <Text style={pctStyles.label}>{label}</Text>
       <View style={pctStyles.controls}>
         <TouchableOpacity style={pctStyles.btn} onPress={() => onChange(Math.max(5, (parseInt(value) || 0) - 5).toString())}>
-          <Text style={pctStyles.btnTxt}>−</Text>
+          <Text style={pctStyles.btnTxt}>-</Text>
         </TouchableOpacity>
         <TextInput
           style={[pctStyles.input, { borderColor: color + '60' }]}
@@ -238,28 +233,30 @@ function MacroPctInput({ label, color, value, onChange }: { label: string; color
 const pctStyles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.sm, gap: Spacing.sm },
   dot: { width: 10, height: 10, borderRadius: 5 },
-  label: { flex: 1, fontSize: Typography.base, color: Colors.text },
+  label: { flex: 1, fontSize: Typography.base, color: Colors.textPrimary },
   controls: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   btn: {
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: Colors.surface2,
+    backgroundColor: Colors.backgroundSubtle,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
-  btnTxt: { fontSize: Typography.base, color: Colors.text, fontWeight: FontWeight.bold },
+  btnTxt: { fontSize: Typography.base, color: Colors.textPrimary, fontWeight: FontWeight.bold },
   input: {
     width: 50,
-    backgroundColor: Colors.surface2,
+    backgroundColor: Colors.backgroundSubtle,
     borderRadius: Radius.sm,
     paddingVertical: 4,
-    color: Colors.text,
+    color: Colors.textPrimary,
     fontSize: Typography.base,
     fontWeight: FontWeight.semibold,
     borderWidth: 1,
   },
-  pct: { fontSize: Typography.sm, color: Colors.textMuted },
+  pct: { fontSize: Typography.sm, color: Colors.textSecondary },
 });
 
 function PreviewMacro({ label, value, unit, color }: { label: string; value: number; unit: string; color: string }) {
@@ -268,19 +265,19 @@ function PreviewMacro({ label, value, unit, color }: { label: string; value: num
       <Text style={{ fontSize: Typography.lg, color, fontWeight: FontWeight.bold }}>
         {value}
       </Text>
-      <Text style={{ fontSize: Typography.xs, color: Colors.textMuted }}>{unit}</Text>
+      <Text style={{ fontSize: Typography.xs, color: Colors.textSecondary }}>{unit}</Text>
       <Text style={{ fontSize: Typography.xs, color: Colors.textDisabled }}>{label}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background },
+  container: { flex: 1, backgroundColor: Colors.background },
   scroll: { flex: 1 },
-  content: { paddingHorizontal: Spacing.md, paddingTop: Spacing.lg },
+  content: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg },
   title: {
     fontSize: Typography.xxl,
-    color: Colors.text,
+    color: Colors.textPrimary,
     fontWeight: FontWeight.bold,
     marginBottom: Spacing.lg,
   },
@@ -289,26 +286,28 @@ const styles = StyleSheet.create({
     borderRadius: Radius.lg,
     padding: Spacing.md,
     marginBottom: Spacing.md,
-    ...Shadow.sm,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    ...Shadow.card,
   },
   previewCard: {
-    borderWidth: 1,
-    borderColor: Colors.accent + '30',
+    borderColor: Colors.primaryLight,
+    backgroundColor: Colors.surfaceElevated,
   },
   fieldLabel: {
-    fontSize: Typography.sm,
-    color: Colors.textMuted,
-    fontWeight: FontWeight.medium,
+    fontSize: Typography.xs,
+    color: Colors.textSecondary,
+    fontWeight: FontWeight.semibold,
     marginBottom: Spacing.sm,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
   },
   input: {
-    backgroundColor: Colors.surface2,
+    backgroundColor: Colors.backgroundSubtle,
     borderRadius: Radius.md,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
-    color: Colors.text,
+    color: Colors.textPrimary,
     fontSize: Typography.base,
     borderWidth: 1,
     borderColor: Colors.border,
@@ -319,30 +318,40 @@ const styles = StyleSheet.create({
   },
   goalCard: {
     flex: 1,
-    backgroundColor: Colors.surface2,
+    backgroundColor: Colors.backgroundSubtle,
     borderRadius: Radius.md,
     padding: Spacing.sm,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: Colors.border,
+    gap: 4,
   },
   goalCardActive: {
-    borderColor: Colors.accent,
-    backgroundColor: Colors.accent + '15',
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primaryLight,
   },
-  goalEmoji: { fontSize: 22, marginBottom: 4 },
+  goalIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: Colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  goalIconBoxActive: {
+    backgroundColor: Colors.primary + '20',
+  },
   goalLabel: {
     fontSize: Typography.xs,
-    color: Colors.textMuted,
+    color: Colors.textSecondary,
     fontWeight: FontWeight.semibold,
     textAlign: 'center',
   },
-  goalLabelActive: { color: Colors.accent },
+  goalLabelActive: { color: Colors.primary },
   goalDesc: {
     fontSize: 10,
     color: Colors.textDisabled,
     textAlign: 'center',
-    marginTop: 2,
   },
   calorieRow: {
     flexDirection: 'row',
@@ -353,21 +362,23 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: Colors.surface2,
+    backgroundColor: Colors.backgroundSubtle,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   adjBtnTxt: {
     fontSize: Typography.xl,
-    color: Colors.text,
+    color: Colors.textPrimary,
     fontWeight: FontWeight.bold,
   },
   calorieInput: {
     flex: 1,
-    backgroundColor: Colors.surface2,
+    backgroundColor: Colors.backgroundSubtle,
     borderRadius: Radius.md,
     paddingVertical: Spacing.sm,
-    color: Colors.text,
+    color: Colors.textPrimary,
     fontSize: Typography.xl,
     fontWeight: FontWeight.bold,
     borderWidth: 1,
@@ -375,12 +386,12 @@ const styles = StyleSheet.create({
   },
   calorieUnit: {
     fontSize: Typography.base,
-    color: Colors.textMuted,
+    color: Colors.textSecondary,
     fontWeight: FontWeight.medium,
   },
   totalPct: {
     fontSize: Typography.sm,
-    color: Colors.textMuted,
+    color: Colors.textSecondary,
     textAlign: 'right',
     marginTop: 4,
   },
@@ -389,15 +400,18 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   saveBtn: {
-    backgroundColor: Colors.accent,
+    backgroundColor: Colors.primary,
     borderRadius: Radius.lg,
     paddingVertical: Spacing.md + 2,
     alignItems: 'center',
     marginBottom: Spacing.md,
-    ...Shadow.accent,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    ...Shadow.strong,
   },
   saveBtnTxt: {
-    color: Colors.background,
+    color: Colors.white,
     fontSize: Typography.md,
     fontWeight: FontWeight.bold,
   },

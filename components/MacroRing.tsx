@@ -1,10 +1,12 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, Animated, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Animated } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
-import { Colors, Typography, FontWeight } from '../constants/theme';
+import { Colors, Typography, FontWeight, Spacing, Radius } from '../constants/theme';
 import { MacroColors } from '../constants/theme';
 
-interface Props {
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+
+interface MacroRingProps {
   calories: number;
   calorieGoal: number;
   protein: number;
@@ -16,225 +18,113 @@ interface Props {
   size?: number;
 }
 
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+const SIZE = 220;
+const STROKE = 10;
+const R = (SIZE - STROKE * 2) / 2;
+const CIRCUMFERENCE = 2 * Math.PI * R;
+const CX = SIZE / 2;
+const CY = SIZE / 2;
 
-function Arc({
-  cx,
-  cy,
-  r,
-  color,
-  percent,
-  strokeWidth,
-  offset,
-}: {
-  cx: number;
-  cy: number;
-  r: number;
-  color: string;
-  percent: number;
-  strokeWidth: number;
-  offset: number;
-}) {
-  const circumference = 2 * Math.PI * r;
-  const anim = useRef(new Animated.Value(0)).current;
+export default function MacroRing({ calories, calorieGoal, protein, proteinGoal, carbs, carbsGoal, fat, fatGoal }: MacroRingProps) {
+  const proteinAnim = useRef(new Animated.Value(0)).current;
+  const carbsAnim = useRef(new Animated.Value(0)).current;
+  const fatAnim = useRef(new Animated.Value(0)).current;
+
+  const proteinPct = Math.min(protein / Math.max(proteinGoal, 1), 1);
+  const carbsPct = Math.min(carbs / Math.max(carbsGoal, 1), 1);
+  const fatPct = Math.min(fat / Math.max(fatGoal, 1), 1);
 
   useEffect(() => {
-    Animated.timing(anim, {
-      toValue: percent,
-      duration: 900,
-      useNativeDriver: false,
-    }).start();
-  }, [percent]);
+    Animated.stagger(120, [
+      Animated.timing(proteinAnim, { toValue: proteinPct, duration: 900, useNativeDriver: false }),
+      Animated.timing(carbsAnim, { toValue: carbsPct, duration: 900, useNativeDriver: false }),
+      Animated.timing(fatAnim, { toValue: fatPct, duration: 900, useNativeDriver: false }),
+    ]).start();
+  }, [proteinPct, carbsPct, fatPct]);
 
-  const strokeDashoffset = anim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [circumference, circumference * (1 - Math.min(percent, 1))],
-  });
+  const kcalLeft = Math.max(calorieGoal - calories, 0);
 
-  return (
-    <AnimatedCircle
-      cx={cx}
-      cy={cy}
-      r={r}
-      stroke={color}
-      strokeWidth={strokeWidth}
-      fill="none"
-      strokeDasharray={`${circumference} ${circumference}`}
-      strokeDashoffset={strokeDashoffset}
-      strokeLinecap="round"
-      rotation="-90"
-      origin={`${cx},${cy}`}
-      strokeOpacity={0.9}
-    />
-  );
-}
-
-export function MacroRing({
-  calories,
-  calorieGoal,
-  protein,
-  proteinGoal,
-  carbs,
-  carbsGoal,
-  fat,
-  fatGoal,
-  size = 220,
-}: Props) {
-  const cx = size / 2;
-  const cy = size / 2;
-  const remaining = Math.max(calorieGoal - calories, 0);
-  const isOver = calories > calorieGoal;
-
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start();
-  }, []);
-
-  const rings = [
-    { r: cx - 14, color: MacroColors.protein, percent: proteinGoal > 0 ? protein / proteinGoal : 0, sw: 10 },
-    { r: cx - 30, color: MacroColors.carbs, percent: carbsGoal > 0 ? carbs / carbsGoal : 0, sw: 10 },
-    { r: cx - 46, color: MacroColors.fat, percent: fatGoal > 0 ? fat / fatGoal : 0, sw: 10 },
-  ];
+  const proteinDash = proteinAnim.interpolate({ inputRange: [0, 1], outputRange: [0, CIRCUMFERENCE] });
+  const carbsDash = carbsAnim.interpolate({ inputRange: [0, 1], outputRange: [0, CIRCUMFERENCE] });
+  const fatDash = fatAnim.interpolate({ inputRange: [0, 1], outputRange: [0, CIRCUMFERENCE] });
 
   return (
-    <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
-      <Svg width={size} height={size}>
-        {/* Track circles */}
-        {rings.map((ring, i) => (
-          <Circle
-            key={`track-${i}`}
-            cx={cx}
-            cy={cy}
-            r={ring.r}
-            stroke={Colors.surface2}
-            strokeWidth={ring.sw}
+    <View style={styles.container}>
+      <View style={styles.ringWrapper}>
+        <Svg width={SIZE} height={SIZE}>
+          {/* Track */}
+          <Circle cx={CX} cy={CY} r={R} stroke={Colors.border} strokeWidth={STROKE} fill="none" />
+          {/* Fat */}
+          <AnimatedCircle
+            cx={CX} cy={CY} r={R}
+            stroke={MacroColors.fat}
+            strokeWidth={STROKE}
             fill="none"
+            strokeDasharray={CIRCUMFERENCE}
+            strokeDashoffset={fatDash.interpolate({ inputRange: [0, CIRCUMFERENCE], outputRange: [CIRCUMFERENCE, 0] })}
+            strokeLinecap="round"
+            rotation={-90}
+            origin={`${CX}, ${CY}`}
           />
-        ))}
-        {/* Animated macro arcs */}
-        {rings.map((ring, i) => (
-          <Arc
-            key={`arc-${i}`}
-            cx={cx}
-            cy={cy}
-            r={ring.r}
-            color={ring.color}
-            percent={ring.percent}
-            strokeWidth={ring.sw}
-            offset={0}
+          {/* Carbs */}
+          <AnimatedCircle
+            cx={CX} cy={CY} r={R}
+            stroke={MacroColors.carbs}
+            strokeWidth={STROKE}
+            fill="none"
+            strokeDasharray={CIRCUMFERENCE}
+            strokeDashoffset={carbsDash.interpolate({ inputRange: [0, CIRCUMFERENCE], outputRange: [CIRCUMFERENCE, 0] })}
+            strokeLinecap="round"
+            rotation={-90 + 360 * fatPct * 0.33}
+            origin={`${CX}, ${CY}`}
           />
+          {/* Protein */}
+          <AnimatedCircle
+            cx={CX} cy={CY} r={R}
+            stroke={MacroColors.protein}
+            strokeWidth={STROKE}
+            fill="none"
+            strokeDasharray={CIRCUMFERENCE}
+            strokeDashoffset={proteinDash.interpolate({ inputRange: [0, CIRCUMFERENCE], outputRange: [CIRCUMFERENCE, 0] })}
+            strokeLinecap="round"
+            rotation={-90 + 360 * (fatPct * 0.33 + carbsPct * 0.33)}
+            origin={`${CX}, ${CY}`}
+          />
+        </Svg>
+        <View style={styles.centerText}>
+          <Text style={styles.kcalNumber}>{kcalLeft}</Text>
+          <Text style={styles.kcalLabel}>kcal restantes</Text>
+        </View>
+      </View>
+      <View style={styles.pills}>
+        {[
+          { label: 'Proteína', value: protein, goal: proteinGoal, color: MacroColors.protein },
+          { label: 'Hidratos', value: carbs, goal: carbsGoal, color: MacroColors.carbs },
+          { label: 'Gordura', value: fat, goal: fatGoal, color: MacroColors.fat },
+        ].map(m => (
+          <View key={m.label} style={styles.pill}>
+            <View style={[styles.dot, { backgroundColor: m.color }]} />
+            <Text style={styles.pillLabel}>{m.label}</Text>
+            <Text style={styles.pillValue}>{Math.round(m.value)}g</Text>
+          </View>
         ))}
-      </Svg>
-
-      {/* Center text */}
-      <View style={[styles.center, { width: size, height: size }]}>
-        <Text style={styles.remainingLabel}>
-          {isOver ? 'acima' : 'restantes'}
-        </Text>
-        <Text style={[styles.caloriesNumber, isOver && styles.caloriesOver]}>
-          {isOver ? `+${calories - calorieGoal}` : remaining}
-        </Text>
-        <Text style={styles.kcalLabel}>kcal</Text>
-        <Text style={styles.totalLabel}>
-          {calories} / {calorieGoal}
-        </Text>
       </View>
-
-      {/* Macro legend */}
-      <View style={styles.legend}>
-        <MacroLegendItem label="P" value={protein} goal={proteinGoal} color={MacroColors.protein} />
-        <MacroLegendItem label="C" value={carbs} goal={carbsGoal} color={MacroColors.carbs} />
-        <MacroLegendItem label="G" value={fat} goal={fatGoal} color={MacroColors.fat} />
-      </View>
-    </Animated.View>
-  );
-}
-
-function MacroLegendItem({
-  label,
-  value,
-  goal,
-  color,
-}: {
-  label: string;
-  value: number;
-  goal: number;
-  color: string;
-}) {
-  return (
-    <View style={styles.legendItem}>
-      <View style={[styles.legendDot, { backgroundColor: color }]} />
-      <Text style={styles.legendLabel}>{label}</Text>
-      <Text style={styles.legendValue}>
-        {Math.round(value)}
-        <Text style={styles.legendGoal}>/{goal}g</Text>
-      </Text>
     </View>
   );
 }
 
+// Named export for backward compatibility
+export { MacroRing };
+
 const styles = StyleSheet.create({
-  container: {
-    alignItems: 'center',
-  },
-  center: {
-    position: 'absolute',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  remainingLabel: {
-    fontSize: Typography.sm,
-    color: Colors.textMuted,
-    fontWeight: FontWeight.medium,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  caloriesNumber: {
-    fontSize: Typography.xxxl,
-    color: Colors.accent,
-    fontWeight: FontWeight.extrabold,
-    lineHeight: Typography.xxxl + 6,
-  },
-  caloriesOver: {
-    color: Colors.accent2,
-  },
-  kcalLabel: {
-    fontSize: Typography.sm,
-    color: Colors.textMuted,
-    fontWeight: FontWeight.medium,
-  },
-  totalLabel: {
-    fontSize: Typography.xs,
-    color: Colors.textDisabled,
-    marginTop: 4,
-  },
-  legend: {
-    flexDirection: 'row',
-    gap: 20,
-    marginTop: 16,
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  legendDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  legendLabel: {
-    fontSize: Typography.xs,
-    color: Colors.textMuted,
-    fontWeight: FontWeight.bold,
-  },
-  legendValue: {
-    fontSize: Typography.xs,
-    color: Colors.text,
-    fontWeight: FontWeight.semibold,
-  },
-  legendGoal: {
-    color: Colors.textMuted,
-    fontWeight: FontWeight.regular,
-  },
+  container: { alignItems: 'center' },
+  ringWrapper: { width: SIZE, height: SIZE, alignItems: 'center', justifyContent: 'center' },
+  centerText: { position: 'absolute', alignItems: 'center' },
+  kcalNumber: { fontSize: Typography.xxxl, fontWeight: FontWeight.bold, color: Colors.textPrimary },
+  kcalLabel: { fontSize: Typography.sm, color: Colors.textSecondary, marginTop: 2 },
+  pills: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.md },
+  pill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Colors.backgroundSubtle, paddingHorizontal: 10, paddingVertical: 6, borderRadius: Radius.pill },
+  dot: { width: 6, height: 6, borderRadius: 3 },
+  pillLabel: { fontSize: Typography.xs, color: Colors.textSecondary },
+  pillValue: { fontSize: Typography.xs, fontWeight: FontWeight.semibold, color: Colors.textPrimary },
 });

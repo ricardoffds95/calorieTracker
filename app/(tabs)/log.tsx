@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -7,15 +7,14 @@ import {
   ScrollView,
   ActivityIndicator,
   StyleSheet,
-  SafeAreaView,
-  StatusBar,
   KeyboardAvoidingView,
   Platform,
   Alert,
 } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useFood } from '../../hooks/useFood';
-import { useDailyGoals } from '../../hooks/useDailyGoals';
 import { parseFoodFromText, ParsedFoodItem } from '../../services/claudeAI';
 import { searchFood, calculateNutrientsForQuantity, FoodSearchResult } from '../../services/openFoodFacts';
 import { Colors, Typography, FontWeight, Spacing, Radius, Shadow } from '../../constants/theme';
@@ -32,11 +31,11 @@ const MEALS: MealLabel[] = [
   { key: 'snacks', label: 'Snacks' },
 ];
 
-// Replace with your actual API key or load from config
 const CLAUDE_API_KEY = process.env.EXPO_PUBLIC_CLAUDE_API_KEY ?? '';
 
 export default function LogScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { addFood } = useFood();
   const [mode, setMode] = useState<InputMode>('ai');
   const [meal, setMeal] = useState<MealType>('lunch');
@@ -108,8 +107,7 @@ export default function LogScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor={Colors.background} />
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -118,6 +116,7 @@ export default function LogScreen() {
           style={styles.scroll}
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
           <Text style={styles.title}>Registar Alimentos</Text>
 
@@ -128,18 +127,16 @@ export default function LogScreen() {
               onPress={() => setMode('ai')}
               activeOpacity={0.7}
             >
-              <Text style={[styles.modeBtnTxt, mode === 'ai' && styles.modeBtnTxtActive]}>
-                ✨ IA
-              </Text>
+              <Feather name="zap" size={15} color={mode === 'ai' ? Colors.white : Colors.textSecondary} />
+              <Text style={[styles.modeBtnTxt, mode === 'ai' && styles.modeBtnTxtActive]}>IA</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.modeBtn, mode === 'search' && styles.modeBtnActive]}
               onPress={() => setMode('search')}
               activeOpacity={0.7}
             >
-              <Text style={[styles.modeBtnTxt, mode === 'search' && styles.modeBtnTxtActive]}>
-                🔍 Pesquisar
-              </Text>
+              <Feather name="search" size={15} color={mode === 'search' ? Colors.white : Colors.textSecondary} />
+              <Text style={[styles.modeBtnTxt, mode === 'search' && styles.modeBtnTxtActive]}>Pesquisar</Text>
             </TouchableOpacity>
           </View>
 
@@ -162,9 +159,7 @@ export default function LogScreen() {
           {/* AI Input */}
           {mode === 'ai' && (
             <View style={styles.section}>
-              <Text style={styles.hint}>
-                Descreve o que comeste em português ou inglês
-              </Text>
+              <Text style={styles.hint}>Descreve o que comeste em português ou inglês</Text>
               <TextInput
                 style={styles.textArea}
                 placeholder="ex: comi 150g de frango grelhado com arroz e salada"
@@ -182,9 +177,12 @@ export default function LogScreen() {
                 disabled={loading}
               >
                 {loading ? (
-                  <ActivityIndicator color={Colors.background} />
+                  <ActivityIndicator color={Colors.white} />
                 ) : (
-                  <Text style={styles.primaryBtnTxt}>Analisar com IA</Text>
+                  <>
+                    <Feather name="zap" size={16} color={Colors.white} />
+                    <Text style={styles.primaryBtnTxt}>Analisar com IA</Text>
+                  </>
                 )}
               </TouchableOpacity>
 
@@ -198,7 +196,7 @@ export default function LogScreen() {
                         <Text style={styles.resultQty}>{item.quantity_g}g</Text>
                       </View>
                       <View style={styles.resultMacros}>
-                        <MacroChip value={item.calories} label="kcal" color={Colors.accent} />
+                        <MacroChip value={item.calories} label="kcal" color={Colors.primary} />
                         <MacroChip value={item.protein_g} label="P" color={MacroColors.protein} />
                         <MacroChip value={item.carbs_g} label="C" color={MacroColors.carbs} />
                         <MacroChip value={item.fat_g} label="G" color={MacroColors.fat} />
@@ -235,9 +233,9 @@ export default function LogScreen() {
                   disabled={loading}
                 >
                   {loading ? (
-                    <ActivityIndicator color={Colors.background} size="small" />
+                    <ActivityIndicator color={Colors.white} size="small" />
                   ) : (
-                    <Text style={styles.searchBtnTxt}>🔍</Text>
+                    <Feather name="search" size={18} color={Colors.white} />
                   )}
                 </TouchableOpacity>
               </View>
@@ -249,7 +247,7 @@ export default function LogScreen() {
                     <Text style={styles.resultBrand}>{result.brand}</Text>
                   )}
                   <View style={styles.resultMacros}>
-                    <MacroChip value={result.calories_100g} label="kcal/100g" color={Colors.accent} />
+                    <MacroChip value={result.calories_100g} label="kcal/100g" color={Colors.primary} />
                     <MacroChip value={result.protein_100g} label="P" color={MacroColors.protein} />
                     <MacroChip value={result.carbs_100g} label="C" color={MacroColors.carbs} />
                     <MacroChip value={result.fat_100g} label="G" color={MacroColors.fat} />
@@ -261,7 +259,7 @@ export default function LogScreen() {
                         setQuantities((q) => ({ ...q, [result.id]: Math.max(10, (q[result.id] ?? 100) - 10) }))
                       }
                     >
-                      <Text style={styles.qtyBtnTxt}>−</Text>
+                      <Text style={styles.qtyBtnTxt}>-</Text>
                     </TouchableOpacity>
                     <Text style={styles.qtyValue}>{quantities[result.id] ?? 100}g</Text>
                     <TouchableOpacity
@@ -288,13 +286,13 @@ export default function LogScreen() {
           <View style={{ height: 40 }} />
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 function MacroChip({ value, label, color }: { value: number; label: string; color: string }) {
   return (
-    <View style={[chipStyles.chip, { borderColor: color + '50' }]}>
+    <View style={[chipStyles.chip, { borderColor: color + '50', backgroundColor: color + '10' }]}>
       <Text style={[chipStyles.value, { color }]}>{Math.round(value * 10) / 10}</Text>
       <Text style={chipStyles.label}>{label}</Text>
     </View>
@@ -315,44 +313,50 @@ const chipStyles = StyleSheet.create({
   },
   label: {
     fontSize: 10,
-    color: Colors.textMuted,
+    color: Colors.textSecondary,
   },
 });
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background },
+  container: { flex: 1, backgroundColor: Colors.background },
   scroll: { flex: 1 },
-  content: { paddingHorizontal: Spacing.md, paddingTop: Spacing.lg },
+  content: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg },
   title: {
     fontSize: Typography.xxl,
-    color: Colors.text,
+    color: Colors.textPrimary,
     fontWeight: FontWeight.bold,
     marginBottom: Spacing.lg,
   },
   modeToggle: {
     flexDirection: 'row',
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.backgroundSubtle,
     borderRadius: Radius.lg,
     padding: 4,
     marginBottom: Spacing.md,
     gap: 4,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   modeBtn: {
     flex: 1,
     paddingVertical: Spacing.sm,
     borderRadius: Radius.md,
     alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 6,
   },
   modeBtnActive: {
-    backgroundColor: Colors.accent,
+    backgroundColor: Colors.primary,
+    ...Shadow.card,
   },
   modeBtnTxt: {
     fontSize: Typography.base,
-    color: Colors.textMuted,
+    color: Colors.textSecondary,
     fontWeight: FontWeight.medium,
   },
   modeBtnTxtActive: {
-    color: Colors.background,
+    color: Colors.white,
     fontWeight: FontWeight.bold,
   },
   mealRow: {
@@ -365,56 +369,59 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: 6,
     borderRadius: Radius.pill,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.backgroundSubtle,
     borderWidth: 1,
     borderColor: Colors.border,
   },
   mealPillActive: {
-    backgroundColor: Colors.accent + '20',
-    borderColor: Colors.accent,
+    backgroundColor: Colors.primaryLight,
+    borderColor: Colors.primary,
   },
   mealPillTxt: {
     fontSize: Typography.sm,
-    color: Colors.textMuted,
+    color: Colors.textSecondary,
     fontWeight: FontWeight.medium,
   },
   mealPillTxtActive: {
-    color: Colors.accent,
+    color: Colors.primary,
     fontWeight: FontWeight.semibold,
   },
   section: { gap: Spacing.md },
   hint: {
     fontSize: Typography.sm,
-    color: Colors.textMuted,
+    color: Colors.textSecondary,
     marginBottom: 4,
   },
   textArea: {
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.backgroundSubtle,
     borderRadius: Radius.lg,
     padding: Spacing.md,
-    color: Colors.text,
+    color: Colors.textPrimary,
     fontSize: Typography.base,
     minHeight: 100,
     borderWidth: 1,
     borderColor: Colors.border,
   },
   primaryBtn: {
-    backgroundColor: Colors.accent,
+    backgroundColor: Colors.primary,
     borderRadius: Radius.lg,
     paddingVertical: Spacing.md,
     alignItems: 'center',
-    ...Shadow.accent,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    ...Shadow.strong,
   },
   primaryBtnDisabled: { opacity: 0.5 },
   primaryBtnTxt: {
-    color: Colors.background,
+    color: Colors.white,
     fontSize: Typography.base,
     fontWeight: FontWeight.bold,
   },
   resultsContainer: { gap: Spacing.sm },
   resultsTitle: {
     fontSize: Typography.base,
-    color: Colors.text,
+    color: Colors.textPrimary,
     fontWeight: FontWeight.semibold,
   },
   resultCard: {
@@ -422,7 +429,9 @@ const styles = StyleSheet.create({
     borderRadius: Radius.lg,
     padding: Spacing.md,
     gap: Spacing.sm,
-    ...Shadow.sm,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    ...Shadow.card,
   },
   resultHeader: {
     flexDirection: 'row',
@@ -431,17 +440,17 @@ const styles = StyleSheet.create({
   },
   resultName: {
     fontSize: Typography.base,
-    color: Colors.text,
+    color: Colors.textPrimary,
     fontWeight: FontWeight.semibold,
     flex: 1,
   },
   resultBrand: {
     fontSize: Typography.xs,
-    color: Colors.textMuted,
+    color: Colors.textSecondary,
   },
   resultQty: {
     fontSize: Typography.sm,
-    color: Colors.textMuted,
+    color: Colors.textSecondary,
   },
   resultMacros: {
     flexDirection: 'row',
@@ -449,14 +458,14 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   saveBtn: {
-    backgroundColor: Colors.accent,
+    backgroundColor: Colors.primary,
     borderRadius: Radius.md,
     paddingVertical: Spacing.sm,
     alignItems: 'center',
     marginTop: 4,
   },
   saveBtnTxt: {
-    color: Colors.background,
+    color: Colors.white,
     fontSize: Typography.base,
     fontWeight: FontWeight.bold,
   },
@@ -466,24 +475,24 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.backgroundSubtle,
     borderRadius: Radius.lg,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm + 2,
-    color: Colors.text,
+    color: Colors.textPrimary,
     fontSize: Typography.base,
     borderWidth: 1,
     borderColor: Colors.border,
   },
   searchBtn: {
-    backgroundColor: Colors.accent,
+    backgroundColor: Colors.primary,
     borderRadius: Radius.lg,
     paddingHorizontal: Spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
     minWidth: 52,
+    ...Shadow.card,
   },
-  searchBtnTxt: { fontSize: 20 },
   qtyRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -493,18 +502,20 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: Colors.surface2,
+    backgroundColor: Colors.backgroundSubtle,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   qtyBtnTxt: {
     fontSize: Typography.lg,
-    color: Colors.text,
+    color: Colors.textPrimary,
     fontWeight: FontWeight.bold,
   },
   qtyValue: {
     fontSize: Typography.base,
-    color: Colors.text,
+    color: Colors.textPrimary,
     fontWeight: FontWeight.semibold,
     minWidth: 50,
     textAlign: 'center',

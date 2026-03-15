@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router';
-import { Colors } from '../../constants/theme';
+import { Feather } from '@expo/vector-icons';
+import { Colors, Typography, FontWeight } from '../../constants/theme';
 
 export default function TabLayout() {
   return (
@@ -10,15 +11,15 @@ export default function TabLayout() {
           backgroundColor: Colors.surface,
           borderTopColor: Colors.border,
           borderTopWidth: 1,
-          height: 64,
-          paddingBottom: 10,
-          paddingTop: 6,
+          height: 60,
+          paddingBottom: 8,
+          paddingTop: 8,
         },
-        tabBarActiveTintColor: Colors.accent,
+        tabBarActiveTintColor: Colors.primary,
         tabBarInactiveTintColor: Colors.textDisabled,
         tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '500',
+          fontSize: Typography.xs,
+          fontWeight: FontWeight.medium,
         },
       }}
     >
@@ -26,43 +27,30 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Hoje',
-          tabBarIcon: ({ color, size }) => (
-            <TabIcon emoji="🏠" color={color} />
-          ),
+          tabBarIcon: ({ color }) => <Feather name="home" size={22} color={color} />,
         }}
       />
       <Tabs.Screen
         name="log"
         options={{
           title: 'Registar',
-          tabBarIcon: ({ color }) => (
-            <TabIcon emoji="➕" color={color} />
-          ),
+          tabBarIcon: ({ color }) => <Feather name="plus-circle" size={22} color={color} />,
         }}
       />
       <Tabs.Screen
         name="history"
         options={{
           title: 'Histórico',
-          tabBarIcon: ({ color }) => (
-            <TabIcon emoji="📊" color={color} />
-          ),
+          tabBarIcon: ({ color }) => <Feather name="bar-chart-2" size={22} color={color} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: 'Perfil',
-          tabBarIcon: ({ color }) => (
-            <TabIcon emoji="👤" color={color} />
-          ),
+          tabBarIcon: ({ color }) => <Feather name="user" size={22} color={color} />,
         }}
       />
     </Tabs>
   );
-}
-
-function TabIcon({ emoji, color }: { emoji: string; color: string }) {
-  const { Text } = require('react-native');
-  return <Text style={{ fontSize: 22, opacity: color === Colors.accent ? 1 : 0.5 }}>{emoji}</Text>;
 }
