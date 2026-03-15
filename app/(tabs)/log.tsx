@@ -196,6 +196,31 @@ function MacroPreviewCard({ calories, protein, carbs, fat }: { calories: number;
   );
 }
 
+// ─── Barcode validation ───────────────────────────────────────────────────────
+
+const REQUIRED_CONSISTENT_SCANS = 3;
+
+function validateEAN13(barcode: string): boolean {
+  if (barcode.length !== 13) return false;
+  let sum = 0;
+  for (let i = 0; i < 12; i++) {
+    const digit = parseInt(barcode[i]);
+    sum += i % 2 === 0 ? digit : digit * 3;
+  }
+  const checkDigit = (10 - (sum % 10)) % 10;
+  return checkDigit === parseInt(barcode[12]);
+}
+
+function isValidBarcode(data: string, type: string): boolean {
+  const onlyDigits = /^\d+$/.test(data);
+  if (type === 'ean13') return onlyDigits && data.length === 13 && validateEAN13(data);
+  if (type === 'ean8') return onlyDigits && data.length === 8;
+  if (type === 'upc_a') return onlyDigits && data.length === 12;
+  if (type === 'upc_e') return onlyDigits && data.length >= 6 && data.length <= 8;
+  if (type === 'code128' || type === 'code39') return data.length >= 4;
+  return false;
+}
+
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function LogScreen() {
@@ -271,10 +296,12 @@ export default function LogScreen() {
   const [scannerVisible, setScannerVisible] = useState(false);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [torchEnabled, setTorchEnabled] = useState(false);
-  const [barcodeScanning, setBarcodeScanning] = useState(false);
+  const [scanned, setScanned] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [scanConfidence, setScanConfidence] = useState(0);
   const [barcodeError, setBarcodeError] = useState<string | null>(null);
   const scanLineAnim = useRef(new Animated.Value(0)).current;
-  const scanCooldown = useRef(false);
+  const scanBuffer = useRef<string[]>([]);
 
   // ── Manual tab ───────────────────────────────────────────────────────────
   const [manualSubMode, setManualSubMode] = useState<ManualSubMode>('food');
@@ -304,7 +331,10 @@ export default function LogScreen() {
 
   useEffect(() => {
     if (scannerVisible) {
-      scanCooldown.current = false;
+      scanBuffer.current = [];
+      setScanConfidence(0);
+      setScanned(false);
+      setIsProcessing(false);
       const anim = Animated.loop(
         Animated.sequence([
           Animated.timing(scanLineAnim, { toValue: 1, duration: 1800, useNativeDriver: true }),
@@ -441,21 +471,65 @@ export default function LogScreen() {
     setScannerVisible(true);
   };
 
-  const handleBarcodeScan = useCallback(async (result: BarcodeScanningResult) => {
-    if (scanCooldown.current || barcodeScanning) return;
-    scanCooldown.current = true;
-    setBarcodeScanning(true);
+  const lookupBarcode = useCallback(async (data: string) => {
     setScannerVisible(false);
     try {
-      const food = await searchByBarcode(result.data);
+      const food = await searchByBarcode(data);
       if (food) { setSearchResults([food]); setFromCache(false); setBarcodeError(null); }
       else { setSearchResults([]); setBarcodeError('Produto não encontrado. Tenta pesquisar pelo nome.'); }
     } catch {
       setBarcodeError('Erro ao procurar produto.');
     } finally {
-      setBarcodeScanning(false);
+      setIsProcessing(false);
     }
-  }, [barcodeScanning]);
+  }, []);
+
+  const handleBarcodeScan = useCallback(async ({ type, data }: BarcodeScanningResult) => {
+    if (scanned || isProcessing) return;
+    if (!isValidBarcode(data, type)) return;
+
+    scanBuffer.current.push(data);
+    if (scanBuffer.current.length > 5) scanBuffer.current = scanBuffer.current.slice(-5);
+
+    const count = scanBuffer.current.filter(b => b === data).length;
+    if (count < REQUIRED_CONSISTENT_SCANS) {
+      setScanConfidence(count);
+      return;
+    }
+
+    scanBuffer.current = [];
+    setScanned(true);
+    setIsProcessing(true);
+    await lookupBarcode(data);
+  }, [scanned, isProcessing, lookupBarcode]);
+
+  const handleManualEntry = () => {
+    if (Platform.OS === 'ios') {
+      Alert.prompt(
+        'Código de barras',
+        'Introduz o código manualmente',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          {
+            text: 'Pesquisar',
+            onPress: async (barcode?: string) => {
+              if (barcode && barcode.trim().length >= 8) {
+                setScannerVisible(false);
+                setScanned(true);
+                setIsProcessing(true);
+                await lookupBarcode(barcode.trim());
+              }
+            },
+          },
+        ],
+        'plain-text',
+        '',
+        'numeric'
+      );
+    } else {
+      setScannerVisible(false);
+    }
+  };
 
   // ── Saved handlers ────────────────────────────────────────────────────────
 
@@ -704,7 +778,7 @@ export default function LogScreen() {
                   <Feather name="maximize" size={18} color={Colors.primary} />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.searchBtn} onPress={() => runSearch(searchText)} activeOpacity={0.8} disabled={searchLoading}>
-                  {searchLoading || barcodeScanning ? <ActivityIndicator color={Colors.white} size="small" /> : <Feather name="search" size={18} color={Colors.white} />}
+                  {searchLoading || isProcessing ? <ActivityIndicator color={Colors.white} size="small" /> : <Feather name="search" size={18} color={Colors.white} />}
                 </TouchableOpacity>
               </View>
 
@@ -1011,7 +1085,7 @@ export default function LogScreen() {
       {/* Barcode Scanner Modal */}
       <Modal visible={scannerVisible} transparent={false} animationType="slide" onRequestClose={() => setScannerVisible(false)}>
         <View style={scanStyles.container}>
-          <CameraView style={StyleSheet.absoluteFill} facing="back" enableTorch={torchEnabled} onBarcodeScanned={handleBarcodeScan} />
+          <CameraView style={StyleSheet.absoluteFill} facing="back" enableTorch={torchEnabled} onBarcodeScanned={handleBarcodeScan} barcodeScannerSettings={{ barcodeTypes: ['ean13', 'ean8'] }} />
           <View style={scanStyles.overlay}>
             <View style={scanStyles.overlayTop} />
             <View style={scanStyles.overlayMiddle}>
@@ -1027,6 +1101,15 @@ export default function LogScreen() {
             </View>
             <View style={scanStyles.overlayBottom}>
               <Text style={scanStyles.hint}>Aponta para o código de barras</Text>
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 16 }}>
+                {[1, 2, 3].map(i => (
+                  <View key={i} style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: i <= scanConfidence ? Colors.primary : 'rgba(255,255,255,0.3)' }} />
+                ))}
+              </View>
+              <TouchableOpacity onPress={handleManualEntry} style={{ marginTop: 24, flexDirection: 'row', alignItems: 'center', gap: 8 }} activeOpacity={0.7}>
+                <Feather name="edit-3" size={14} color="rgba(255,255,255,0.6)" />
+                <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13 }}>Introduzir código manualmente</Text>
+              </TouchableOpacity>
             </View>
           </View>
           <View style={[scanStyles.topBar, { paddingTop: insets.top + 8 }]}>
@@ -1109,8 +1192,8 @@ const styles = StyleSheet.create({
   title: { fontSize: Typography.xxl, color: Colors.textPrimary, fontWeight: FontWeight.bold, marginBottom: Spacing.sm },
   contextPill: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: Colors.primaryLight, borderRadius: Radius.pill, paddingHorizontal: Spacing.md, paddingVertical: 7, alignSelf: 'flex-start', marginBottom: Spacing.md, borderWidth: 1, borderColor: Colors.primary + '30' },
   contextPillTxt: { fontSize: Typography.sm, color: Colors.primary, fontWeight: FontWeight.semibold },
-  modeToggle: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', alignSelf: 'center', backgroundColor: '#F0F4FF', borderRadius: 50, padding: 4, marginHorizontal: 16, marginVertical: 12 },
-  modeBtn: { flex: 1, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 50, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 4 },
+  modeToggle: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F0F4FF', borderRadius: 50, padding: 4, marginHorizontal: 16, marginVertical: 12 },
+  modeBtn: { flex: 1, paddingVertical: 8, paddingHorizontal: 6, borderRadius: 50, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 3 },
   modeBtnActive: { backgroundColor: Colors.primary, ...Shadow.card },
   modeBtnTxt: { fontSize: Typography.xs, color: Colors.textSecondary, fontWeight: FontWeight.medium },
   modeBtnTxtActive: { color: Colors.white, fontWeight: FontWeight.bold },
