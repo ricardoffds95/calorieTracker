@@ -1,12 +1,9 @@
 const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? '';
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${GEMINI_API_KEY}`;
 
-// Minimal prompts = fewer tokens = faster responses
-const TEXT_PROMPT = `Alimentos em JSON apenas:
-[{"name":"","quantity_g":0,"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0}]`;
-
-const IMAGE_PROMPT = `Identifica alimentos na imagem. JSON apenas:
-[{"name":"","quantity_g":0,"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0}]`;
+const SYSTEM_PROMPT = `Identifica os alimentos descritos ou visíveis, estima as quantidades em gramas se não especificadas, e devolve APENAS um JSON array sem markdown nem texto extra:
+[{"name":"frango grelhado","quantity_g":150,"calories":165,"protein_g":31,"carbs_g":0,"fat_g":3.6}]
+Usa valores nutricionais padrão. Responde APENAS com o JSON array.`;
 
 export interface GeminiParsedItem {
   name: string;
@@ -17,97 +14,57 @@ export interface GeminiParsedItem {
   fat_g: number;
 }
 
-function extractText(data: unknown): string {
-  // gemini-2.5-flash is a thinking model: parts = [{thought:true, text:"..."}, {text:"..."}]
-  // Join all non-thought parts so we always get the final answer regardless of part count.
-  const parts = (data as any)?.candidates?.[0]?.content?.parts as Array<{ text?: string; thought?: boolean }> | undefined;
-  if (!parts) return '';
-  return parts.filter(p => !p.thought).map(p => p.text ?? '').join('');
-}
-
 function parseGeminiResponse(text: string): GeminiParsedItem[] {
-  console.log('Gemini raw text:', text); // keep until stable
-  let clean = text.replace(/```json\n?|```\n?/g, '').trim();
-  const start = clean.indexOf('[');
-  const end = clean.lastIndexOf(']');
-  if (start !== -1 && end !== -1 && end > start) {
-    clean = clean.slice(start, end + 1);
-  }
-  try {
-    const parsed = JSON.parse(clean);
-    if (!Array.isArray(parsed) || parsed.length === 0) throw new Error('empty');
-    return parsed as GeminiParsedItem[];
-  } catch {
-    throw new Error('Não foi possível interpretar a resposta. Tenta novamente.');
-  }
+  const clean = text.replace(/```json\n?|```\n?/g, '').trim();
+  return JSON.parse(clean) as GeminiParsedItem[];
 }
 
-async function fetchWithTimeout(url: string, options: RequestInit, ms = 8000): Promise<Response> {
+async function callGemini(contents: unknown): Promise<GeminiParsedItem[]> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), ms);
+  const timeout = setTimeout(() => controller.abort(), 10000);
+  let response: Response;
   try {
-    const response = await fetch(url, { ...options, signal: controller.signal });
+    response = await fetch(GEMINI_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents }),
+      signal: controller.signal,
+    });
+  } catch (err: unknown) {
     clearTimeout(timeout);
-    return response;
-  } catch (error: unknown) {
-    clearTimeout(timeout);
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('Pedido demorou demasiado. Tenta novamente.');
+    if (err instanceof Error && err.name === 'AbortError') throw new Error('Pedido demorou demasiado. Tenta novamente.');
+    throw err;
+  }
+  clearTimeout(timeout);
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    console.error('Gemini API error:', response.status, errorData);
+    if (response.status === 429) {
+      const retryMatch = (errorData?.error?.message as string | undefined)?.match(/retry in ([\d.]+)s/);
+      const secs = retryMatch ? Math.ceil(parseFloat(retryMatch[1])) : null;
+      throw new Error(secs ? `Limite atingido. Tenta novamente em ${secs} segundos.` : 'Limite atingido. Aguarda um momento e tenta novamente.');
     }
-    throw error;
+    if (response.status === 401 || response.status === 403) throw new Error('Não foi possível ligar ao serviço de IA. Verifica a tua ligação.');
+    if (response.status >= 500) throw new Error('O serviço de IA está temporariamente indisponível. Tenta mais tarde.');
+    throw new Error('Não foi possível analisar. Tenta novamente.');
   }
-}
 
-function handleGeminiError(status: number, errorData: unknown): never {
-  console.error('Gemini API error:', status, errorData);
-  if (status === 429) {
-    const msg = (errorData as any)?.error?.message as string | undefined;
-    const retryMatch = msg?.match(/retry in ([\d.]+)s/);
-    const secs = retryMatch ? Math.ceil(parseFloat(retryMatch[1])) : null;
-    throw new Error(secs
-      ? `Limite atingido. Tenta novamente em ${secs} segundos.`
-      : 'Limite atingido. Aguarda um momento e tenta novamente.');
-  }
-  if (status === 401 || status === 403) throw new Error('Não foi possível ligar ao serviço de IA. Verifica a tua ligação.');
-  if (status >= 500) throw new Error('O serviço de IA está temporariamente indisponível. Tenta mais tarde.');
-  throw new Error('Não foi possível analisar. Tenta novamente.');
-}
-
-export async function parseFoodWithAI(input: string): Promise<GeminiParsedItem[]> {
-  const response = await fetchWithTimeout(GEMINI_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: TEXT_PROMPT + '\nInput: ' + input }] }],
-      generationConfig: { maxOutputTokens: 512, temperature: 0.1, topP: 0.8, topK: 10 },
-    }),
-  });
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    handleGeminiError(response.status, err);
-  }
   const data = await response.json();
-  return parseGeminiResponse(extractText(data));
+  const parts = data?.candidates?.[0]?.content?.parts as Array<{ text?: string; thought?: boolean }> | undefined;
+  const text = parts?.filter(p => !p.thought).map(p => p.text ?? '').join('') ?? '';
+  return parseGeminiResponse(text);
 }
 
-export async function analyzeFoodImage(base64Image: string): Promise<GeminiParsedItem[]> {
-  const response = await fetchWithTimeout(GEMINI_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{
-        parts: [
-          { text: IMAGE_PROMPT },
-          { inline_data: { mime_type: 'image/jpeg', data: base64Image } },
-        ],
-      }],
-      generationConfig: { maxOutputTokens: 600, temperature: 0.1, topP: 0.8, topK: 10 },
-    }),
-  });
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    handleGeminiError(response.status, err);
-  }
-  const data = await response.json();
-  return parseGeminiResponse(extractText(data));
+export function parseFoodWithAI(input: string): Promise<GeminiParsedItem[]> {
+  return callGemini([{ parts: [{ text: SYSTEM_PROMPT + '\n\n' + input }] }]);
+}
+
+export function analyzeFoodImage(base64Image: string): Promise<GeminiParsedItem[]> {
+  return callGemini([{
+    parts: [
+      { text: SYSTEM_PROMPT },
+      { inline_data: { mime_type: 'image/jpeg', data: base64Image } },
+    ],
+  }]);
 }
