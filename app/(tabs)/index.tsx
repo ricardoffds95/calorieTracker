@@ -77,7 +77,7 @@ export default function DashboardScreen() {
           <Text style={styles.sectionTitle}>Refeições</Text>
           {MEALS.map(meal => {
             const items = meals[meal];
-            const mealCalories = items.reduce((sum, item) => sum + item.calories, 0);
+            const mealCalories = items.reduce((sum, entry) => sum + (entry.type === 'meal' ? entry.totalCalories : entry.calories), 0);
             return (
               <MealSection
                 key={meal}

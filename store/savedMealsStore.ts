@@ -166,17 +166,17 @@ export const useSavedMealsStore = create<SavedMealsState>((set, get) => ({
   },
 
   addMealToLog: (meal, mealType) => {
-    const addFood = useFoodStore.getState().addFood;
-    meal.items.forEach((item) => {
-      addFood({
+    useFoodStore.getState().addMeal({
+      name: meal.name,
+      items: meal.items.map(item => ({
         name: item.name,
         quantity_g: item.quantity_g,
         calories: item.calories,
         protein_g: item.protein_g,
         carbs_g: item.carbs_g,
         fat_g: item.fat_g,
-        meal: mealType,
-      });
+      })),
+      meal: mealType,
     });
     get().incrementUsage(meal.id);
   },

@@ -196,6 +196,91 @@ function MacroPreviewCard({ calories, protein, carbs, fat }: { calories: number;
   );
 }
 
+// ─── Editable AI item ─────────────────────────────────────────────────────────
+
+interface EditableFoodItem {
+  id: string;
+  name: string;
+  quantity_g: number;
+  calories: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+  originalCaloriesPer100g: number;
+  originalProteinPer100g: number;
+  originalCarbsPer100g: number;
+  originalFatPer100g: number;
+}
+
+function toEditableItem(item: GeminiParsedItem): EditableFoodItem {
+  const qty = item.quantity_g > 0 ? item.quantity_g : 100;
+  const factor = 100 / qty;
+  return {
+    id: `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    name: item.name,
+    quantity_g: qty,
+    calories: item.calories,
+    protein_g: item.protein_g,
+    carbs_g: item.carbs_g,
+    fat_g: item.fat_g,
+    originalCaloriesPer100g: item.calories * factor,
+    originalProteinPer100g: item.protein_g * factor,
+    originalCarbsPer100g: item.carbs_g * factor,
+    originalFatPer100g: item.fat_g * factor,
+  };
+}
+
+function EditableFoodCard({
+  item, onQuantityChange, onDelete,
+}: {
+  item: EditableFoodItem;
+  onQuantityChange: (id: string, qty: number) => void;
+  onDelete: (id: string) => void;
+}) {
+  return (
+    <View style={editCardStyles.card}>
+      <View style={editCardStyles.header}>
+        <Text style={editCardStyles.name} numberOfLines={2}>{item.name}</Text>
+        <TouchableOpacity onPress={() => onDelete(item.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Feather name="x" size={18} color="#E85D75" />
+        </TouchableOpacity>
+      </View>
+      <View style={editCardStyles.qtyRow}>
+        <TouchableOpacity onPress={() => onQuantityChange(item.id, Math.max(5, item.quantity_g - 10))} style={editCardStyles.qtyBtn}>
+          <Feather name="minus" size={15} color={Colors.primary} />
+        </TouchableOpacity>
+        <QuantityInput value={item.quantity_g} onChange={(qty) => onQuantityChange(item.id, qty)} min={1} />
+        <TouchableOpacity onPress={() => onQuantityChange(item.id, item.quantity_g + 10)} style={editCardStyles.qtyBtn}>
+          <Feather name="plus" size={15} color={Colors.primary} />
+        </TouchableOpacity>
+      </View>
+      <View style={editCardStyles.macros}>
+        <Text style={editCardStyles.kcal}>{Math.round(item.calories)} kcal</Text>
+        <View style={editCardStyles.macroPills}>
+          <Text style={[editCardStyles.macro, { color: MacroColors.protein }]}>P {Math.round(item.protein_g * 10) / 10}g</Text>
+          <Text style={[editCardStyles.macro, { color: MacroColors.carbs }]}>H {Math.round(item.carbs_g * 10) / 10}g</Text>
+          <Text style={[editCardStyles.macro, { color: MacroColors.fat }]}>G {Math.round(item.fat_g * 10) / 10}g</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function ResultsTotalsBar({ items }: { items: EditableFoodItem[] }) {
+  const totals = items.reduce(
+    (acc, item) => ({ calories: acc.calories + item.calories, protein: acc.protein + item.protein_g, carbs: acc.carbs + item.carbs_g, fat: acc.fat + item.fat_g }),
+    { calories: 0, protein: 0, carbs: 0, fat: 0 }
+  );
+  return (
+    <View style={editCardStyles.totalsBar}>
+      <Text style={editCardStyles.totalKcal}>Total: {Math.round(totals.calories)} kcal</Text>
+      <Text style={[editCardStyles.totalMacro, { color: MacroColors.protein }]}>P {Math.round(totals.protein * 10) / 10}g</Text>
+      <Text style={[editCardStyles.totalMacro, { color: MacroColors.carbs }]}>H {Math.round(totals.carbs * 10) / 10}g</Text>
+      <Text style={[editCardStyles.totalMacro, { color: MacroColors.fat }]}>G {Math.round(totals.fat * 10) / 10}g</Text>
+    </View>
+  );
+}
+
 // ─── Barcode validation ───────────────────────────────────────────────────────
 
 const CHECKSUM_TYPES = ['ean13', 'ean8', 'upc_a'];
@@ -248,7 +333,7 @@ function isValidBarcode(data: string, type: string): boolean {
 
 export default function LogScreen() {
   const insets = useSafeAreaInsets();
-  const { addFood } = useFood();
+  const { addFood, addMeal } = useFood();
   const savedStore = useSavedMealsStore();
   const params = useLocalSearchParams<{ mealContext?: string; timestamp?: string }>();
 
@@ -301,13 +386,12 @@ export default function LogScreen() {
   const [aiText, setAiText] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
-  const [parsedItems, setParsedItems] = useState<GeminiParsedItem[]>([]);
+  const [editableItems, setEditableItems] = useState<EditableFoodItem[]>([]);
   const [selectedPhoto, setSelectedPhoto] = useState<{ uri: string; base64: string } | null>(null);
 
   // Save meal modal
   const [saveModalVisible, setSaveModalVisible] = useState(false);
   const [saveMealName, setSaveMealName] = useState('');
-  const [pendingSaveItems, setPendingSaveItems] = useState<GeminiParsedItem[]>([]);
 
   // ── Search tab ───────────────────────────────────────────────────────────
   const [searchText, setSearchText] = useState('');
@@ -402,7 +486,7 @@ export default function LogScreen() {
     setAiLoading(true); setAiError(null);
     try {
       const items = selectedPhoto ? await analyzeFoodImage(selectedPhoto.base64) : await parseFoodWithAI(aiText);
-      setParsedItems(items);
+      setEditableItems(items.map(toEditableItem));
     } catch (e: unknown) {
       setAiError(e instanceof Error ? e.message : 'Não foi possível processar');
     } finally {
@@ -410,25 +494,55 @@ export default function LogScreen() {
     }
   };
 
-  const saveAiItems = () => {
+  const handleQuantityChange = (id: string, newQty: number) => {
+    setEditableItems(prev => prev.map(item => {
+      if (item.id !== id) return item;
+      const factor = newQty / 100;
+      return {
+        ...item,
+        quantity_g: newQty,
+        calories: Math.round(item.originalCaloriesPer100g * factor * 10) / 10,
+        protein_g: Math.round(item.originalProteinPer100g * factor * 10) / 10,
+        carbs_g: Math.round(item.originalCarbsPer100g * factor * 10) / 10,
+        fat_g: Math.round(item.originalFatPer100g * factor * 10) / 10,
+      };
+    }));
+  };
+
+  const handleDeleteItem = (id: string) => {
+    setEditableItems(prev => {
+      const next = prev.filter(item => item.id !== id);
+      return next;
+    });
+  };
+
+  const addAiItemsToDiary = () => {
+    if (editableItems.length === 0) return;
     const doAdd = (m: MealType) => {
-      parsedItems.forEach((item) => {
+      if (editableItems.length === 1) {
+        const item = editableItems[0];
         addFood({ name: item.name, quantity_g: item.quantity_g, calories: item.calories, protein_g: item.protein_g, carbs_g: item.carbs_g, fat_g: item.fat_g, meal: m });
-      });
-      setParsedItems([]); setAiText(''); setSelectedPhoto(null);
+      } else {
+        addMeal({
+          name: aiText.trim() ? aiText.trim().slice(0, 40) : 'Refeição IA',
+          items: editableItems.map(item => ({ name: item.name, quantity_g: item.quantity_g, calories: item.calories, protein_g: item.protein_g, carbs_g: item.carbs_g, fat_g: item.fat_g })),
+          meal: m,
+        });
+      }
+      setEditableItems([]); setAiText(''); setSelectedPhoto(null);
       showToast(`✓ Adicionado ao ${MEAL_DISPLAY[m]}`);
     };
     if (activeMeal) doAdd(activeMeal);
     else openMealSheet(doAdd);
   };
 
-  const openSaveMealModal = (items: GeminiParsedItem[]) => {
-    setPendingSaveItems(items); setSaveMealName(''); setSaveModalVisible(true);
+  const openSaveMealModal = () => {
+    setSaveMealName(''); setSaveModalVisible(true);
   };
 
   const confirmSaveMeal = async () => {
     if (!saveMealName.trim()) return;
-    const storeItems: SavedMealItem[] = pendingSaveItems.map((item) => ({
+    const storeItems: SavedMealItem[] = editableItems.map((item) => ({
       id: Date.now().toString() + Math.random().toString(36).slice(2),
       name: item.name, quantity_g: item.quantity_g, calories: item.calories,
       protein_g: item.protein_g, carbs_g: item.carbs_g, fat_g: item.fat_g,
@@ -440,13 +554,13 @@ export default function LogScreen() {
         `Já tens uma refeição chamada "${saveMealName.trim()}". Queres substituir ou guardar como nova?`,
         [
           { text: 'Cancelar', style: 'cancel' },
-          { text: 'Guardar como nova', onPress: async () => { await savedStore.saveMealForce(saveMealName.trim(), storeItems); setSaveModalVisible(false); setSaveMealName(''); } },
-          { text: 'Substituir', style: 'destructive', onPress: async () => { await savedStore.replaceMeal(result.existingId!, saveMealName.trim(), storeItems); setSaveModalVisible(false); setSaveMealName(''); } },
+          { text: 'Guardar como nova', onPress: async () => { await savedStore.saveMealForce(saveMealName.trim(), storeItems); setSaveModalVisible(false); setSaveMealName(''); showToast('Refeição guardada!'); } },
+          { text: 'Substituir', style: 'destructive', onPress: async () => { await savedStore.replaceMeal(result.existingId!, saveMealName.trim(), storeItems); setSaveModalVisible(false); setSaveMealName(''); showToast('Refeição guardada!'); } },
         ]
       );
       return;
     }
-    setSaveModalVisible(false); setSaveMealName('');
+    setSaveModalVisible(false); setSaveMealName(''); showToast('Refeição guardada!');
   };
 
   // ── Search handlers ───────────────────────────────────────────────────────
@@ -669,7 +783,12 @@ export default function LogScreen() {
   const handleMealAddToDiary = () => {
     if (mealItems.length === 0) { Alert.alert('Atenção', 'Adiciona pelo menos um item.'); return; }
     const doAdd = (m: MealType) => {
-      mealItems.forEach((item) => { addFood({ name: item.name, quantity_g: item.quantity_g, calories: item.calories, protein_g: item.protein_g, carbs_g: item.carbs_g, fat_g: item.fat_g, meal: m }); });
+      if (mealItems.length === 1) {
+        const item = mealItems[0];
+        addFood({ name: item.name, quantity_g: item.quantity_g, calories: item.calories, protein_g: item.protein_g, carbs_g: item.carbs_g, fat_g: item.fat_g, meal: m });
+      } else {
+        addMeal({ name: mealName.trim() || 'Refeição manual', items: mealItems, meal: m });
+      }
       setMealItems([]); setMealName('');
       showToast(`✓ Adicionado ao ${MEAL_DISPLAY[m]}`);
     };
@@ -777,30 +896,27 @@ export default function LogScreen() {
 
               {aiError && <ErrorCard message={aiError} />}
 
-              {parsedItems.length > 0 && (
+              {editableItems.length > 0 && (
                 <View style={styles.resultsContainer}>
                   <Text style={styles.resultsTitle}>Alimentos identificados:</Text>
-                  {parsedItems.map((item, idx) => (
-                    <View key={idx} style={styles.resultCard}>
-                      <View style={styles.resultHeader}>
-                        <Text style={styles.resultName}>{item.name}</Text>
-                        <Text style={styles.resultQty}>{item.quantity_g}g</Text>
-                      </View>
-                      <View style={styles.resultMacros}>
-                        <MacroChip value={item.calories} label="kcal" color={Colors.primary} />
-                        <MacroChip value={item.protein_g} label="P" color={MacroColors.protein} />
-                        <MacroChip value={item.carbs_g} label="C" color={MacroColors.carbs} />
-                        <MacroChip value={item.fat_g} label="G" color={MacroColors.fat} />
-                      </View>
-                    </View>
+                  {editableItems.map((item) => (
+                    <EditableFoodCard
+                      key={item.id}
+                      item={item}
+                      onQuantityChange={handleQuantityChange}
+                      onDelete={handleDeleteItem}
+                    />
                   ))}
-                  <TouchableOpacity style={styles.saveBtn} onPress={saveAiItems} activeOpacity={0.8}>
-                    <Text style={styles.saveBtnTxt}>{addLabel(`Adicionar tudo`)} ({parsedItems.length} alimento{parsedItems.length !== 1 ? 's' : ''})</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.outlineBtn} onPress={() => openSaveMealModal(parsedItems)} activeOpacity={0.8}>
-                    <Feather name="bookmark" size={15} color={Colors.primary} />
-                    <Text style={styles.outlineBtnTxt}>Guardar Refeição</Text>
-                  </TouchableOpacity>
+                  <ResultsTotalsBar items={editableItems} />
+                  <View style={styles.twoButtonRow}>
+                    <TouchableOpacity style={[styles.outlineBtnSmall, { flex: 1 }]} onPress={openSaveMealModal} activeOpacity={0.8}>
+                      <Feather name="bookmark" size={13} color={Colors.primary} />
+                      <Text style={styles.outlineBtnSmallTxt}>Guardar Refeição</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.saveBtn, { flex: 1, marginTop: 0 }]} onPress={addAiItemsToDiary} activeOpacity={0.8}>
+                      <Text style={styles.saveBtnTxt}>{addLabel('Adicionar ao Diário')}</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               )}
             </View>
@@ -1324,4 +1440,19 @@ const styles = StyleSheet.create({
   modalBtnCancelTxt: { color: Colors.textSecondary, fontSize: Typography.base, fontWeight: FontWeight.medium },
   modalBtnConfirm: { backgroundColor: Colors.primary, ...Shadow.card },
   modalBtnConfirmTxt: { color: Colors.white, fontSize: Typography.base, fontWeight: FontWeight.bold },
+});
+
+const editCardStyles = StyleSheet.create({
+  card: { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.md, gap: 10, borderWidth: 1, borderColor: Colors.border, ...Shadow.card },
+  header: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 },
+  name: { flex: 1, fontSize: Typography.base, color: Colors.textPrimary, fontWeight: FontWeight.semibold },
+  qtyRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  qtyBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.primary + '40' },
+  macros: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  kcal: { fontSize: Typography.base, fontWeight: FontWeight.bold, color: Colors.primary },
+  macroPills: { flexDirection: 'row', gap: 8 },
+  macro: { fontSize: Typography.sm, fontWeight: FontWeight.semibold },
+  totalsBar: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, backgroundColor: '#EEF3FD', borderRadius: Radius.md, padding: Spacing.sm + 2, borderWidth: 1, borderColor: Colors.primary + '30', flexWrap: 'wrap' },
+  totalKcal: { fontSize: Typography.sm, color: Colors.primary, fontWeight: FontWeight.bold, marginRight: 4 },
+  totalMacro: { fontSize: Typography.sm, fontWeight: FontWeight.semibold },
 });
