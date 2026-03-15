@@ -25,7 +25,11 @@ async function callGemini(contents: unknown): Promise<GeminiParsedItem[]> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ contents }),
   });
-  if (!response.ok) throw new Error(`Gemini API error: ${response.status}`);
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    console.error('Gemini API error:', response.status, errorData);
+    throw new Error(`Gemini API error ${response.status}: ${errorData?.error?.message ?? response.statusText}`);
+  }
   const data = await response.json();
   const text = data.candidates[0].content.parts[0].text as string;
   return parseGeminiResponse(text);
