@@ -17,8 +17,16 @@ export interface GeminiParsedItem {
   fat_g: number;
 }
 
+function extractText(data: unknown): string {
+  // gemini-2.5-flash is a thinking model: parts = [{thought:true, text:"..."}, {text:"..."}]
+  // Join all non-thought parts so we always get the final answer regardless of part count.
+  const parts = (data as any)?.candidates?.[0]?.content?.parts as Array<{ text?: string; thought?: boolean }> | undefined;
+  if (!parts) return '';
+  return parts.filter(p => !p.thought).map(p => p.text ?? '').join('');
+}
+
 function parseGeminiResponse(text: string): GeminiParsedItem[] {
-  // Strip markdown fences then find the JSON array boundaries
+  console.log('Gemini raw text:', text); // keep until stable
   let clean = text.replace(/```json\n?|```\n?/g, '').trim();
   const start = clean.indexOf('[');
   const end = clean.lastIndexOf(']');
@@ -27,12 +35,10 @@ function parseGeminiResponse(text: string): GeminiParsedItem[] {
   }
   try {
     const parsed = JSON.parse(clean);
-    if (!Array.isArray(parsed) || parsed.length === 0) {
-      throw new Error('empty');
-    }
+    if (!Array.isArray(parsed) || parsed.length === 0) throw new Error('empty');
     return parsed as GeminiParsedItem[];
   } catch {
-    throw new Error('Não foi possível interpretar a resposta. Tenta descrever os alimentos de forma mais simples.');
+    throw new Error('Não foi possível interpretar a resposta. Tenta novamente.');
   }
 }
 
@@ -81,7 +87,7 @@ export async function parseFoodWithAI(input: string): Promise<GeminiParsedItem[]
     handleGeminiError(response.status, err);
   }
   const data = await response.json();
-  return parseGeminiResponse(data.candidates[0].content.parts[0].text as string);
+  return parseGeminiResponse(extractText(data));
 }
 
 export async function analyzeFoodImage(base64Image: string): Promise<GeminiParsedItem[]> {
@@ -103,5 +109,5 @@ export async function analyzeFoodImage(base64Image: string): Promise<GeminiParse
     handleGeminiError(response.status, err);
   }
   const data = await response.json();
-  return parseGeminiResponse(data.candidates[0].content.parts[0].text as string);
+  return parseGeminiResponse(extractText(data));
 }
