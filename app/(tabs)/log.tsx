@@ -737,7 +737,35 @@ export default function LogScreen() {
     const fat = parseFloat(savedEdit.fat) || 0;
     if (savedEdit.kind === 'meal') {
       await savedStore.editMeal(savedEdit.id, { name: savedEdit.name.trim(), totalCalories: cal, totalProtein: prot, totalCarbs: carb, totalFat: fat });
-      useFoodStore.getState().syncSavedMeal(savedEdit.id, { name: savedEdit.name.trim(), totalCalories: cal, totalProtein: prot, totalCarbs: carb, totalFat: fat });
+      const updates = { name: savedEdit.name.trim(), totalCalories: cal, totalProtein: prot, totalCarbs: carb, totalFat: fat };
+      // Count matching diary entries across all dates
+      const allLogs = useFoodStore.getState().logs;
+      let count = 0;
+      for (const dayLog of Object.values(allLogs)) {
+        for (const entries of Object.values(dayLog.meals)) {
+          for (const entry of entries) {
+            if (entry.type === 'meal' && (entry as any).savedMealId === savedEdit.id) count++;
+          }
+        }
+      }
+      if (count > 0) {
+        Alert.alert(
+          'Atualizar diário?',
+          `Esta refeição aparece ${count === 1 ? '1 vez' : `${count} vezes`} no teu diário. Queres atualizar esses registos também?`,
+          [
+            { text: 'Não', style: 'cancel', onPress: () => setSavedEdit(null) },
+            {
+              text: 'Atualizar tudo',
+              onPress: () => {
+                useFoodStore.getState().updateDiaryEntriesFromMeal(savedEdit.id, updates);
+                setSavedEdit(null);
+                showToast('Refeição e diário atualizados ✓');
+              },
+            },
+          ]
+        );
+        return;
+      }
     } else {
       await savedStore.editFood(savedEdit.id, { name: savedEdit.name.trim(), calories_100g: cal, protein_100g: prot, carbs_100g: carb, fat_100g: fat });
     }

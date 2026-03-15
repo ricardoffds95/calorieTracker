@@ -25,6 +25,37 @@ const CIRCUMFERENCE = 2 * Math.PI * R;
 const CX = SIZE / 2;
 const CY = SIZE / 2;
 
+function MacroBar({ label, value, goal, color }: { label: string; value: number; goal: number; color: string }) {
+  const anim = useRef(new Animated.Value(0)).current;
+  const pct = Math.min(value / Math.max(goal, 1), 1);
+  const isOver = value > goal;
+
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: pct,
+      duration: 800,
+      useNativeDriver: false,
+    }).start();
+  }, [pct]);
+
+  const width = anim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
+
+  return (
+    <View style={barStyles.row}>
+      <View style={barStyles.header}>
+        <Text style={barStyles.label}>{label}</Text>
+        <Text style={barStyles.valueText}>
+          <Text style={[barStyles.current, isOver && barStyles.over]}>{Math.round(value)}g</Text>
+          <Text style={barStyles.goal}> / {goal}g</Text>
+        </Text>
+      </View>
+      <View style={barStyles.track}>
+        <Animated.View style={[barStyles.fill, { width, backgroundColor: isOver ? '#E85D75' : color }]} />
+      </View>
+    </View>
+  );
+}
+
 export default function MacroRing({ calories, calorieGoal, protein, proteinGoal, carbs, carbsGoal, fat, fatGoal }: MacroRingProps) {
   const proteinAnim = useRef(new Animated.Value(0)).current;
   const carbsAnim = useRef(new Animated.Value(0)).current;
@@ -96,6 +127,8 @@ export default function MacroRing({ calories, calorieGoal, protein, proteinGoal,
           <Text style={styles.kcalLabel}>kcal restantes</Text>
         </View>
       </View>
+
+      {/* Pills */}
       <View style={styles.pills}>
         {[
           { label: 'Proteína', value: protein, goal: proteinGoal, color: MacroColors.protein },
@@ -109,15 +142,21 @@ export default function MacroRing({ calories, calorieGoal, protein, proteinGoal,
           </View>
         ))}
       </View>
+
+      {/* Macro bars */}
+      <View style={styles.barsContainer}>
+        <MacroBar label="Proteína" value={protein} goal={proteinGoal} color={MacroColors.protein} />
+        <MacroBar label="Hidratos" value={carbs} goal={carbsGoal} color={MacroColors.carbs} />
+        <MacroBar label="Gordura" value={fat} goal={fatGoal} color={MacroColors.fat} />
+      </View>
     </View>
   );
 }
 
-// Named export for backward compatibility
 export { MacroRing };
 
 const styles = StyleSheet.create({
-  container: { alignItems: 'center' },
+  container: { alignItems: 'center', width: '100%' },
   ringWrapper: { width: SIZE, height: SIZE, alignItems: 'center', justifyContent: 'center' },
   centerText: { position: 'absolute', alignItems: 'center' },
   kcalNumber: { fontSize: Typography.xxxl, fontWeight: FontWeight.bold, color: Colors.textPrimary },
@@ -127,4 +166,17 @@ const styles = StyleSheet.create({
   dot: { width: 6, height: 6, borderRadius: 3 },
   pillLabel: { fontSize: Typography.xs, color: Colors.textSecondary },
   pillValue: { fontSize: Typography.xs, fontWeight: FontWeight.semibold, color: Colors.textPrimary },
+  barsContainer: { width: '100%', gap: 12, marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: Colors.border },
+});
+
+const barStyles = StyleSheet.create({
+  row: { gap: 6 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  label: { fontSize: 13, fontWeight: '500', color: Colors.textSecondary },
+  valueText: { fontSize: 13 },
+  current: { fontWeight: '600', color: Colors.textPrimary },
+  over: { color: '#E85D75' },
+  goal: { color: Colors.textDisabled, fontWeight: '400' },
+  track: { height: 7, backgroundColor: Colors.border, borderRadius: 4, overflow: 'hidden' },
+  fill: { height: '100%', borderRadius: 4 },
 });

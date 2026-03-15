@@ -50,7 +50,7 @@ interface FoodState {
   logs: Record<string, DayLog>;
   addFood: (item: Omit<FoodEntry, 'id' | 'addedAt' | 'type'>, date?: string) => void;
   addMeal: (meal: { name: string; items: { name: string; quantity_g: number; calories: number; protein_g: number; carbs_g: number; fat_g: number }[]; meal: MealType; savedMealId?: string }, date?: string) => void;
-  syncSavedMeal: (savedMealId: string, updates: { name?: string; totalCalories?: number; totalProtein?: number; totalCarbs?: number; totalFat?: number }, date?: string) => void;
+  updateDiaryEntriesFromMeal: (savedMealId: string, updates: { name?: string; totalCalories?: number; totalProtein?: number; totalCarbs?: number; totalFat?: number }) => void;
   removeFood: (foodId: string, date?: string) => void;
   updateEntry: (id: string, updates: { name?: string; quantity_g?: number; calories?: number; protein_g?: number; carbs_g?: number; fat_g?: number; totalCalories?: number; totalProtein?: number; totalCarbs?: number; totalFat?: number }, date?: string) => void;
   removeItemFromMeal: (entryId: string, itemId: string, date?: string) => void;
@@ -213,21 +213,21 @@ export const useFoodStore = create<FoodState>((set, get) => ({
     });
   },
 
-  syncSavedMeal: (savedMealId, updates, date) => {
-    const day = date ?? format(new Date(), 'yyyy-MM-dd');
+  updateDiaryEntriesFromMeal: (savedMealId, updates) => {
     set((state) => {
-      const existing = state.logs[day];
-      if (!existing) return state;
-      const meals = { ...existing.meals } as Record<MealType, DiaryEntry[]>;
-      (Object.keys(meals) as MealType[]).forEach((meal) => {
-        meals[meal] = meals[meal].map((entry) => {
-          if (entry.type !== 'meal' || entry.savedMealId !== savedMealId) return entry;
-          return { ...entry, ...updates } as MealEntry;
+      const newLogs: typeof state.logs = {};
+      for (const [date, dayLog] of Object.entries(state.logs)) {
+        const meals = { ...dayLog.meals } as Record<MealType, DiaryEntry[]>;
+        (Object.keys(meals) as MealType[]).forEach((meal) => {
+          meals[meal] = meals[meal].map((entry) => {
+            if (entry.type !== 'meal' || (entry as MealEntry).savedMealId !== savedMealId) return entry;
+            return { ...entry, ...updates } as MealEntry;
+          });
         });
-      });
-      const updated = { ...state.logs, [day]: { ...existing, meals } };
-      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated)).catch(console.error);
-      return { logs: updated };
+        newLogs[date] = { ...dayLog, meals };
+      }
+      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(newLogs)).catch(console.error);
+      return { logs: newLogs };
     });
   },
 
