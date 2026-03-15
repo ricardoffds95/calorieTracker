@@ -34,6 +34,7 @@ export interface MealEntry {
   totalProtein: number;
   totalCarbs: number;
   totalFat: number;
+  savedMealId?: string;
   meal: MealType;
   addedAt: string;
 }
@@ -48,7 +49,8 @@ export interface DayLog {
 interface FoodState {
   logs: Record<string, DayLog>;
   addFood: (item: Omit<FoodEntry, 'id' | 'addedAt' | 'type'>, date?: string) => void;
-  addMeal: (meal: { name: string; items: { name: string; quantity_g: number; calories: number; protein_g: number; carbs_g: number; fat_g: number }[]; meal: MealType }, date?: string) => void;
+  addMeal: (meal: { name: string; items: { name: string; quantity_g: number; calories: number; protein_g: number; carbs_g: number; fat_g: number }[]; meal: MealType; savedMealId?: string }, date?: string) => void;
+  syncSavedMeal: (savedMealId: string, updates: { name?: string; totalCalories?: number; totalProtein?: number; totalCarbs?: number; totalFat?: number }, date?: string) => void;
   removeFood: (foodId: string, date?: string) => void;
   updateEntry: (id: string, updates: { name?: string; quantity_g?: number; calories?: number; protein_g?: number; carbs_g?: number; fat_g?: number; totalCalories?: number; totalProtein?: number; totalCarbs?: number; totalFat?: number }, date?: string) => void;
   removeItemFromMeal: (entryId: string, itemId: string, date?: string) => void;
@@ -137,6 +139,7 @@ export const useFoodStore = create<FoodState>((set, get) => ({
       totalCarbs: Math.round(totals.carbs * 10) / 10,
       totalFat: Math.round(totals.fat * 10) / 10,
       meal: mealData.meal,
+      savedMealId: mealData.savedMealId,
       addedAt: new Date().toISOString(),
     };
     set((state) => {
@@ -202,6 +205,24 @@ export const useFoodStore = create<FoodState>((set, get) => ({
             { cal: 0, p: 0, c: 0, f: 0 }
           );
           return { ...entry, items: newItems, totalCalories: Math.round(t.cal * 10) / 10, totalProtein: Math.round(t.p * 10) / 10, totalCarbs: Math.round(t.c * 10) / 10, totalFat: Math.round(t.f * 10) / 10 } as MealEntry;
+        });
+      });
+      const updated = { ...state.logs, [day]: { ...existing, meals } };
+      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated)).catch(console.error);
+      return { logs: updated };
+    });
+  },
+
+  syncSavedMeal: (savedMealId, updates, date) => {
+    const day = date ?? format(new Date(), 'yyyy-MM-dd');
+    set((state) => {
+      const existing = state.logs[day];
+      if (!existing) return state;
+      const meals = { ...existing.meals } as Record<MealType, DiaryEntry[]>;
+      (Object.keys(meals) as MealType[]).forEach((meal) => {
+        meals[meal] = meals[meal].map((entry) => {
+          if (entry.type !== 'meal' || entry.savedMealId !== savedMealId) return entry;
+          return { ...entry, ...updates } as MealEntry;
         });
       });
       const updated = { ...state.logs, [day]: { ...existing, meals } };

@@ -31,7 +31,7 @@ import {
 } from '../../services/openFoodFacts';
 import { useSavedMealsStore, SavedMeal, SavedMealItem, SavedFood } from '../../store/savedMealsStore';
 import { Colors, Typography, FontWeight, Spacing, Radius, Shadow, MacroColors } from '../../constants/theme';
-import { MealType } from '../../store/foodStore';
+import { MealType, useFoodStore } from '../../store/foodStore';
 
 type InputMode = 'ai' | 'search' | 'manual' | 'saved';
 type ManualSubMode = 'food' | 'meal';
@@ -737,6 +737,7 @@ export default function LogScreen() {
     const fat = parseFloat(savedEdit.fat) || 0;
     if (savedEdit.kind === 'meal') {
       await savedStore.editMeal(savedEdit.id, { name: savedEdit.name.trim(), totalCalories: cal, totalProtein: prot, totalCarbs: carb, totalFat: fat });
+      useFoodStore.getState().syncSavedMeal(savedEdit.id, { name: savedEdit.name.trim(), totalCalories: cal, totalProtein: prot, totalCarbs: carb, totalFat: fat });
     } else {
       await savedStore.editFood(savedEdit.id, { name: savedEdit.name.trim(), calories_100g: cal, protein_100g: prot, carbs_100g: carb, fat_100g: fat });
     }

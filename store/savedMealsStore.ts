@@ -191,6 +191,7 @@ export const useSavedMealsStore = create<SavedMealsState>((set, get) => ({
         fat_g: item.fat_g,
       })),
       meal: mealType,
+      savedMealId: meal.id,
     });
     get().incrementUsage(meal.id);
   },
