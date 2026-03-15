@@ -50,7 +50,7 @@ interface SavedMealsState {
   deleteFood: (id: string) => Promise<void>;
   incrementUsage: (id: string) => Promise<void>;
   incrementFoodUsage: (id: string) => Promise<void>;
-  addMealToLog: (meal: SavedMeal, mealType: MealType) => void;
+  addMealToLog: (meal: SavedMeal, mealType: MealType, doses?: number) => void;
   addFoodToLog: (food: SavedFood, quantity: number, mealType: MealType) => void;
   loadFromStorage: () => Promise<void>;
 }
@@ -179,16 +179,16 @@ export const useSavedMealsStore = create<SavedMealsState>((set, get) => ({
     await AsyncStorage.setItem(FOODS_KEY, JSON.stringify(foods));
   },
 
-  addMealToLog: (meal, mealType) => {
+  addMealToLog: (meal, mealType, doses = 1) => {
     useFoodStore.getState().addMeal({
-      name: meal.name,
+      name: doses !== 1 ? `${meal.name} ×${doses}` : meal.name,
       items: meal.items.map(item => ({
         name: item.name,
-        quantity_g: item.quantity_g,
-        calories: item.calories,
-        protein_g: item.protein_g,
-        carbs_g: item.carbs_g,
-        fat_g: item.fat_g,
+        quantity_g: Math.round(item.quantity_g * doses),
+        calories: Math.round(item.calories * doses),
+        protein_g: Math.round(item.protein_g * doses * 10) / 10,
+        carbs_g: Math.round(item.carbs_g * doses * 10) / 10,
+        fat_g: Math.round(item.fat_g * doses * 10) / 10,
       })),
       meal: mealType,
       savedMealId: meal.id,
@@ -206,6 +206,7 @@ export const useSavedMealsStore = create<SavedMealsState>((set, get) => ({
       protein_g: Math.round(food.protein_100g * factor * 10) / 10,
       carbs_g: Math.round(food.carbs_100g * factor * 10) / 10,
       fat_g: Math.round(food.fat_100g * factor * 10) / 10,
+      savedFoodId: food.id,
       meal: mealType,
     });
     get().incrementFoodUsage(food.id);

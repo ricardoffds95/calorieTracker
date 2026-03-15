@@ -13,6 +13,7 @@ export interface FoodEntry {
   protein_g: number;
   carbs_g: number;
   fat_g: number;
+  savedFoodId?: string;
   meal: MealType;
   addedAt: string;
 }
@@ -49,6 +50,7 @@ export interface DayLog {
 interface FoodState {
   logs: Record<string, DayLog>;
   addFood: (item: Omit<FoodEntry, 'id' | 'addedAt' | 'type'>, date?: string) => void;
+  updateEntriesBySavedFoodId: (savedFoodId: string, updates: { name?: string; calories?: number; protein_g?: number; carbs_g?: number; fat_g?: number }) => void;
   addMeal: (meal: { name: string; items: { name: string; quantity_g: number; calories: number; protein_g: number; carbs_g: number; fat_g: number }[]; meal: MealType; savedMealId?: string }, date?: string) => void;
   updateDiaryEntriesFromMeal: (savedMealId: string, updates: { name?: string; totalCalories?: number; totalProtein?: number; totalCarbs?: number; totalFat?: number }) => void;
   removeFood: (foodId: string, date?: string) => void;
@@ -222,6 +224,32 @@ export const useFoodStore = create<FoodState>((set, get) => ({
           meals[meal] = meals[meal].map((entry) => {
             if (entry.type !== 'meal' || (entry as MealEntry).savedMealId !== savedMealId) return entry;
             return { ...entry, ...updates } as MealEntry;
+          });
+        });
+        newLogs[date] = { ...dayLog, meals };
+      }
+      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(newLogs)).catch(console.error);
+      return { logs: newLogs };
+    });
+  },
+
+  updateEntriesBySavedFoodId: (savedFoodId, updates) => {
+    set((state) => {
+      const newLogs: typeof state.logs = {};
+      for (const [date, dayLog] of Object.entries(state.logs)) {
+        const meals = { ...dayLog.meals } as Record<MealType, DiaryEntry[]>;
+        (Object.keys(meals) as MealType[]).forEach((meal) => {
+          meals[meal] = meals[meal].map((entry) => {
+            if (entry.type !== 'food' || (entry as FoodEntry).savedFoodId !== savedFoodId) return entry;
+            const factor = (entry as FoodEntry).quantity_g / 100;
+            return {
+              ...entry,
+              name: updates.name ?? entry.name,
+              calories: updates.calories !== undefined ? Math.round(updates.calories * factor) : (entry as FoodEntry).calories,
+              protein_g: updates.protein_g !== undefined ? Math.round(updates.protein_g * factor * 10) / 10 : (entry as FoodEntry).protein_g,
+              carbs_g: updates.carbs_g !== undefined ? Math.round(updates.carbs_g * factor * 10) / 10 : (entry as FoodEntry).carbs_g,
+              fat_g: updates.fat_g !== undefined ? Math.round(updates.fat_g * factor * 10) / 10 : (entry as FoodEntry).fat_g,
+            } as FoodEntry;
           });
         });
         newLogs[date] = { ...dayLog, meals };

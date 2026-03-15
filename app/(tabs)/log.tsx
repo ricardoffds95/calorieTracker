@@ -431,6 +431,7 @@ export default function LogScreen() {
   // ── Saved tab ────────────────────────────────────────────────────────────
   const [savedSubMode, setSavedSubMode] = useState<SavedSubMode>('meals');
   const [savedFoodQtys, setSavedFoodQtys] = useState<Record<string, number>>({});
+  const [savedMealDoses, setSavedMealDoses] = useState<Record<string, number>>({});
   const [renamingMealId, setRenamingMealId] = useState<string | null>(null);
   const [renameText, setRenameText] = useState('');
 
@@ -688,8 +689,9 @@ export default function LogScreen() {
   // ── Saved handlers ────────────────────────────────────────────────────────
 
   const addSavedMeal = (savedMeal: SavedMeal) => {
+    const doses = savedMealDoses[savedMeal.id] ?? 1;
     const doAdd = (m: MealType) => {
-      savedStore.addMealToLog(savedMeal, m);
+      savedStore.addMealToLog(savedMeal, m, doses);
       showToast(`✓ Adicionado ao ${MEAL_DISPLAY[m]}`);
     };
     if (activeMeal) doAdd(activeMeal);
@@ -737,40 +739,13 @@ export default function LogScreen() {
     const fat = parseFloat(savedEdit.fat) || 0;
     if (savedEdit.kind === 'meal') {
       await savedStore.editMeal(savedEdit.id, { name: savedEdit.name.trim(), totalCalories: cal, totalProtein: prot, totalCarbs: carb, totalFat: fat });
-      const updates = { name: savedEdit.name.trim(), totalCalories: cal, totalProtein: prot, totalCarbs: carb, totalFat: fat };
-      // Count matching diary entries across all dates
-      const allLogs = useFoodStore.getState().logs;
-      let count = 0;
-      for (const dayLog of Object.values(allLogs)) {
-        for (const entries of Object.values(dayLog.meals)) {
-          for (const entry of entries) {
-            if (entry.type === 'meal' && (entry as any).savedMealId === savedEdit.id) count++;
-          }
-        }
-      }
-      if (count > 0) {
-        Alert.alert(
-          'Atualizar diário?',
-          `Esta refeição aparece ${count === 1 ? '1 vez' : `${count} vezes`} no teu diário. Queres atualizar esses registos também?`,
-          [
-            { text: 'Não', style: 'cancel', onPress: () => setSavedEdit(null) },
-            {
-              text: 'Atualizar tudo',
-              onPress: () => {
-                useFoodStore.getState().updateDiaryEntriesFromMeal(savedEdit.id, updates);
-                setSavedEdit(null);
-                showToast('Refeição e diário atualizados ✓');
-              },
-            },
-          ]
-        );
-        return;
-      }
+      useFoodStore.getState().updateDiaryEntriesFromMeal(savedEdit.id, { name: savedEdit.name.trim(), totalCalories: cal, totalProtein: prot, totalCarbs: carb, totalFat: fat });
     } else {
       await savedStore.editFood(savedEdit.id, { name: savedEdit.name.trim(), calories_100g: cal, protein_100g: prot, carbs_100g: carb, fat_100g: fat });
+      useFoodStore.getState().updateEntriesBySavedFoodId(savedEdit.id, { name: savedEdit.name.trim(), calories: cal, protein_g: prot, carbs_g: carb, fat_g: fat });
     }
     setSavedEdit(null);
-    showToast('Guardado!');
+    showToast('Atualizado ✓');
   };
 
   const confirmDeleteFood = (food: SavedFood) => {
@@ -1197,6 +1172,15 @@ export default function LogScreen() {
                           <TouchableOpacity onPress={() => confirmDeleteMeal(savedMeal)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ marginBottom: 6 }}>
                             <Feather name="trash-2" size={16} color={Colors.textDisabled} />
                           </TouchableOpacity>
+                          <View style={styles.dosesRow}>
+                            <TouchableOpacity style={styles.qtyBtn} onPress={() => setSavedMealDoses(d => ({ ...d, [savedMeal.id]: Math.max(0.5, parseFloat(((d[savedMeal.id] ?? 1) - 0.5).toFixed(1))) }))}>
+                              <Text style={styles.qtyBtnTxt}>-</Text>
+                            </TouchableOpacity>
+                            <Text style={styles.dosesTxt}>{(savedMealDoses[savedMeal.id] ?? 1) % 1 === 0 ? `${savedMealDoses[savedMeal.id] ?? 1}` : `${savedMealDoses[savedMeal.id] ?? 1}`} dose{(savedMealDoses[savedMeal.id] ?? 1) !== 1 ? 's' : ''}</Text>
+                            <TouchableOpacity style={styles.qtyBtn} onPress={() => setSavedMealDoses(d => ({ ...d, [savedMeal.id]: parseFloat(((d[savedMeal.id] ?? 1) + 0.5).toFixed(1)) }))}>
+                              <Text style={styles.qtyBtnTxt}>+</Text>
+                            </TouchableOpacity>
+                          </View>
                           <TouchableOpacity style={styles.addPillBtn} onPress={() => addSavedMeal(savedMeal)} activeOpacity={0.7}>
                             <Text style={styles.addPillBtnTxt}>{activeMeal ? MEAL_DISPLAY[activeMeal].split('-')[0] : 'Adicionar'}</Text>
                           </TouchableOpacity>
@@ -1531,6 +1515,8 @@ const styles = StyleSheet.create({
   savedCard: { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.md, borderWidth: 1, borderColor: Colors.border, flexDirection: 'row', alignItems: 'center', gap: Spacing.md, ...Shadow.card },
   savedCardLeft: { flex: 1, gap: 4 },
   savedCardActions: { alignItems: 'center', gap: 4 },
+  dosesRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  dosesTxt: { fontSize: Typography.xs, color: Colors.textSecondary, minWidth: 52, textAlign: 'center' },
   savedCardName: { fontSize: Typography.base, color: Colors.textPrimary, fontWeight: FontWeight.bold },
   savedCardMeta: { fontSize: Typography.sm, color: Colors.textSecondary },
   savedMacroPills: { flexDirection: 'row', gap: 6, marginTop: 4 },
