@@ -57,27 +57,15 @@ function MacroBar({ label, value, goal, color }: { label: string; value: number;
 }
 
 export default function MacroRing({ calories, calorieGoal, protein, proteinGoal, carbs, carbsGoal, fat, fatGoal }: MacroRingProps) {
-  const proteinAnim = useRef(new Animated.Value(0)).current;
-  const carbsAnim = useRef(new Animated.Value(0)).current;
-  const fatAnim = useRef(new Animated.Value(0)).current;
-
-  const proteinPct = Math.min(protein / Math.max(proteinGoal, 1), 1);
-  const carbsPct = Math.min(carbs / Math.max(carbsGoal, 1), 1);
-  const fatPct = Math.min(fat / Math.max(fatGoal, 1), 1);
+  const caloriesAnim = useRef(new Animated.Value(0)).current;
+  const caloriesPct = Math.min(calories / Math.max(calorieGoal, 1), 1);
 
   useEffect(() => {
-    Animated.stagger(120, [
-      Animated.timing(proteinAnim, { toValue: proteinPct, duration: 900, useNativeDriver: false }),
-      Animated.timing(carbsAnim, { toValue: carbsPct, duration: 900, useNativeDriver: false }),
-      Animated.timing(fatAnim, { toValue: fatPct, duration: 900, useNativeDriver: false }),
-    ]).start();
-  }, [proteinPct, carbsPct, fatPct]);
+    Animated.timing(caloriesAnim, { toValue: caloriesPct, duration: 900, useNativeDriver: false }).start();
+  }, [caloriesPct]);
 
   const kcalLeft = Math.max(calorieGoal - calories, 0);
-
-  const proteinDash = proteinAnim.interpolate({ inputRange: [0, 1], outputRange: [0, CIRCUMFERENCE] });
-  const carbsDash = carbsAnim.interpolate({ inputRange: [0, 1], outputRange: [0, CIRCUMFERENCE] });
-  const fatDash = fatAnim.interpolate({ inputRange: [0, 1], outputRange: [0, CIRCUMFERENCE] });
+  const caloriesDash = caloriesAnim.interpolate({ inputRange: [0, 1], outputRange: [CIRCUMFERENCE, 0] });
 
   return (
     <View style={styles.container}>
@@ -85,40 +73,16 @@ export default function MacroRing({ calories, calorieGoal, protein, proteinGoal,
         <Svg width={SIZE} height={SIZE}>
           {/* Track */}
           <Circle cx={CX} cy={CY} r={R} stroke={Colors.border} strokeWidth={STROKE} fill="none" />
-          {/* Fat */}
+          {/* Calories */}
           <AnimatedCircle
             cx={CX} cy={CY} r={R}
-            stroke={MacroColors.fat}
+            stroke={Colors.primary}
             strokeWidth={STROKE}
             fill="none"
             strokeDasharray={CIRCUMFERENCE}
-            strokeDashoffset={fatDash.interpolate({ inputRange: [0, CIRCUMFERENCE], outputRange: [CIRCUMFERENCE, 0] })}
+            strokeDashoffset={caloriesDash}
             strokeLinecap="round"
             rotation={-90}
-            origin={`${CX}, ${CY}`}
-          />
-          {/* Carbs */}
-          <AnimatedCircle
-            cx={CX} cy={CY} r={R}
-            stroke={MacroColors.carbs}
-            strokeWidth={STROKE}
-            fill="none"
-            strokeDasharray={CIRCUMFERENCE}
-            strokeDashoffset={carbsDash.interpolate({ inputRange: [0, CIRCUMFERENCE], outputRange: [CIRCUMFERENCE, 0] })}
-            strokeLinecap="round"
-            rotation={-90 + 360 * fatPct * 0.33}
-            origin={`${CX}, ${CY}`}
-          />
-          {/* Protein */}
-          <AnimatedCircle
-            cx={CX} cy={CY} r={R}
-            stroke={MacroColors.protein}
-            strokeWidth={STROKE}
-            fill="none"
-            strokeDasharray={CIRCUMFERENCE}
-            strokeDashoffset={proteinDash.interpolate({ inputRange: [0, CIRCUMFERENCE], outputRange: [CIRCUMFERENCE, 0] })}
-            strokeLinecap="round"
-            rotation={-90 + 360 * (fatPct * 0.33 + carbsPct * 0.33)}
             origin={`${CX}, ${CY}`}
           />
         </Svg>
