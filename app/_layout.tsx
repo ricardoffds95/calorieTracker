@@ -5,13 +5,15 @@ import { useFonts, DMSans_400Regular, DMSans_500Medium, DMSans_600SemiBold, DMSa
 import * as SplashScreen from 'expo-splash-screen';
 import { useFoodStore } from '../store/foodStore';
 import { useGoalsStore } from '../store/goalsStore';
+import { useSavedMealsStore } from '../store/savedMealsStore';
 
 SplashScreen.preventAutoHideAsync();
 
 function AppInit() {
   const loadFood = useFoodStore(s => s.loadFromStorage);
   const loadGoals = useGoalsStore(s => s.loadFromStorage);
-  useEffect(() => { loadFood(); loadGoals(); }, []);
+  const loadSavedMeals = useSavedMealsStore(s => s.loadFromStorage);
+  useEffect(() => { loadFood(); loadGoals(); loadSavedMeals(); }, []);
   return null;
 }
 

@@ -39,7 +39,8 @@
         {
           "faceIDPermission": "Allow CalTracker to use Face ID."
         }
-      ]
+      ],
+      "expo-secure-store"
     ]
   }
 }

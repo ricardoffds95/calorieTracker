@@ -1,27 +1,33 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
   ScrollView,
+  FlatList,
   ActivityIndicator,
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Modal,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
+import { SaveFormat } from 'expo-image-manipulator';
 import { useFood } from '../../hooks/useFood';
-import { parseFoodFromText, ParsedFoodItem } from '../../services/claudeAI';
+import { parseFoodWithAI, analyzeFoodImage, GeminiParsedItem } from '../../services/geminiAI';
 import { searchFood, calculateNutrientsForQuantity, FoodSearchResult } from '../../services/openFoodFacts';
+import { useSavedMealsStore, SavedMeal, SavedMealItem } from '../../store/savedMealsStore';
 import { Colors, Typography, FontWeight, Spacing, Radius, Shadow } from '../../constants/theme';
 import { MacroColors } from '../../constants/theme';
 import { MealType } from '../../store/foodStore';
 
-type InputMode = 'ai' | 'search';
+type InputMode = 'ai' | 'search' | 'photo' | 'saved';
 type MealLabel = { key: MealType; label: string };
 
 const MEALS: MealLabel[] = [
@@ -31,46 +37,94 @@ const MEALS: MealLabel[] = [
   { key: 'snacks', label: 'Snacks' },
 ];
 
-const CLAUDE_API_KEY = process.env.EXPO_PUBLIC_CLAUDE_API_KEY ?? '';
+// ─── Helper components ────────────────────────────────────────────────────────
+
+function PulseLoader({ text }: { text: string }) {
+  return (
+    <View style={{ alignItems: 'center', padding: 24, gap: 12 }}>
+      <ActivityIndicator size="large" color={Colors.primary} />
+      <Text style={{ color: Colors.textSecondary, fontSize: 14 }}>{text}</Text>
+    </View>
+  );
+}
+
+function ErrorCard({ message }: { message: string }) {
+  return (
+    <View style={{
+      backgroundColor: '#FFF0F0',
+      borderRadius: 12,
+      padding: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      borderWidth: 1,
+      borderColor: '#FFD0D0',
+    }}>
+      <Feather name="alert-circle" size={18} color="#E85D75" />
+      <Text style={{ color: '#E85D75', fontSize: 14, flex: 1 }}>{message}</Text>
+    </View>
+  );
+}
+
+function MacroChip({ value, label, color }: { value: number; label: string; color: string }) {
+  return (
+    <View style={[chipStyles.chip, { borderColor: color + '50', backgroundColor: color + '10' }]}>
+      <Text style={[chipStyles.value, { color }]}>{Math.round(value * 10) / 10}</Text>
+      <Text style={chipStyles.label}>{label}</Text>
+    </View>
+  );
+}
+
+// ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function LogScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { addFood } = useFood();
+  const savedMealsStore = useSavedMealsStore();
+
   const [mode, setMode] = useState<InputMode>('ai');
   const [meal, setMeal] = useState<MealType>('lunch');
+
+  // AI tab
   const [aiText, setAiText] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [parsedItems, setParsedItems] = useState<GeminiParsedItem[]>([]);
+
+  // Save meal modal
+  const [saveModalVisible, setSaveModalVisible] = useState(false);
+  const [saveMealName, setSaveMealName] = useState('');
+  const [pendingSaveItems, setPendingSaveItems] = useState<GeminiParsedItem[]>([]);
+
+  // Search tab
   const [searchText, setSearchText] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [parsedItems, setParsedItems] = useState<ParsedFoodItem[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [searchResults, setSearchResults] = useState<FoodSearchResult[]>([]);
+  const [fromCache, setFromCache] = useState(false);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Photo tab
+  const [photoLoading, setPhotoLoading] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const [photoItems, setPhotoItems] = useState<GeminiParsedItem[]>([]);
+
+  // ── AI handlers ─────────────────────────────────────────────────────────────
 
   const handleAiParse = async () => {
     if (!aiText.trim()) return;
-    setLoading(true);
+    setAiLoading(true);
+    setAiError(null);
     try {
-      const items = await parseFoodFromText(aiText, CLAUDE_API_KEY);
+      const items = await parseFoodWithAI(aiText);
       setParsedItems(items);
-      setSearchResults([]);
-    } catch (e: any) {
-      Alert.alert('Erro', e?.message ?? 'Não foi possível processar o texto');
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Não foi possível processar o texto';
+      setAiError(msg);
     } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSearch = async () => {
-    if (!searchText.trim()) return;
-    setLoading(true);
-    try {
-      const results = await searchFood(searchText);
-      setSearchResults(results);
-      setParsedItems([]);
-    } catch (e: any) {
-      Alert.alert('Erro', e?.message ?? 'Erro na pesquisa');
-    } finally {
-      setLoading(false);
+      setAiLoading(false);
     }
   };
 
@@ -91,6 +145,60 @@ export default function LogScreen() {
     router.push('/(tabs)/');
   };
 
+  const openSaveMealModal = (items: GeminiParsedItem[]) => {
+    setPendingSaveItems(items);
+    setSaveMealName('');
+    setSaveModalVisible(true);
+  };
+
+  const confirmSaveMeal = async () => {
+    if (!saveMealName.trim()) return;
+    const storeItems: SavedMealItem[] = pendingSaveItems.map((item) => ({
+      id: Date.now().toString() + Math.random().toString(36).slice(2),
+      name: item.name,
+      quantity_g: item.quantity_g,
+      calories: item.calories,
+      protein_g: item.protein_g,
+      carbs_g: item.carbs_g,
+      fat_g: item.fat_g,
+    }));
+    await savedMealsStore.saveMeal(saveMealName.trim(), storeItems);
+    setSaveModalVisible(false);
+    setSaveMealName('');
+  };
+
+  // ── Search handlers ──────────────────────────────────────────────────────────
+
+  const handleSearchChange = useCallback((text: string) => {
+    setSearchText(text);
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => {
+      if (text.trim().length >= 2) {
+        runSearch(text);
+      }
+    }, 500);
+  }, []);
+
+  const runSearch = async (q: string) => {
+    setSearchLoading(true);
+    setSearchError(null);
+    try {
+      const { results, fromCache: cached } = await searchFood(q);
+      setSearchResults(results);
+      setFromCache(cached);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Erro na pesquisa';
+      setSearchError(msg);
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  const handleSearchSubmit = () => {
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    runSearch(searchText);
+  };
+
   const saveSearchItem = (result: FoodSearchResult) => {
     const qty = quantities[result.id] ?? 100;
     const nutrients = calculateNutrientsForQuantity(result, qty);
@@ -105,6 +213,99 @@ export default function LogScreen() {
     });
     router.push('/(tabs)/');
   };
+
+  // ── Photo handlers ───────────────────────────────────────────────────────────
+
+  const processImageUri = async (uri: string) => {
+    setPhotoLoading(true);
+    setPhotoError(null);
+    try {
+      const manipulated = await ImageManipulator.manipulateAsync(
+        uri,
+        [{ resize: { width: 800 } }],
+        { compress: 0.7, format: SaveFormat.JPEG, base64: true }
+      );
+      if (!manipulated.base64) throw new Error('Falha ao processar imagem');
+      const items = await analyzeFoodImage(manipulated.base64);
+      setPhotoItems(items);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Erro ao analisar imagem';
+      setPhotoError(msg);
+    } finally {
+      setPhotoLoading(false);
+    }
+  };
+
+  const handleTakePhoto = async () => {
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ['images'],
+      quality: 0.9,
+    });
+    if (!result.canceled && result.assets[0]) {
+      await processImageUri(result.assets[0].uri);
+    }
+  };
+
+  const handlePickGallery = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.9,
+    });
+    if (!result.canceled && result.assets[0]) {
+      await processImageUri(result.assets[0].uri);
+    }
+  };
+
+  const savePhotoItems = () => {
+    photoItems.forEach((item) => {
+      addFood({
+        name: item.name,
+        quantity_g: item.quantity_g,
+        calories: item.calories,
+        protein_g: item.protein_g,
+        carbs_g: item.carbs_g,
+        fat_g: item.fat_g,
+        meal,
+      });
+    });
+    setPhotoItems([]);
+    router.push('/(tabs)/');
+  };
+
+  // ── Saved meals handlers ─────────────────────────────────────────────────────
+
+  const addSavedMeal = (savedMeal: SavedMeal) => {
+    savedMeal.items.forEach((item) => {
+      addFood({
+        name: item.name,
+        quantity_g: item.quantity_g,
+        calories: item.calories,
+        protein_g: item.protein_g,
+        carbs_g: item.carbs_g,
+        fat_g: item.fat_g,
+        meal,
+      });
+    });
+    savedMealsStore.incrementUsage(savedMeal.id);
+    router.push('/(tabs)/');
+  };
+
+  const confirmDeleteMeal = (savedMeal: SavedMeal) => {
+    Alert.alert(
+      'Eliminar refeição',
+      `Tens a certeza que queres eliminar "${savedMeal.name}"?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: () => savedMealsStore.deleteMeal(savedMeal.id),
+        },
+      ]
+    );
+  };
+
+  // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -127,7 +328,7 @@ export default function LogScreen() {
               onPress={() => setMode('ai')}
               activeOpacity={0.7}
             >
-              <Feather name="zap" size={15} color={mode === 'ai' ? Colors.white : Colors.textSecondary} />
+              <Feather name="zap" size={14} color={mode === 'ai' ? Colors.white : Colors.textSecondary} />
               <Text style={[styles.modeBtnTxt, mode === 'ai' && styles.modeBtnTxtActive]}>IA</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -135,12 +336,28 @@ export default function LogScreen() {
               onPress={() => setMode('search')}
               activeOpacity={0.7}
             >
-              <Feather name="search" size={15} color={mode === 'search' ? Colors.white : Colors.textSecondary} />
+              <Feather name="search" size={14} color={mode === 'search' ? Colors.white : Colors.textSecondary} />
               <Text style={[styles.modeBtnTxt, mode === 'search' && styles.modeBtnTxtActive]}>Pesquisar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modeBtn, mode === 'photo' && styles.modeBtnActive]}
+              onPress={() => setMode('photo')}
+              activeOpacity={0.7}
+            >
+              <Feather name="camera" size={14} color={mode === 'photo' ? Colors.white : Colors.textSecondary} />
+              <Text style={[styles.modeBtnTxt, mode === 'photo' && styles.modeBtnTxtActive]}>Foto</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modeBtn, mode === 'saved' && styles.modeBtnActive]}
+              onPress={() => setMode('saved')}
+              activeOpacity={0.7}
+            >
+              <Feather name="bookmark" size={14} color={mode === 'saved' ? Colors.white : Colors.textSecondary} />
+              <Text style={[styles.modeBtnTxt, mode === 'saved' && styles.modeBtnTxtActive]}>Guardados</Text>
             </TouchableOpacity>
           </View>
 
-          {/* Meal selector */}
+          {/* Meal selector — visible on all tabs */}
           <View style={styles.mealRow}>
             {MEALS.map((m) => (
               <TouchableOpacity
@@ -156,7 +373,7 @@ export default function LogScreen() {
             ))}
           </View>
 
-          {/* AI Input */}
+          {/* ── AI Tab ──────────────────────────────────────────────────── */}
           {mode === 'ai' && (
             <View style={styles.section}>
               <Text style={styles.hint}>Descreve o que comeste em português ou inglês</Text>
@@ -171,12 +388,12 @@ export default function LogScreen() {
                 textAlignVertical="top"
               />
               <TouchableOpacity
-                style={[styles.primaryBtn, loading && styles.primaryBtnDisabled]}
+                style={[styles.primaryBtn, aiLoading && styles.primaryBtnDisabled]}
                 onPress={handleAiParse}
                 activeOpacity={0.8}
-                disabled={loading}
+                disabled={aiLoading}
               >
-                {loading ? (
+                {aiLoading ? (
                   <ActivityIndicator color={Colors.white} />
                 ) : (
                   <>
@@ -185,6 +402,8 @@ export default function LogScreen() {
                   </>
                 )}
               </TouchableOpacity>
+
+              {aiError && <ErrorCard message={aiError} />}
 
               {parsedItems.length > 0 && (
                 <View style={styles.resultsContainer}>
@@ -205,15 +424,23 @@ export default function LogScreen() {
                   ))}
                   <TouchableOpacity style={styles.saveBtn} onPress={saveAiItems} activeOpacity={0.8}>
                     <Text style={styles.saveBtnTxt}>
-                      Guardar {parsedItems.length} alimento{parsedItems.length !== 1 ? 's' : ''}
+                      Adicionar {parsedItems.length} alimento{parsedItems.length !== 1 ? 's' : ''}
                     </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.outlineBtn}
+                    onPress={() => openSaveMealModal(parsedItems)}
+                    activeOpacity={0.8}
+                  >
+                    <Feather name="bookmark" size={15} color={Colors.primary} />
+                    <Text style={styles.outlineBtnTxt}>Guardar Refeição</Text>
                   </TouchableOpacity>
                 </View>
               )}
             </View>
           )}
 
-          {/* Search */}
+          {/* ── Search Tab ──────────────────────────────────────────────── */}
           {mode === 'search' && (
             <View style={styles.section}>
               <View style={styles.searchRow}>
@@ -222,23 +449,34 @@ export default function LogScreen() {
                   placeholder="ex: frango, arroz, banana..."
                   placeholderTextColor={Colors.textDisabled}
                   value={searchText}
-                  onChangeText={setSearchText}
+                  onChangeText={handleSearchChange}
                   returnKeyType="search"
-                  onSubmitEditing={handleSearch}
+                  onSubmitEditing={handleSearchSubmit}
                 />
                 <TouchableOpacity
                   style={styles.searchBtn}
-                  onPress={handleSearch}
+                  onPress={handleSearchSubmit}
                   activeOpacity={0.8}
-                  disabled={loading}
+                  disabled={searchLoading}
                 >
-                  {loading ? (
+                  {searchLoading ? (
                     <ActivityIndicator color={Colors.white} size="small" />
                   ) : (
                     <Feather name="search" size={18} color={Colors.white} />
                   )}
                 </TouchableOpacity>
               </View>
+
+              {searchError && <ErrorCard message={searchError} />}
+
+              {searchResults.length > 0 && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={styles.resultsTitle}>{searchResults.length} resultados</Text>
+                  {fromCache && (
+                    <Feather name="zap" size={14} color={Colors.primary} />
+                  )}
+                </View>
+              )}
 
               {searchResults.map((result) => (
                 <View key={result.id} style={styles.resultCard}>
@@ -283,21 +521,168 @@ export default function LogScreen() {
             </View>
           )}
 
+          {/* ── Photo Tab ───────────────────────────────────────────────── */}
+          {mode === 'photo' && (
+            <View style={styles.section}>
+              <Text style={styles.hint}>Tira uma foto ou seleciona da galeria para identificar alimentos</Text>
+              <View style={styles.photoButtonRow}>
+                <TouchableOpacity
+                  style={[styles.photoOutlineBtn, { flex: 1 }]}
+                  onPress={handleTakePhoto}
+                  activeOpacity={0.7}
+                  disabled={photoLoading}
+                >
+                  <Feather name="camera" size={16} color={Colors.primary} />
+                  <Text style={styles.photoOutlineBtnTxt}>Tirar Foto</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.photoOutlineBtn, { flex: 1 }]}
+                  onPress={handlePickGallery}
+                  activeOpacity={0.7}
+                  disabled={photoLoading}
+                >
+                  <Feather name="image" size={16} color={Colors.primary} />
+                  <Text style={styles.photoOutlineBtnTxt}>Galeria</Text>
+                </TouchableOpacity>
+              </View>
+
+              {photoLoading && <PulseLoader text="A analisar refeição..." />}
+
+              {photoError && <ErrorCard message={photoError} />}
+
+              {photoItems.length > 0 && (
+                <View style={styles.resultsContainer}>
+                  <Text style={styles.resultsTitle}>Alimentos identificados:</Text>
+                  {photoItems.map((item, idx) => (
+                    <View key={idx} style={styles.resultCard}>
+                      <View style={styles.resultHeader}>
+                        <Text style={styles.resultName}>{item.name}</Text>
+                        <Text style={styles.resultQty}>{item.quantity_g}g</Text>
+                      </View>
+                      <View style={styles.resultMacros}>
+                        <MacroChip value={item.calories} label="kcal" color={Colors.primary} />
+                        <MacroChip value={item.protein_g} label="P" color={MacroColors.protein} />
+                        <MacroChip value={item.carbs_g} label="C" color={MacroColors.carbs} />
+                        <MacroChip value={item.fat_g} label="G" color={MacroColors.fat} />
+                      </View>
+                    </View>
+                  ))}
+                  <TouchableOpacity style={styles.saveBtn} onPress={savePhotoItems} activeOpacity={0.8}>
+                    <Text style={styles.saveBtnTxt}>
+                      Adicionar tudo ({photoItems.length} alimento{photoItems.length !== 1 ? 's' : ''})
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* ── Saved Meals Tab ─────────────────────────────────────────── */}
+          {mode === 'saved' && (
+            <View style={styles.section}>
+              {savedMealsStore.meals.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Feather name="bookmark" size={48} color={Colors.textDisabled} />
+                  <Text style={styles.emptyTitle}>Refeições Guardadas</Text>
+                  <Text style={styles.emptyText}>Ainda não tens refeições guardadas</Text>
+                </View>
+              ) : (
+                <FlatList
+                  data={savedMealsStore.meals}
+                  keyExtractor={(item) => item.id}
+                  scrollEnabled={false}
+                  contentContainerStyle={{ gap: Spacing.sm }}
+                  renderItem={({ item: savedMeal }) => (
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      onLongPress={() => confirmDeleteMeal(savedMeal)}
+                      style={styles.savedCard}
+                    >
+                      <View style={styles.savedCardLeft}>
+                        <Text style={styles.savedCardName}>{savedMeal.name}</Text>
+                        <Text style={styles.savedCardMeta}>
+                          {savedMeal.items.length} {savedMeal.items.length !== 1 ? 'itens' : 'item'} · {Math.round(savedMeal.totalCalories)} kcal
+                        </Text>
+                        <View style={styles.savedMacroPills}>
+                          <View style={styles.savedMacroPill}>
+                            <Text style={[styles.savedMacroTxt, { color: MacroColors.protein }]}>
+                              P {Math.round(savedMeal.totalProtein * 10) / 10}g
+                            </Text>
+                          </View>
+                          <View style={styles.savedMacroPill}>
+                            <Text style={[styles.savedMacroTxt, { color: MacroColors.carbs }]}>
+                              C {Math.round(savedMeal.totalCarbs * 10) / 10}g
+                            </Text>
+                          </View>
+                          <View style={styles.savedMacroPill}>
+                            <Text style={[styles.savedMacroTxt, { color: MacroColors.fat }]}>
+                              G {Math.round(savedMeal.totalFat * 10) / 10}g
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+                      <TouchableOpacity
+                        style={styles.addPillBtn}
+                        onPress={() => addSavedMeal(savedMeal)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={styles.addPillBtnTxt}>Adicionar</Text>
+                      </TouchableOpacity>
+                    </TouchableOpacity>
+                  )}
+                />
+              )}
+            </View>
+          )}
+
           <View style={{ height: 40 }} />
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* ── Save Meal Name Modal ─────────────────────────────────────────── */}
+      <Modal
+        visible={saveModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSaveModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>Guardar Refeição</Text>
+            <Text style={styles.modalSubtitle}>Dá um nome a esta refeição</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="ex: Almoço de frango"
+              placeholderTextColor={Colors.textDisabled}
+              value={saveMealName}
+              onChangeText={setSaveMealName}
+              autoFocus
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalBtnCancel]}
+                onPress={() => setSaveModalVisible(false)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.modalBtnCancelTxt}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalBtnConfirm, !saveMealName.trim() && { opacity: 0.4 }]}
+                onPress={confirmSaveMeal}
+                activeOpacity={0.7}
+                disabled={!saveMealName.trim()}
+              >
+                <Text style={styles.modalBtnConfirmTxt}>Guardar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
-function MacroChip({ value, label, color }: { value: number; label: string; color: string }) {
-  return (
-    <View style={[chipStyles.chip, { borderColor: color + '50', backgroundColor: color + '10' }]}>
-      <Text style={[chipStyles.value, { color }]}>{Math.round(value * 10) / 10}</Text>
-      <Text style={chipStyles.label}>{label}</Text>
-    </View>
-  );
-}
+// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const chipStyles = StyleSheet.create({
   chip: {
@@ -333,7 +718,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.lg,
     padding: 4,
     marginBottom: Spacing.md,
-    gap: 4,
+    gap: 3,
     borderWidth: 1,
     borderColor: Colors.border,
   },
@@ -344,14 +729,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 6,
+    gap: 4,
   },
   modeBtnActive: {
     backgroundColor: Colors.primary,
     ...Shadow.card,
   },
   modeBtnTxt: {
-    fontSize: Typography.base,
+    fontSize: Typography.xs,
     color: Colors.textSecondary,
     fontWeight: FontWeight.medium,
   },
@@ -417,6 +802,21 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontSize: Typography.base,
     fontWeight: FontWeight.bold,
+  },
+  outlineBtn: {
+    borderWidth: 1.5,
+    borderColor: Colors.primary,
+    borderRadius: Radius.lg,
+    paddingVertical: Spacing.sm + 2,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  outlineBtnTxt: {
+    color: Colors.primary,
+    fontSize: Typography.base,
+    fontWeight: FontWeight.semibold,
   },
   resultsContainer: { gap: Spacing.sm },
   resultsTitle: {
@@ -519,5 +919,162 @@ const styles = StyleSheet.create({
     fontWeight: FontWeight.semibold,
     minWidth: 50,
     textAlign: 'center',
+  },
+  // Photo tab
+  photoButtonRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  photoOutlineBtn: {
+    borderWidth: 1.5,
+    borderColor: Colors.primary,
+    borderRadius: Radius.lg,
+    paddingVertical: Spacing.md,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: Colors.primaryLight,
+  },
+  photoOutlineBtnTxt: {
+    color: Colors.primary,
+    fontSize: Typography.base,
+    fontWeight: FontWeight.semibold,
+  },
+  // Saved meals tab
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: Spacing.xxxl,
+    gap: Spacing.md,
+  },
+  emptyTitle: {
+    fontSize: Typography.lg,
+    color: Colors.textPrimary,
+    fontWeight: FontWeight.semibold,
+  },
+  emptyText: {
+    fontSize: Typography.sm,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+  },
+  savedCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    padding: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    ...Shadow.card,
+  },
+  savedCardLeft: {
+    flex: 1,
+    gap: 4,
+  },
+  savedCardName: {
+    fontSize: Typography.base,
+    color: Colors.textPrimary,
+    fontWeight: FontWeight.bold,
+  },
+  savedCardMeta: {
+    fontSize: Typography.sm,
+    color: Colors.textSecondary,
+  },
+  savedMacroPills: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 4,
+  },
+  savedMacroPill: {
+    backgroundColor: Colors.backgroundSubtle,
+    borderRadius: Radius.sm,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  savedMacroTxt: {
+    fontSize: Typography.xs,
+    fontWeight: FontWeight.semibold,
+  },
+  addPillBtn: {
+    backgroundColor: Colors.primary,
+    borderRadius: Radius.pill,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Shadow.card,
+  },
+  addPillBtnTxt: {
+    color: Colors.white,
+    fontSize: Typography.sm,
+    fontWeight: FontWeight.bold,
+  },
+  // Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Spacing.xl,
+  },
+  modalBox: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.xl,
+    padding: Spacing.xl,
+    width: '100%',
+    gap: Spacing.md,
+    ...Shadow.strong,
+  },
+  modalTitle: {
+    fontSize: Typography.lg,
+    color: Colors.textPrimary,
+    fontWeight: FontWeight.bold,
+  },
+  modalSubtitle: {
+    fontSize: Typography.sm,
+    color: Colors.textSecondary,
+  },
+  modalInput: {
+    backgroundColor: Colors.backgroundSubtle,
+    borderRadius: Radius.lg,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm + 2,
+    color: Colors.textPrimary,
+    fontSize: Typography.base,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginTop: 4,
+  },
+  modalBtn: {
+    flex: 1,
+    borderRadius: Radius.lg,
+    paddingVertical: Spacing.sm + 2,
+    alignItems: 'center',
+  },
+  modalBtnCancel: {
+    backgroundColor: Colors.backgroundSubtle,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  modalBtnCancelTxt: {
+    color: Colors.textSecondary,
+    fontSize: Typography.base,
+    fontWeight: FontWeight.medium,
+  },
+  modalBtnConfirm: {
+    backgroundColor: Colors.primary,
+    ...Shadow.card,
+  },
+  modalBtnConfirmTxt: {
+    color: Colors.white,
+    fontSize: Typography.base,
+    fontWeight: FontWeight.bold,
   },
 });

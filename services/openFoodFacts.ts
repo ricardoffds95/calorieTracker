@@ -1,3 +1,5 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 export interface FoodSearchResult {
   id: string;
   name: string;
@@ -28,8 +30,45 @@ interface OFFResponse {
   count: number;
 }
 
-export async function searchFood(query: string): Promise<FoodSearchResult[]> {
-  const encoded = encodeURIComponent(query.trim());
+const CACHE_KEY = 'food_search_cache_v1';
+const CACHE_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+interface CacheEntry {
+  results: FoodSearchResult[];
+  timestamp: number;
+}
+
+type CacheStore = Record<string, CacheEntry>;
+
+async function getCache(): Promise<CacheStore> {
+  try {
+    const raw = await AsyncStorage.getItem(CACHE_KEY);
+    if (raw) return JSON.parse(raw) as CacheStore;
+  } catch {
+    // ignore
+  }
+  return {};
+}
+
+async function setCache(store: CacheStore): Promise<void> {
+  try {
+    await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(store));
+  } catch {
+    // ignore
+  }
+}
+
+export async function searchFood(query: string): Promise<{ results: FoodSearchResult[]; fromCache: boolean }> {
+  const normalized = query.trim().toLowerCase();
+  const cache = await getCache();
+  const entry = cache[normalized];
+  const now = Date.now();
+
+  if (entry && now - entry.timestamp < CACHE_EXPIRY_MS) {
+    return { results: entry.results, fromCache: true };
+  }
+
+  const encoded = encodeURIComponent(normalized);
   const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encoded}&search_simple=1&action=process&json=1&fields=code,product_name,brands,nutriments,serving_size&lc=pt&page_size=20`;
 
   const response = await fetch(url, {
@@ -42,7 +81,7 @@ export async function searchFood(query: string): Promise<FoodSearchResult[]> {
 
   const data: OFFResponse = await response.json();
 
-  return data.products
+  const results = data.products
     .filter((p) => p.product_name && p.nutriments)
     .map((p): FoodSearchResult => {
       const n = p.nutriments!;
@@ -59,6 +98,11 @@ export async function searchFood(query: string): Promise<FoodSearchResult[]> {
       };
     })
     .filter((r) => r.calories_100g > 0);
+
+  const updatedCache: CacheStore = { ...cache, [normalized]: { results, timestamp: now } };
+  await setCache(updatedCache);
+
+  return { results, fromCache: false };
 }
 
 export function calculateNutrientsForQuantity(
