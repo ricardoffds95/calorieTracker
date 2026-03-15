@@ -112,11 +112,12 @@ function EditModal({
 // ─── MealEntryRow ────────────────────────────────────────────────────────────
 
 function MealEntryRow({
-  entry, onRemove, onEdit,
+  entry, onRemove, onEdit, onRemoveItem,
 }: {
   entry: MealEntry;
   onRemove: () => void;
   onEdit: () => void;
+  onRemoveItem: (itemId: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const rotation = useRef(new Animated.Value(0)).current;
@@ -148,10 +149,15 @@ function MealEntryRow({
         </View>
       </TouchableOpacity>
 
-      {expanded && entry.items.map((item, i) => (
-        <View key={i} style={rowStyles.subItem}>
+      {expanded && entry.items.map((item) => (
+        <View key={item.id} style={rowStyles.subItem}>
           <Text style={rowStyles.subItemName} numberOfLines={1}>└ {item.name}</Text>
           <Text style={rowStyles.subItemCals}>{Math.round(item.calories)} kcal</Text>
+          {entry.items.length > 1 && (
+            <TouchableOpacity onPress={() => onRemoveItem(item.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Feather name="x" size={12} color={Colors.textDisabled} />
+            </TouchableOpacity>
+          )}
         </View>
       ))}
     </View>
@@ -165,6 +171,7 @@ export default function MealSection({ meal, items, totalCalories, onAddFood, onR
   const anim = useRef(new Animated.Value(1)).current;
   const config = MEAL_CONFIG[meal];
   const updateEntry = useFoodStore(s => s.updateEntry);
+  const removeItemFromMeal = useFoodStore(s => s.removeItemFromMeal);
   const [editState, setEditState] = useState<EditState | null>(null);
 
   const today = date ?? format(new Date(), 'yyyy-MM-dd');
@@ -249,6 +256,7 @@ export default function MealSection({ meal, items, totalCalories, onAddFood, onR
                   entry={entry}
                   onRemove={() => onRemoveFood(entry.id)}
                   onEdit={() => openEdit(entry)}
+                  onRemoveItem={(itemId) => removeItemFromMeal(entry.id, itemId, today)}
                 />
               </View>
             );

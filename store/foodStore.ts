@@ -51,6 +51,7 @@ interface FoodState {
   addMeal: (meal: { name: string; items: { name: string; quantity_g: number; calories: number; protein_g: number; carbs_g: number; fat_g: number }[]; meal: MealType }, date?: string) => void;
   removeFood: (foodId: string, date?: string) => void;
   updateEntry: (id: string, updates: { name?: string; quantity_g?: number; calories?: number; protein_g?: number; carbs_g?: number; fat_g?: number; totalCalories?: number; totalProtein?: number; totalCarbs?: number; totalFat?: number }, date?: string) => void;
+  removeItemFromMeal: (entryId: string, itemId: string, date?: string) => void;
   clearDay: (date?: string) => void;
   getTodayTotals: () => { calories: number; protein: number; carbs: number; fat: number };
   getDayTotals: (date: string) => { calories: number; protein: number; carbs: number; fat: number };
@@ -177,6 +178,30 @@ export const useFoodStore = create<FoodState>((set, get) => ({
         meals[meal] = meals[meal].map((entry) => {
           if (entry.id !== id) return entry;
           return { ...entry, ...updates } as DiaryEntry;
+        });
+      });
+      const updated = { ...state.logs, [day]: { ...existing, meals } };
+      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated)).catch(console.error);
+      return { logs: updated };
+    });
+  },
+
+  removeItemFromMeal: (entryId, itemId, date) => {
+    const day = date ?? format(new Date(), 'yyyy-MM-dd');
+    set((state) => {
+      const existing = state.logs[day];
+      if (!existing) return state;
+      const meals = { ...existing.meals } as Record<MealType, DiaryEntry[]>;
+      (Object.keys(meals) as MealType[]).forEach((meal) => {
+        meals[meal] = meals[meal].map((entry) => {
+          if (entry.id !== entryId || entry.type !== 'meal') return entry;
+          const newItems = entry.items.filter(i => i.id !== itemId);
+          if (newItems.length === 0) return entry; // keep entry, don't leave empty
+          const t = newItems.reduce(
+            (acc, i) => ({ cal: acc.cal + i.calories, p: acc.p + i.protein_g, c: acc.c + i.carbs_g, f: acc.f + i.fat_g }),
+            { cal: 0, p: 0, c: 0, f: 0 }
+          );
+          return { ...entry, items: newItems, totalCalories: Math.round(t.cal * 10) / 10, totalProtein: Math.round(t.p * 10) / 10, totalCarbs: Math.round(t.c * 10) / 10, totalFat: Math.round(t.f * 10) / 10 } as MealEntry;
         });
       });
       const updated = { ...state.logs, [day]: { ...existing, meals } };

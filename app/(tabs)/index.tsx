@@ -76,6 +76,7 @@ export default function DashboardScreen() {
         <Animated.View style={{ opacity: fadeAnim3 }}>
           <Text style={styles.sectionTitle}>Refeições</Text>
           {MEALS.map(meal => {
+            const today = format(new Date(), 'yyyy-MM-dd');
             const items = meals[meal];
             const mealCalories = items.reduce((sum, entry) => sum + (entry.type === 'meal' ? entry.totalCalories : entry.calories), 0);
             return (
@@ -84,8 +85,9 @@ export default function DashboardScreen() {
                 meal={meal}
                 items={items}
                 totalCalories={mealCalories}
+                date={today}
                 onAddFood={() => router.push({ pathname: '/(tabs)/log', params: { mealContext: meal, timestamp: Date.now().toString() } })}
-                onRemoveFood={(id) => removeFood(id, new Date().toISOString().split('T')[0])}
+                onRemoveFood={(id) => removeFood(id, today)}
               />
             );
           })}
