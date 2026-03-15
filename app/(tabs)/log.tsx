@@ -769,9 +769,10 @@ export default function LogScreen() {
               </View>
 
               <TouchableOpacity style={[styles.primaryBtn, aiLoading && styles.primaryBtnDisabled]} onPress={handleAnalyze} activeOpacity={0.8} disabled={aiLoading}>
-                {aiLoading ? <ActivityIndicator color={Colors.white} /> : (
-                  <><Feather name="zap" size={16} color={Colors.white} /><Text style={styles.primaryBtnTxt}>Analisar com IA</Text></>
-                )}
+                {aiLoading
+                  ? <><ActivityIndicator color={Colors.white} size="small" /><Text style={styles.primaryBtnTxt}>A analisar...</Text></>
+                  : <><Feather name="zap" size={16} color={Colors.white} /><Text style={styles.primaryBtnTxt}>Analisar com IA</Text></>
+                }
               </TouchableOpacity>
 
               {aiError && <ErrorCard message={aiError} />}
