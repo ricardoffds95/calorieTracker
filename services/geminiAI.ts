@@ -1,5 +1,5 @@
 const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? '';
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${GEMINI_API_KEY}`;
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
 const SYSTEM_PROMPT = `Identifica os alimentos descritos ou visíveis, estima as quantidades em gramas se não especificadas, e devolve APENAS um JSON array sem markdown nem texto extra:
 [{"name":"frango grelhado","quantity_g":150,"calories":165,"protein_g":31,"carbs_g":0,"fat_g":3.6}]
