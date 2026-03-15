@@ -1,5 +1,5 @@
 const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? '';
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
 
 const SYSTEM_PROMPT = `Identifica os alimentos descritos ou visíveis, estima as quantidades em gramas se não especificadas, e devolve APENAS um JSON array sem markdown nem texto extra:
 [{"name":"frango grelhado","quantity_g":150,"calories":165,"protein_g":31,"carbs_g":0,"fat_g":3.6}]
@@ -28,7 +28,10 @@ async function callGemini(contents: unknown): Promise<GeminiParsedItem[]> {
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     console.error('Gemini API error:', response.status, errorData);
-    throw new Error(`Gemini API error ${response.status}: ${errorData?.error?.message ?? response.statusText}`);
+    if (response.status === 429) throw new Error('Muitos pedidos seguidos. Aguarda um momento e tenta novamente.');
+    if (response.status === 401 || response.status === 403) throw new Error('Não foi possível ligar ao serviço de IA. Verifica a tua ligação.');
+    if (response.status >= 500) throw new Error('O serviço de IA está temporariamente indisponível. Tenta mais tarde.');
+    throw new Error('Não foi possível analisar. Tenta novamente.');
   }
   const data = await response.json();
   const text = data.candidates[0].content.parts[0].text as string;
