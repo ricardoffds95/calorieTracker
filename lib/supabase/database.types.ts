@@ -217,6 +217,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      diary_daily_totals: {
+        Args: { p_from: string; p_to: string }
+        Returns: {
+          calories: number
+          carbs_g: number
+          entries: number
+          entry_date: string
+          fat_g: number
+          protein_g: number
+        }[]
+      }
       apply_saved_food: {
         Args: { p_food_id: string; p_from_date?: string }
         Returns: number

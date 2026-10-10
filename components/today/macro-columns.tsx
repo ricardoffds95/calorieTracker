@@ -6,9 +6,9 @@ import { cn } from "@/lib/utils";
 const TONES = { protein: "bg-protein", carbs: "bg-carbs", fat: "bg-fat" } as const;
 const TEXT = { protein: "text-protein", carbs: "text-carbs", fat: "text-fat" } as const;
 
-export function MacroColumns({ goals, totals }: { goals: MacroGoals; totals: MacroTotals }) {
+export function MacroColumns({ goals, totals, label = "Macros do dia" }: { goals: MacroGoals; totals: MacroTotals; label?: string }) {
   return (
-    <section aria-label="Macros do dia" className="grid grid-cols-3 gap-4">
+    <section aria-label={label} className="grid grid-cols-3 gap-4">
       {macroColumns(goals, totals).map((col) => (
         <div key={col.key} data-testid={`macro-${col.key}`} className="flex flex-col gap-1.5">
           <p className="text-xs text-muted-foreground">{col.label}</p>

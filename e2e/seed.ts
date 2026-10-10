@@ -131,3 +131,9 @@ export async function fetchSavedMeals(user: TestUser) {
   if (error) throw error;
   return data;
 }
+
+/** Calls diary_daily_totals as `user` (RLS applies). */
+export async function dailyTotalsAs(user: TestUser, from: string, to: string) {
+  const supabase = await clientFor(user);
+  return supabase.rpc("diary_daily_totals", { p_from: from, p_to: to });
+}

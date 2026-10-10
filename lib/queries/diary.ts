@@ -6,6 +6,7 @@ import { toDiaryEntry, type DiaryEntry } from "@/lib/diary";
 import { itemsToJson, mealItemRemovalUpdate, toInsertRow, type EntryUpdate, type MealItemRemoval } from "@/lib/diary-edit";
 import type { NewDiaryEntry } from "@/lib/log";
 import { toastSaveError } from "@/lib/queries/errors";
+import { historyKey } from "@/lib/queries/history";
 import { createClient } from "@/lib/supabase/client";
 
 export const diaryKey = (userId: string, dateKey: string) => ["diary", userId, dateKey] as const;
@@ -62,7 +63,7 @@ function useDiaryMutation<V>(userId: string, dateKey: string, options: DiaryMuta
       toastSaveError(error);
     },
     onSuccess: (_data, variables) => options.onSuccess?.(variables),
-    onSettled: () => queryClient.invalidateQueries({ queryKey: key }),
+    onSettled: () => Promise.all([queryClient.invalidateQueries({ queryKey: key }), queryClient.invalidateQueries({ queryKey: historyKey(userId) })]),
   });
 }
 
@@ -114,7 +115,7 @@ export function useDeleteEntry(userId: string, dateKey: string) {
     queryClient.setQueryData<DiaryEntry[]>(key, (current) =>
       current && !current.some((e) => e.id === entry.id) ? [...current, entry].sort(byCreatedAt) : current,
     );
-    await queryClient.invalidateQueries({ queryKey: key });
+    await Promise.all([queryClient.invalidateQueries({ queryKey: key }), queryClient.invalidateQueries({ queryKey: historyKey(userId) })]);
   }
 
   return useDiaryMutation<DiaryEntry>(userId, dateKey, {
@@ -156,6 +157,7 @@ export function useAddEntries(userId: string) {
         ...[...new Set((entries ?? []).map((e) => e.entry_date))].map((date) =>
           queryClient.invalidateQueries({ queryKey: diaryKey(userId, date) }),
         ),
+        queryClient.invalidateQueries({ queryKey: historyKey(userId) }),
         // times_used changed in SQL
         queryClient.invalidateQueries({ queryKey: ["saved_foods", userId] }),
         queryClient.invalidateQueries({ queryKey: ["saved_meals", userId] }),

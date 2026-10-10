@@ -6,6 +6,7 @@ import type { FoodSearchResult, SavedFood } from "@/lib/food-search";
 import { propagationFromDate, savedMealRow, type PropagationScope, type SavedFoodValues } from "@/lib/log";
 import type { FoodItem } from "@/lib/nutrition";
 import { toastSaveError } from "@/lib/queries/errors";
+import { historyKey } from "@/lib/queries/history";
 import { foodItemsSchema } from "@/lib/schemas";
 import { createClient } from "@/lib/supabase/client";
 import type { Tables } from "@/lib/supabase/database.types";
@@ -125,6 +126,7 @@ function useSavedMutation<V>(
       Promise.all([
         queryClient.invalidateQueries({ queryKey: kind === "food" ? savedFoodsKey(userId) : savedMealsKey(userId) }),
         queryClient.invalidateQueries({ queryKey: allDiaryKey(userId) }),
+        queryClient.invalidateQueries({ queryKey: historyKey(userId) }),
       ]),
   });
 }

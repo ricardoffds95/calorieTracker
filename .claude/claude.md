@@ -71,6 +71,13 @@ Migração de uma app React Native (Expo) de contagem de calorias e macros para 
 - Todo o código de IA em `lib/ai.ts`, para poder trocar de fornecedor.
 - O free tier tem quota partilhada por todos os utilizadores, e os dados enviados podem ser usados pela Google para melhorar produtos; ter isto em conta.
 
+## Histórico
+- Por defeito a **semana atual** (segunda a domingo); também mês, ano e intervalo entre 2 datas (máx. 3660 dias). O período vive no URL (`?p=week|month|year|custom&d=…` ou `&from=…&to=…`); setas, "Voltar a hoje" e "Ir para uma data" (um só campo de data, porque `type=month/week` não funciona no iOS). Lógica pura em `lib/history.ts`.
+- Os dados vêm de `diary_daily_totals(p_from, p_to)` (SQL, `security invoker`, uma linha por dia com entradas), não de ler as entradas: o PostgREST devolve no máximo 1000 linhas por pedido e um ano tem mais. **Sem tabelas de estatísticas**: o diário é a única fonte de verdade, por isso editar um guardado com "todo o histórico" atualiza também o Histórico (as mutações invalidam `["history", userId]`).
+- **A média é por dia registado** (dias sem entradas não puxam a média para baixo, são outliers) e o ecrã diz sempre "N de M dias registados" (M = dias do período que já começaram; mês e ano atuais contam só até hoje).
+- **Nada no Histórico é comparado com as metas** (decisão do utilizador): as metas mudam ao longo do ano e não há histórico de metas, por isso comparar um período antigo com a meta atual enganaria. Só voltar a comparar se um dia existir uma média das metas do período. As macros mostram gramas médias e a parte de cada uma nas calorias (`macroSplit`).
+- Gráfico de barras próprio (sem biblioteca): barras ≤ 24 px, uma por dia (≤ 31 dias), semana (≤ ~6 meses) ou mês, sempre em `primary`; cada barra é um botão com a lista por baixo como vista em tabela.
+
 ## Segurança (regras duras)
 - **Nunca** pôr chaves no repositório ou no cliente. Só `NEXT_PUBLIC_SUPABASE_URL` e a chave anónima/publicável são públicas.
 - `service_role` nunca vai para o cliente nem para o Git. Segredos em `.env.local` (no `.gitignore`) e nas variáveis da Vercel.

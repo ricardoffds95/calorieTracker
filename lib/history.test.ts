@@ -1,0 +1,250 @@
+import { describe, expect, it } from "vitest";
+import {
+  axisLabel,
+  bucketHref,
+  bucketLabel,
+  bucketize,
+  containsDay,
+  elapsedDays,
+  granularityFor,
+  macroSplit,
+  parsePeriodParams,
+  periodFor,
+  periodHref,
+  periodLabel,
+  shiftPeriod,
+  spanDays,
+  summarize,
+  validateRange,
+  type DayTotals,
+  type Period,
+} from "./history";
+
+const now = new Date(2026, 9, 10, 15, 30); // Saturday 10 Oct 2026
+const day = (date: string, calories: number, protein_g = 0, carbs_g = 0, fat_g = 0, entries = 1): DayTotals => ({
+  date,
+  calories,
+  protein_g,
+  carbs_g,
+  fat_g,
+  entries,
+});
+const custom = (from: string, to: string): Period => ({ kind: "custom", from, to });
+
+describe("periodFor", () => {
+  it("weeks run Monday to Sunday", () => {
+    expect(periodFor("week", "2026-10-10")).toEqual({ kind: "week", from: "2026-10-05", to: "2026-10-11" });
+    expect(periodFor("week", "2026-10-05")).toMatchObject({ from: "2026-10-05", to: "2026-10-11" }); // Monday
+    expect(periodFor("week", "2026-10-11")).toMatchObject({ from: "2026-10-05", to: "2026-10-11" }); // Sunday
+  });
+  it("a week can span two months or two years", () => {
+    expect(periodFor("week", "2026-10-01")).toMatchObject({ from: "2026-09-28", to: "2026-10-04" });
+    expect(periodFor("week", "2026-01-01")).toMatchObject({ from: "2025-12-29", to: "2026-01-04" });
+  });
+  it("covers the whole month, including leap Februarys, and the whole year", () => {
+    expect(periodFor("month", "2026-10-17")).toEqual({ kind: "month", from: "2026-10-01", to: "2026-10-31" });
+    expect(periodFor("month", "2028-02-10").to).toBe("2028-02-29");
+    expect(periodFor("month", "2027-02-10").to).toBe("2027-02-28");
+    expect(periodFor("year", "2026-06-15")).toEqual({ kind: "year", from: "2026-01-01", to: "2026-12-31" });
+  });
+});
+
+describe("shiftPeriod", () => {
+  it("moves weeks by 7 days across the year boundary", () => {
+    expect(shiftPeriod(periodFor("week", "2026-01-01"), 1)).toMatchObject({ from: "2026-01-05", to: "2026-01-11" });
+    expect(shiftPeriod(periodFor("week", "2026-01-01"), -1)).toMatchObject({ from: "2025-12-22", to: "2025-12-28" });
+  });
+  it("moves months and years, keeping their real length", () => {
+    expect(shiftPeriod(periodFor("month", "2026-01-15"), -1)).toMatchObject({ from: "2025-12-01", to: "2025-12-31" });
+    expect(shiftPeriod(periodFor("month", "2026-01-31"), 1)).toMatchObject({ from: "2026-02-01", to: "2026-02-28" });
+    expect(shiftPeriod(periodFor("year", "2026-03-01"), 1)).toMatchObject({ from: "2027-01-01", to: "2027-12-31" });
+  });
+  it("moves a custom range by its own length", () => {
+    expect(shiftPeriod(custom("2026-10-01", "2026-10-10"), 1)).toEqual(custom("2026-10-11", "2026-10-20"));
+    expect(shiftPeriod(custom("2026-10-01", "2026-10-10"), -1)).toEqual(custom("2026-09-21", "2026-09-30"));
+  });
+});
+
+describe("validateRange", () => {
+  it("accepts a valid range, including a single day", () => {
+    expect(validateRange("2026-10-01", "2026-10-10")).toBeNull();
+    expect(validateRange("2026-10-01", "2026-10-01")).toBeNull();
+  });
+  it("explains what is wrong", () => {
+    expect(validateRange("", "2026-10-10")).toBe("Indica as duas datas.");
+    expect(validateRange("2026-02-30", "2026-03-10")).toBe("Indica as duas datas.");
+    expect(validateRange("2026-10-10", "2026-10-01")).toBe("A data final tem de ser depois da inicial.");
+    expect(validateRange("2010-01-01", "2026-10-10")).toBe("Máximo 10 anos.");
+  });
+  it("allows exactly the maximum and rejects one more day", () => {
+    expect(validateRange("2016-01-01", "2025-12-31")).toBeNull(); // 3653 days
+    expect(validateRange("2016-01-01", "2026-01-08")).toBe("Máximo 10 anos."); // 3661 days
+  });
+});
+
+describe("parsePeriodParams / periodHref", () => {
+  const params = (query: string) => new URLSearchParams(query);
+  const currentWeek = periodFor("week", "2026-10-10");
+
+  it("defaults to the current week", () => {
+    expect(parsePeriodParams(params(""), now)).toEqual(currentWeek);
+  });
+  it("reads week, month, year and custom", () => {
+    expect(parsePeriodParams(params("p=month&d=2026-09-01"), now)).toEqual(periodFor("month", "2026-09-01"));
+    expect(parsePeriodParams(params("p=year&d=2025-05-05"), now)).toEqual(periodFor("year", "2025-05-05"));
+    expect(parsePeriodParams(params("p=month"), now)).toEqual(periodFor("month", "2026-10-10")); // no date: the current one
+    expect(parsePeriodParams(params("p=custom&from=2026-10-01&to=2026-10-10"), now)).toEqual(custom("2026-10-01", "2026-10-10"));
+  });
+  it("falls back to the current week for anything invalid", () => {
+    for (const query of ["p=decade", "p=custom&from=2026-10-10&to=2026-10-01", "p=custom&from=x&to=y", "p=custom", "p=week&d=nope"]) {
+      expect(parsePeriodParams(params(query), now), query).toEqual(currentWeek);
+    }
+  });
+  it("builds URLs that restore the same period", () => {
+    expect(periodHref(currentWeek, now)).toBe("/historico");
+    for (const period of [periodFor("week", "2026-09-01"), periodFor("month", "2026-09-01"), periodFor("year", "2025-01-01"), custom("2026-10-01", "2026-10-10")]) {
+      const url = new URL(periodHref(period, now), "http://localhost");
+      expect(parsePeriodParams(url.searchParams, now)).toEqual(period);
+    }
+  });
+});
+
+describe("periodLabel", () => {
+  it("is short and only shows the year when it is not the current one", () => {
+    expect(periodLabel(periodFor("week", "2026-10-10"), now)).toBe("5–11 out");
+    expect(periodLabel(periodFor("week", "2026-10-01"), now)).toBe("28 set – 4 out");
+    expect(periodLabel(periodFor("week", "2025-10-10"), now)).toBe("6–12 out 2025");
+    expect(periodLabel(periodFor("month", "2026-10-10"), now)).toBe("outubro 2026");
+    expect(periodLabel(periodFor("year", "2026-10-10"), now)).toBe("2026");
+    expect(periodLabel(custom("2026-09-03", "2026-10-20"), now)).toBe("3 set – 20 out");
+    expect(periodLabel(custom("2025-09-03", "2025-10-20"), now)).toBe("3 set – 20 out 2025");
+    expect(periodLabel(custom("2025-12-29", "2026-01-04"), now)).toBe("29 dez 2025 – 4 jan 2026");
+    expect(periodLabel(custom("2026-10-10", "2026-10-10"), now)).toBe("10 out");
+  });
+});
+
+describe("containsDay / elapsedDays / spanDays", () => {
+  const week = periodFor("week", "2026-10-10");
+  it("includes both ends", () => {
+    expect(containsDay(week, "2026-10-05")).toBe(true);
+    expect(containsDay(week, "2026-10-11")).toBe(true);
+    expect(containsDay(week, "2026-10-12")).toBe(false);
+    expect(spanDays("2026-10-05", "2026-10-11")).toBe(7);
+  });
+  it("only counts the days that have already started", () => {
+    expect(elapsedDays(week, "2026-10-07")).toBe(3);
+    expect(elapsedDays(week, "2026-10-20")).toBe(7);
+    expect(elapsedDays(week, "2026-10-01")).toBe(0);
+  });
+});
+
+describe("summarize", () => {
+  const week = periodFor("week", "2026-10-10");
+  const days = [day("2026-10-05", 2000, 100, 200, 60, 4), day("2026-10-06", 1500, 90.5, 150, 40.4, 3), day("2026-10-08", 1799, 80, 180, 50, 2)];
+
+  it("averages over the days that were logged, not over the calendar", () => {
+    const s = summarize(days, week, "2026-10-10");
+    expect(s.loggedDays).toBe(3);
+    expect(s.elapsedDays).toBe(6);
+    expect(s.total).toEqual({ calories: 5299, protein: 270.5, carbs: 530, fat: 150.4 });
+    expect(s.average).toEqual({ calories: 1766, protein: 90.2, carbs: 176.7, fat: 50.1 }); // 5299/3, not /6 or /7
+  });
+  it("finds the highest and lowest day", () => {
+    const s = summarize(days, week, "2026-10-10");
+    expect(s.highest?.date).toBe("2026-10-05");
+    expect(s.lowest?.date).toBe("2026-10-06");
+  });
+  it("ignores days outside the period and days without entries", () => {
+    const s = summarize([...days, day("2026-10-12", 9999), day("2026-10-07", 777, 0, 0, 0, 0)], week, "2026-10-10");
+    expect(s.loggedDays).toBe(3);
+    expect(s.total.calories).toBe(5299);
+  });
+  it("has no average when nothing was logged", () => {
+    expect(summarize([], week, "2026-10-10")).toMatchObject({ loggedDays: 0, average: null, highest: null, lowest: null });
+  });
+});
+
+describe("macroSplit", () => {
+  it("is each macro's share of the calories (4/4/9 kcal per gram)", () => {
+    // 320.4 + 780 + 518.4 kcal = 48.19% carbs, 32.02% fat, 19.79% protein
+    expect(macroSplit({ protein: 80.1, carbs: 195, fat: 57.6 })).toEqual({ protein: 20, carbs: 48, fat: 32 });
+    expect(macroSplit({ protein: 100, carbs: 0, fat: 0 })).toEqual({ protein: 100, carbs: 0, fat: 0 });
+  });
+  it("always adds up to exactly 100", () => {
+    for (const [p, c, f] of [[33.3, 33.3, 33.3], [1, 1, 1], [120.7, 210.2, 64.9], [0.1, 0.1, 0.1], [50, 0, 50]] as const) {
+      const { protein, carbs, fat } = macroSplit({ protein: p, carbs: c, fat: f });
+      expect(protein + carbs + fat, `${p}/${c}/${f}`).toBe(100);
+    }
+  });
+  it("is all zeros when nothing was eaten", () => {
+    expect(macroSplit({ protein: 0, carbs: 0, fat: 0 })).toEqual({ protein: 0, carbs: 0, fat: 0 });
+  });
+});
+
+describe("granularityFor / bucketize", () => {
+  it("chooses days, weeks or months by the length of the period", () => {
+    expect(granularityFor(periodFor("week", "2026-10-10"))).toBe("day");
+    expect(granularityFor(periodFor("month", "2026-10-10"))).toBe("day"); // 31 days
+    expect(granularityFor(custom("2026-10-01", "2026-11-01"))).toBe("week"); // 32 days
+    expect(granularityFor(custom("2026-01-01", "2026-07-09"))).toBe("week"); // 190 days
+    expect(granularityFor(custom("2026-01-01", "2026-07-10"))).toBe("month"); // 191 days
+    expect(granularityFor(periodFor("year", "2026-10-10"))).toBe("month");
+  });
+
+  it("gives one bucket per day for a week, empty days included", () => {
+    const week = periodFor("week", "2026-10-10");
+    const buckets = bucketize([day("2026-10-06", 1500, 90)], week);
+    expect(buckets).toHaveLength(7);
+    expect(buckets.map((b) => b.loggedDays)).toEqual([0, 1, 0, 0, 0, 0, 0]);
+    expect(buckets[1]?.average).toEqual({ calories: 1500, protein: 90, carbs: 0, fat: 0 });
+    expect(buckets[0]?.average).toBeNull();
+  });
+
+  it("gives 12 months for a year, each averaged over its logged days", () => {
+    const year = periodFor("year", "2026-10-10");
+    const buckets = bucketize([day("2026-03-01", 2000), day("2026-03-02", 1000), day("2026-12-31", 1800)], year);
+    expect(buckets).toHaveLength(12);
+    expect(buckets[2]).toMatchObject({ from: "2026-03-01", to: "2026-03-31", loggedDays: 2, average: { calories: 1500 } });
+    expect(buckets[11]).toMatchObject({ loggedDays: 1, average: { calories: 1800 } });
+    expect(buckets[0]?.average).toBeNull();
+  });
+
+  it("clips weeks to a custom range that starts and ends mid-week", () => {
+    const buckets = bucketize([], custom("2026-01-15", "2026-03-10"));
+    expect(buckets).toHaveLength(9);
+    expect(buckets[0]).toMatchObject({ from: "2026-01-15", to: "2026-01-18", granularity: "week" });
+    expect(buckets.at(-1)).toMatchObject({ from: "2026-03-09", to: "2026-03-10" });
+    for (let i = 1; i < buckets.length; i++) expect(buckets[i]!.from > buckets[i - 1]!.to).toBe(true); // no overlaps
+  });
+
+  it("covers every day exactly once, whatever the granularity", () => {
+    for (const period of [periodFor("month", "2028-02-10"), periodFor("year", "2028-02-10"), custom("2026-01-15", "2026-03-10")]) {
+      const buckets = bucketize([], period);
+      expect(buckets.reduce((n, b) => n + spanDays(b.from, b.to), 0)).toBe(spanDays(period.from, period.to));
+    }
+  });
+});
+
+describe("labels and links", () => {
+  const week = periodFor("week", "2026-10-10");
+  it("labels buckets and axis ticks", () => {
+    const days = bucketize([], week);
+    expect(bucketLabel(days[0]!)).toBe("seg, 5 out");
+    expect(days.map((b, i) => axisLabel(b, i, days.length))).toEqual(["S", "T", "Q", "Q", "S", "S", "D"]);
+    const month = bucketize([], periodFor("month", "2026-10-10"));
+    const ticks = month.map((b, i) => axisLabel(b, i, month.length)).filter(Boolean);
+    expect(ticks).toEqual(["1", "5", "10", "15", "20", "25", "30"]);
+    const year = bucketize([], periodFor("year", "2026-10-10"));
+    expect(year.map((b, i) => axisLabel(b, i, year.length)).join("")).toBe("JFMAMJJASOND");
+    expect(bucketLabel(year[9]!)).toBe("outubro");
+  });
+  it("opens a day in Hoje and drills weeks and months into their own period", () => {
+    const days = bucketize([], week);
+    expect(bucketHref(days[0]!, now)).toBe("/?d=2026-10-05");
+    expect(bucketHref(days[5]!, now)).toBe("/"); // today
+    const year = bucketize([], periodFor("year", "2026-10-10"));
+    expect(bucketHref(year[2]!, now)).toBe("/historico?p=month&d=2026-03-01");
+    const weeks = bucketize([], custom("2026-01-15", "2026-03-10"));
+    expect(bucketHref(weeks[1]!, now)).toBe("/historico?p=week&d=2026-01-19");
+  });
+});
