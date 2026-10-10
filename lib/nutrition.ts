@@ -129,3 +129,21 @@ export function removeItemFromMeal(items: readonly FoodItem[], index: number): {
   const next = items.length > 1 && index >= 0 && index < items.length ? items.filter((_, i) => i !== index) : [...items];
   return { items: next, totals: sumItems(next) };
 }
+
+/** The items as one food per 100 g of their total weight; null when any item has no grams (nothing to divide by). */
+export function per100gFromItems(items: readonly FoodItem[]): Per100g | null {
+  let grams = 0;
+  for (const item of items) {
+    if (item.quantity_g === null || item.quantity_g <= 0) return null;
+    grams += item.quantity_g;
+  }
+  if (grams <= 0) return null;
+  const totals = sumItems(items);
+  const per = (value: number) => roundMacro((value / grams) * 100);
+  return {
+    calories_100g: roundCalories((totals.total_calories / grams) * 100),
+    protein_100g: per(totals.total_protein),
+    carbs_100g: per(totals.total_carbs),
+    fat_100g: per(totals.total_fat),
+  };
+}

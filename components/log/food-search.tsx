@@ -34,11 +34,13 @@ interface FoodSearchProps {
   onPick: (food: FoodSearchResult) => void;
   onScan: () => void;
   onAi: () => void;
+  /** Called when the results start/stop showing, so a dialog can hide the rest of its form meanwhile. */
+  onSearchingChange?: (searching: boolean) => void;
   /** Rendered below the field while nothing is being searched (saved lists). */
   children?: ReactNode;
 }
 
-export function FoodSearch({ saved, onPick, onScan, onAi, children }: FoodSearchProps) {
+export function FoodSearch({ saved, onPick, onScan, onAi, onSearchingChange, children }: FoodSearchProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
   const [submitted, setSubmitted] = useState<string | null>(null); // set by the button / Enter, cleared by typing
@@ -50,6 +52,10 @@ export function FoodSearch({ saved, onPick, onScan, onAi, children }: FoodSearch
   const term = submitted ?? debounced;
   const searching = term.length >= MIN_QUERY_LENGTH;
   const current = view.term === term ? view : { term, savedPage: 1, offPage: 1 };
+
+  useEffect(() => {
+    onSearchingChange?.(searching);
+  }, [searching, onSearchingChange]);
 
   const savedAll = useMemo(() => searchSavedFoods(saved, term), [saved, term]);
   const savedPage = paginate(savedAll, current.savedPage);

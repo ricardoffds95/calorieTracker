@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Plus } from "lucide-react";
+import { AiPanel } from "@/components/log/ai-panel";
+import { BarcodeScannerDialog } from "@/components/log/barcode-scanner-dialog";
+import { FoodSearch } from "@/components/log/food-search";
 import { ItemsEditor, fromEditable, toEditable, type EditableItem } from "@/components/log/items-editor";
 import { MealActions } from "@/components/log/meal-actions";
 import { PortionTotalsFields, portionItems, type PortionTotals } from "@/components/log/portion-totals-fields";
@@ -9,9 +11,9 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { searchSavedFoods, type SavedFood } from "@/lib/food-search";
+import type { FoodSearchResult, SavedFood } from "@/lib/food-search";
 import type { LogTarget } from "@/lib/log";
-import { scaleFromPer100g } from "@/lib/nutrition";
+import { scaleFromPer100g, type FoodItem } from "@/lib/nutrition";
 import type { SavedMeal } from "@/lib/queries/saved";
 
 interface NewMealDialogProps {
@@ -27,21 +29,32 @@ interface NewMealDialogProps {
 
 const DEFAULT_GRAMS = 100;
 
+type Panel = "scan" | "ai" | null;
+
 export function NewMealDialog({ userId, initialTarget, now, foods, onClose, onAdded, onSaved }: NewMealDialogProps) {
   const [mode, setMode] = useState<"foods" | "portion">("foods");
   const [name, setName] = useState("");
-  const [query, setQuery] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [panel, setPanel] = useState<Panel>(null);
+  const [searchKey, setSearchKey] = useState(0); // remounts the search to clear it after a pick
   const [rows, setRows] = useState<EditableItem[]>([]);
   const [totals, setTotals] = useState<PortionTotals>({ calories: "", protein_g: "0", carbs_g: "0", fat_g: "0" });
 
   const trimmed = name.trim();
   const items = mode === "foods" ? fromEditable(rows) : portionItems(trimmed, totals);
-  const matches = query.trim() ? searchSavedFoods(foods, query).slice(0, 6) : [];
 
-  function addFood(food: (typeof matches)[number]) {
+  // A food from the search, the scanner or the AI joins with 100 g (changed in the list below).
+  function addFood(food: FoodSearchResult) {
     const item = { name: food.name, quantity_g: DEFAULT_GRAMS, ...scaleFromPer100g(food, DEFAULT_GRAMS) };
     setRows((r) => [...r, ...toEditable([item])]);
-    setQuery("");
+    setPanel(null);
+    setSearchKey((k) => k + 1);
+  }
+
+  function addAiItems(result: { name: string; items: FoodItem[] }, close: () => void) {
+    setRows((r) => [...r, ...toEditable(result.items)]);
+    setName((current) => current || result.name);
+    close();
   }
 
   return (
@@ -75,41 +88,19 @@ export function NewMealDialog({ userId, initialTarget, now, foods, onClose, onAd
 
           {mode === "foods" ? (
             <>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="new-meal-search">Adicionar alimento guardado</Label>
-                <Input id="new-meal-search" className="h-11" placeholder="Procurar nos teus alimentos" value={query} onChange={(e) => setQuery(e.target.value)} />
-                {matches.length > 0 && (
-                  <ul className="flex flex-col">
-                    {matches.map((food) => (
-                      <li key={food.id}>
-                        <button
-                          type="button"
-                          aria-label={`Juntar ${food.name}`}
-                          onClick={() => addFood(food)}
-                          className="flex min-h-11 w-full items-center justify-between gap-2 rounded-sm px-1 text-left"
-                        >
-                          <span className="min-w-0 truncate">{food.name}</span>
-                          <Plus aria-hidden className="size-4 shrink-0 text-primary" />
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {query.trim() && matches.length === 0 && (
-                  <p className="text-xs text-muted-foreground">Nenhum alimento guardado com esse nome. Adiciona-o primeiro pela pesquisa.</p>
-                )}
-              </div>
-              {rows.length > 0 ? (
-                <ItemsEditor rows={rows} onChange={setRows} />
-              ) : (
-                <p className="text-sm text-muted-foreground">Ainda sem alimentos. Procura acima e toca para juntar (100 g por omissão).</p>
-              )}
+              <FoodSearch key={searchKey} saved={foods} onPick={addFood} onScan={() => setPanel("scan")} onAi={() => setPanel("ai")} onSearchingChange={setSearching} />
+              {!searching &&
+                (rows.length > 0 ? (
+                  <ItemsEditor rows={rows} onChange={setRows} />
+                ) : (
+                  <p className="text-sm text-muted-foreground">Ainda sem alimentos. Procura acima, lê um código de barras ou usa a IA (100 g por omissão).</p>
+                ))}
             </>
           ) : (
             <PortionTotalsFields value={totals} onChange={setTotals} />
           )}
 
-          {items && trimmed ? (
+          {searching ? null : items && trimmed ? (
             // Remount when the meal changes after being saved, so a stale saved copy is never reused.
             <MealActions
               key={JSON.stringify([trimmed, items])}
@@ -126,6 +117,10 @@ export function NewMealDialog({ userId, initialTarget, now, foods, onClose, onAd
           )}
         </div>
       </DialogContent>
+      <BarcodeScannerDialog open={panel === "scan"} onOpenChange={(open) => !open && setPanel((p) => (p === "scan" ? null : p))} onFound={addFood} />
+      {panel === "ai" && (
+        <AiPanel userId={userId} onClose={() => setPanel(null)} onUse={addAiItems} useLabel="Juntar à refeição" />
+      )}
     </Dialog>
   );
 }

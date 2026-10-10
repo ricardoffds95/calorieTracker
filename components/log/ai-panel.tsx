@@ -17,15 +17,19 @@ import { AI_MAX_TEXT_LENGTH } from "@/lib/schemas";
 
 interface AiPanelProps {
   userId: string;
-  initialTarget: LogTarget;
-  now: Date;
+  /** Where the meal is logged; with `onAdded` and `now`, only needed when the panel logs (no `onUse`). */
+  initialTarget?: LogTarget;
+  now?: Date;
   onClose: () => void;
-  onAdded: (message: string, day: string) => void;
+  onAdded?: (message: string, day: string) => void;
+  /** Instead of logging, hand the result back (used while creating a saved meal or food). */
+  onUse?: (result: { name: string; items: FoodItem[] }, close: () => void) => void;
+  useLabel?: string;
 }
 
 type Result = { name: string; items: FoodItem[] };
 
-export function AiPanel({ userId, initialTarget, now, onClose, onAdded }: AiPanelProps) {
+export function AiPanel({ userId, initialTarget, now, onClose, onAdded, onUse, useLabel = "Usar" }: AiPanelProps) {
   const [text, setText] = useState("");
   const [photo, setPhoto] = useState<AiImage | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -49,7 +53,7 @@ export function AiPanel({ userId, initialTarget, now, onClose, onAdded }: AiPane
     <Sheet open onOpenChange={(open) => !open && onClose()}>
       <SheetContent side="bottom" className="mx-auto max-h-[90dvh] max-w-md overflow-y-auto rounded-t-lg pb-[max(1rem,env(safe-area-inset-bottom))]">
         <SheetHeader>
-          <SheetTitle>{result && !editing ? result.name : "Registar com IA"}</SheetTitle>
+          <SheetTitle>{result && !editing ? result.name : onUse ? "Procurar com IA" : "Registar com IA"}</SheetTitle>
           <SheetDescription>
             {editing
               ? "Corrige o nome, as quantidades ou remove itens."
@@ -100,6 +104,16 @@ export function AiPanel({ userId, initialTarget, now, onClose, onAdded }: AiPane
                   </li>
                 ))}
               </ul>
+              {onUse || !initialTarget || !now || !onAdded ? (
+                <>
+                  <Button type="button" size="lg" className="h-11" onClick={() => onUse?.(result, onClose)}>
+                    {useLabel}
+                  </Button>
+                  <Button type="button" variant="ghost" className="h-11" onClick={() => setResult(null)}>
+                    Tentar outra vez
+                  </Button>
+                </>
+              ) : (
               <MealActions
                 key={JSON.stringify(result)}
                 userId={userId}
@@ -110,6 +124,7 @@ export function AiPanel({ userId, initialTarget, now, onClose, onAdded }: AiPane
                 onAdded={onAdded}
                 onEdit={() => setEditing({ name: result.name, rows: toEditable(result.items) })}
               />
+              )}
             </>
           )}
 

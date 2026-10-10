@@ -201,3 +201,58 @@ test("saved items are private to each user", async ({ page }) => {
   await page.getByRole("button", { name: "Refeições · 0" }).click();
   await expect(page.getByText("Ainda sem refeições guardadas")).toBeVisible();
 });
+
+test("new food: the search fills the form, the values can be changed before saving", async ({ page }) => {
+  await page.route("**/api/food-search**", (route) =>
+    route.fulfill({
+      json: {
+        results: [{ id: "560", source: "off", name: "Pão E2E", brand: "Padaria", off_code: "560", calories_100g: 265, protein_100g: 9, carbs_100g: 49, fat_100g: 3.2 }],
+        page: 1,
+        pageCount: 1,
+        total: 1,
+        totalExact: true,
+      },
+    }),
+  );
+  await login(page, "A");
+  await openSaved(page);
+
+  await page.getByRole("button", { name: "Novo alimento" }).click();
+  await page.getByRole("dialog").getByRole("searchbox", { name: "Pesquisar alimento" }).fill("pao e2e");
+  await page.getByRole("button", { name: /^Open Food Facts · / }).click();
+  await page.getByRole("button", { name: "Escolher Pão E2E" }).click();
+
+  await expect(page.getByLabel("Nome", { exact: true })).toHaveValue("Pão E2E");
+  await expect(page.getByLabel("Marca (opcional)")).toHaveValue("Padaria");
+  await expect(page.getByLabel("Calorias (kcal)")).toHaveValue("265");
+  await page.getByLabel("Calorias (kcal)").fill("270");
+  await page.getByRole("button", { name: "Guardar" }).click();
+  await expect(page.getByTestId("saved-foods")).toContainText("Pão E2E");
+  expect(await fetchSavedFoods("A")).toMatchObject([{ name: "Pão E2E", brand: "Padaria", calories_100g: 270, protein_100g: 9, carbs_100g: 49, fat_100g: 3.2 }]);
+});
+
+test("new food: the AI fills the form per 100 g of the total weight", async ({ page }) => {
+  await page.route("**/api/ai/parse", (route) =>
+    route.fulfill({
+      json: {
+        name: "Frango com arroz",
+        items: [
+          { name: "Frango", quantity_g: 100, calories: 165, protein_g: 31, carbs_g: 0, fat_g: 3.6 },
+          { name: "Arroz", quantity_g: 100, calories: 130, protein_g: 2.7, carbs_g: 28, fat_g: 0.3 },
+        ],
+      },
+    }),
+  );
+  await login(page, "A");
+  await openSaved(page);
+
+  await page.getByRole("button", { name: "Novo alimento" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Com IA" }).click();
+  await page.getByLabel("O que comeste?").fill("frango com arroz");
+  await page.getByRole("button", { name: "Analisar" }).click();
+  await page.getByRole("button", { name: "Usar estes valores" }).click();
+
+  await expect(page.getByLabel("Nome", { exact: true })).toHaveValue("Frango com arroz");
+  await expect(page.getByLabel("Calorias (kcal)")).toHaveValue("148"); // 295 kcal / 200 g
+  await expect(page.getByLabel("Proteína (g)")).toHaveValue("16.9");
+});

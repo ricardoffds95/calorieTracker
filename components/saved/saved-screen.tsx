@@ -141,7 +141,7 @@ export function SavedScreen({ userId }: { userId: string }) {
         </Button>
       )}
 
-      {creating === "foods" && <NewFoodDialog userId={userId} onClose={() => setCreating(null)} />}
+      {creating === "foods" && <NewFoodDialog userId={userId} foods={foods.data ?? []} onClose={() => setCreating(null)} />}
       {creating === "meals" && <NewMealDialog userId={userId} foods={foods.data ?? []} onClose={() => setCreating(null)} />}
       {actions && (
         <SavedActionsSheet

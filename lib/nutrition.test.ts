@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   propagateSavedFoodEdit,
   propagateSavedMealEdit,
+  per100gFromItems,
   removeItemFromMeal,
   roundCalories,
   roundMacro,
@@ -124,5 +125,19 @@ describe("removeItemFromMeal", () => {
   it("ignores out-of-range indexes", () => {
     expect(removeItemFromMeal(three, 5).items).toHaveLength(3);
     expect(removeItemFromMeal(three, -1).items).toHaveLength(3);
+  });
+});
+
+describe("per100gFromItems", () => {
+  const item = (quantity_g: number | null, calories: number, protein_g: number) => ({ name: "x", quantity_g, calories, protein_g, carbs_g: 0, fat_g: 0 });
+
+  it("divides the totals by the total weight", () => {
+    expect(per100gFromItems([item(100, 165, 31), item(100, 130, 2.7)])).toEqual({ calories_100g: 148, protein_100g: 16.9, carbs_100g: 0, fat_100g: 0 });
+  });
+  it("is null when an item has no grams", () => {
+    expect(per100gFromItems([item(100, 100, 1), item(null, 50, 1)])).toBeNull();
+  });
+  it("is null for no items", () => {
+    expect(per100gFromItems([])).toBeNull();
   });
 });
