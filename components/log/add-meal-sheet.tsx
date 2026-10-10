@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Minus, Plus } from "lucide-react";
 import { NutrientSummary } from "@/components/log/nutrient-summary";
+import { PortionStepper } from "@/components/log/portion-stepper";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { DOSE_STEP, MAX_DOSES, mealEntryRow, type LogTarget } from "@/lib/log";
+import { mealEntryRow, type LogTarget } from "@/lib/log";
 import type { SavedMeal } from "@/lib/queries/saved";
 
 interface AddMealSheetProps {
@@ -20,7 +20,6 @@ interface AddMealSheetProps {
 export function AddMealSheet({ meal, target, mealName, pending, onClose, onAdd }: AddMealSheetProps) {
   const [doses, setDoses] = useState(1);
   const row = mealEntryRow(target, meal, doses);
-  const change = (delta: number) => setDoses((d) => Math.min(MAX_DOSES, Math.max(DOSE_STEP, d + delta)));
 
   return (
     <Sheet open onOpenChange={(open) => !open && onClose()}>
@@ -30,17 +29,7 @@ export function AddMealSheet({ meal, target, mealName, pending, onClose, onAdd }
           <SheetDescription>{meal.items.map((i) => i.name).join(", ")}</SheetDescription>
         </SheetHeader>
         <div className="flex flex-col gap-4 px-4">
-          <div className="flex items-center gap-3">
-            <Button type="button" variant="outline" size="icon" className="size-11" aria-label="Menos doses" disabled={doses <= DOSE_STEP} onClick={() => change(-DOSE_STEP)}>
-              <Minus aria-hidden />
-            </Button>
-            <output aria-label="Doses" aria-live="polite" className="min-w-16 text-center text-lg font-semibold tabular-nums">
-              {doses}×
-            </output>
-            <Button type="button" variant="outline" size="icon" className="size-11" aria-label="Mais doses" disabled={doses >= MAX_DOSES} onClick={() => change(DOSE_STEP)}>
-              <Plus aria-hidden />
-            </Button>
-          </div>
+          <PortionStepper value={doses} onChange={setDoses} />
           <NutrientSummary value={row} />
         </div>
         <SheetFooter>

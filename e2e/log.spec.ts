@@ -8,6 +8,7 @@ import {
   clearSaved,
   fetchDiary,
   fetchSavedFoods,
+  fetchSavedMeals,
   seedDiary,
   seedSavedFood,
   seedSavedMeal,
@@ -71,7 +72,7 @@ test("search → add 150 g: diary row, auto-saved food with times_used and the T
   await expect(page.getByTestId("meal-lunch-kcal")).toHaveText("195 kcal");
 });
 
-test("a saved meal with 2 doses stores doses and doubled items", async ({ page }) => {
+test("a saved meal with 2 portions stores doses and doubled items", async ({ page }) => {
   const items = [
     { name: "Frango", quantity_g: 150, calories: 248, protein_g: 46.5, carbs_g: 0, fat_g: 5.4 },
     { name: "Arroz", quantity_g: 125, calories: 163, protein_g: 3.4, carbs_g: 35.3, fat_g: 0.4 },
@@ -82,9 +83,9 @@ test("a saved meal with 2 doses stores doses and doubled items", async ({ page }
 
   await page.getByRole("button", { name: "Refeições" }).click();
   await page.getByRole("button", { name: "Escolher Almoço E2E" }).click();
-  await page.getByRole("button", { name: "Mais doses" }).click();
-  await page.getByRole("button", { name: "Mais doses" }).click();
-  await expect(page.getByRole("status", { name: "Doses" })).toHaveText("2×");
+  await page.getByRole("button", { name: "Mais porções" }).click();
+  await page.getByRole("button", { name: "Mais porções" }).click();
+  await expect(page.getByRole("status", { name: "Porções" })).toHaveText("2 porções");
   await page.getByRole("button", { name: "Adicionar a jantar" }).click();
   await expect(page.getByText("Almoço E2E adicionado a jantar")).toBeVisible();
 
@@ -157,19 +158,33 @@ test("editing a saved meal re-applies it with each entry's doses (SQL = TypeScri
   expect(single).toMatchObject(expected(1));
 });
 
-test("AI from a photo: review the items, then add them", async ({ page }) => {
-  let sent: { type?: string; mimeType?: string } = {};
+const AI_MEAL = {
+  name: "Frango com arroz",
+  items: [
+    { name: "Frango grelhado", quantity_g: 150, calories: 248, protein_g: 46.5, carbs_g: 0, fat_g: 5.4 },
+    { name: "Arroz", quantity_g: 150, calories: 195, protein_g: 4.1, carbs_g: 42.3, fat_g: 0.5 },
+  ],
+};
+
+/** Mocks the AI endpoint and returns what the page sent. */
+async function mockAi(page: Page) {
+  const sent: { body?: { type?: string; mimeType?: string } } = {};
   await page.route("**/api/ai/parse", (route) => {
-    sent = route.request().postDataJSON();
-    return route.fulfill({
-      json: {
-        items: [
-          { name: "Frango", quantity_g: 150, calories: 248, protein_g: 46.5, carbs_g: 0, fat_g: 5.4 },
-          { name: "Salada", quantity_g: 80, calories: 16, protein_g: 1, carbs_g: 3, fat_g: 0.2 },
-        ],
-      },
-    });
+    sent.body = route.request().postDataJSON();
+    return route.fulfill({ json: AI_MEAL });
   });
+  return sent;
+}
+
+async function analyzeText(page: Page) {
+  await page.getByRole("button", { name: "Registar com IA" }).click();
+  await page.getByLabel("O que comeste?").fill("frango com arroz");
+  await page.getByRole("button", { name: "Analisar" }).click();
+  await expect(page.getByRole("heading", { name: "Frango com arroz" })).toBeVisible();
+}
+
+test("AI from a photo → one meal → 'Guardar e adicionar' with 2 portions", async ({ page }) => {
+  const sent = await mockAi(page);
   await login(page, "A");
   await openLog(page);
 
@@ -178,18 +193,108 @@ test("AI from a photo: review the items, then add them", async ({ page }) => {
   await page.locator('input[type="file"]:not([capture])').setInputFiles({ name: "prato.png", mimeType: "image/png", buffer: png });
   await expect(page.getByRole("img", { name: "Foto selecionada" })).toBeVisible();
   await page.getByRole("button", { name: "Analisar" }).click();
-  await expect(page.getByTestId("items-editor").getByRole("listitem")).toHaveCount(2);
-  expect(sent).toMatchObject({ type: "image", mimeType: "image/jpeg" });
+  await expect(page.getByRole("heading", { name: "Frango com arroz" })).toBeVisible();
+  expect(sent.body).toMatchObject({ type: "image", mimeType: "image/jpeg" });
+  await expect(page.getByTestId("nutrient-summary")).toContainText("443"); // 1 portion
 
-  await page.getByLabel("Quantidade de Frango (g)").fill("300"); // rescales from the AI values
-  await expect(page.getByTestId("ai-totals")).toContainText("512 kcal");
-  await page.getByRole("button", { name: "Adicionar 2 itens a almoço" }).click();
-  await expect(page.getByText("2 itens adicionado a almoço")).toBeVisible();
+  await page.getByRole("button", { name: "Mais porções" }).click();
+  await page.getByRole("button", { name: "Mais porções" }).click();
+  await page.getByRole("button", { name: "Guardar e adicionar ao diário" }).click();
+  await expect(page.getByText("Frango com arroz adicionado a almoço")).toBeVisible();
 
-  const rows = await fetchDiary("A", DAY);
-  expect(rows.map((r) => [r.name, r.quantity_g, r.calories, r.saved_food_id])).toEqual([
-    ["Frango", 300, 496, null],
-    ["Salada", 80, 16, null],
+  const [meal] = await fetchSavedMeals("A");
+  expect(meal).toMatchObject({ name: "Frango com arroz", total_calories: 443, items: AI_MEAL.items });
+  const [row] = await fetchDiary("A", DAY);
+  expect(row).toMatchObject({ kind: "meal", saved_meal_id: meal!.id, doses: 2, calories: 886, protein_g: 101.2 });
+});
+
+test("AI 'Editar' corrects the values, then 'Guardar nas refeições' saves without logging", async ({ page }) => {
+  await mockAi(page);
+  await login(page, "A");
+  await openLog(page);
+  await analyzeText(page);
+
+  await page.getByRole("button", { name: "Editar" }).click();
+  await page.getByLabel("Nome da refeição").fill("Frango com muito arroz");
+  await page.getByLabel("Quantidade de Arroz (g)").fill("300"); // rescaled from the AI values
+  await page.getByRole("button", { name: "Concluir" }).click();
+  await expect(page.getByRole("heading", { name: "Frango com muito arroz" })).toBeVisible();
+  await expect(page.getByTestId("nutrient-summary")).toContainText("638");
+
+  await page.getByRole("button", { name: "Guardar nas refeições" }).click();
+  await expect(page.getByRole("button", { name: "Guardada" })).toBeDisabled();
+  const [meal] = await fetchSavedMeals("A");
+  expect(meal).toMatchObject({ name: "Frango com muito arroz", total_calories: 638 });
+  expect(await fetchDiary("A", DAY)).toHaveLength(0);
+});
+
+test("AI 'Só adicionar' logs an unlinked meal; a duplicate name is explained inline", async ({ page }) => {
+  await seedSavedMeal("A", { name: "Frango com arroz", items: AI_MEAL.items, total_calories: 443, total_protein: 50.6, total_carbs: 42.3, total_fat: 5.9 });
+  await mockAi(page);
+  await login(page, "A");
+  await openLog(page);
+  await analyzeText(page);
+
+  await page.getByRole("button", { name: "Guardar nas refeições" }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "Já tens uma refeição guardada com este nome" })).toBeVisible();
+  expect(await fetchSavedMeals("A")).toHaveLength(1);
+
+  await page.getByRole("button", { name: /Só adicionar ao diário/ }).click();
+  await expect(page.getByText("Frango com arroz adicionado a almoço")).toBeVisible();
+  const [row] = await fetchDiary("A", DAY);
+  expect(row).toMatchObject({ kind: "meal", saved_meal_id: null, doses: 1, calories: 443 });
+});
+
+test("new meal by values per portion: 1.5 portions, shown without grams on Today", async ({ page }) => {
+  await login(page, "A");
+  await openLog(page, DAY, "dinner");
+
+  await page.getByRole("button", { name: "Refeições" }).click();
+  await page.getByRole("button", { name: "Nova refeição" }).click();
+  await page.getByRole("button", { name: "Valores por porção" }).click();
+  await page.getByLabel("Nome da refeição").fill("Bifana");
+  await page.getByLabel("Calorias (kcal)").fill("450");
+  await page.getByLabel("Proteína (g)").fill("25");
+  await page.getByRole("button", { name: "Mais porções" }).click();
+  await page.getByRole("button", { name: "Guardar e adicionar ao diário" }).click();
+  await expect(page.getByText("Bifana adicionado a jantar")).toBeVisible();
+
+  const [meal] = await fetchSavedMeals("A");
+  expect(meal!.items).toEqual([{ name: "Bifana", quantity_g: null, calories: 450, protein_g: 25, carbs_g: 0, fat_g: 0 }]);
+  expect((await fetchDiary("A", DAY))[0]).toMatchObject({ calories: 675, protein_g: 37.5, doses: 1.5 });
+
+  await page.goto(`/?d=${DAY}`);
+  const row = page.getByTestId("meal-dinner");
+  await expect(row).toContainText("1.5 porções");
+  await expect(row).toContainText("675 kcal");
+  await row.getByRole("button", { name: /Bifana, 1 itens/ }).click();
+  await expect(row.getByText(/ g$/)).toHaveCount(0);
+});
+
+test("new meal by joining saved foods: totals are the sum of the foods", async ({ page }) => {
+  await seedSavedFood("A", { name: "Aveia E2E", calories_100g: 380, protein_100g: 13.2, carbs_100g: 60, fat_100g: 7 });
+  await seedSavedFood("A", { name: "Leite E2E", calories_100g: 46, protein_100g: 3.3, carbs_100g: 4.8, fat_100g: 1.6 });
+  await login(page, "A");
+  await openLog(page, DAY, "breakfast");
+
+  await page.getByRole("button", { name: "Refeições" }).click();
+  await page.getByRole("button", { name: "Nova refeição" }).click();
+  await page.getByLabel("Nome da refeição").fill("Papas E2E");
+  await page.getByLabel("Adicionar alimento guardado").fill("aveia");
+  await page.getByRole("button", { name: "Juntar Aveia E2E" }).click();
+  await page.getByLabel("Quantidade de Aveia E2E (g)").fill("60");
+  await page.getByLabel("Adicionar alimento guardado").fill("leite");
+  await page.getByRole("button", { name: "Juntar Leite E2E" }).click();
+  await page.getByLabel("Quantidade de Leite E2E (g)").fill("250");
+  await expect(page.getByTestId("nutrient-summary")).toContainText("343"); // 228 + 115
+  await page.getByRole("button", { name: "Guardar nas refeições" }).click();
+  await expect(page.getByRole("button", { name: "Guardada" })).toBeDisabled();
+
+  const [meal] = await fetchSavedMeals("A");
+  expect(meal).toMatchObject({ name: "Papas E2E", total_calories: 343, total_protein: 16.2 });
+  expect(meal!.items).toEqual([
+    { name: "Aveia E2E", quantity_g: 60, calories: 228, protein_g: 7.9, carbs_g: 36, fat_g: 4.2 },
+    { name: "Leite E2E", quantity_g: 250, calories: 115, protein_g: 8.3, carbs_g: 12, fat_g: 4 },
   ]);
 });
 

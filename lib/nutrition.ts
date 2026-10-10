@@ -1,9 +1,9 @@
 import type { MacroTotals } from "./macros";
 
-/** One food line (also the shape stored in `items` of meals). */
+/** One line of a meal (the shape stored in `items`). `quantity_g` is null for a meal defined per portion. */
 export interface FoodItem {
   name: string;
-  quantity_g: number;
+  quantity_g: number | null;
   calories: number;
   protein_g: number;
   carbs_g: number;
@@ -48,7 +48,7 @@ export function scaleFromPer100g(food: Per100g, quantity_g: number): Nutrients {
 export function scaleMealItems(items: readonly FoodItem[], doses: number): FoodItem[] {
   return items.map((item) => ({
     ...item,
-    quantity_g: Math.round(item.quantity_g * doses),
+    quantity_g: item.quantity_g === null ? null : Math.round(item.quantity_g * doses),
     calories: roundCalories(item.calories * doses),
     protein_g: roundMacro(item.protein_g * doses),
     carbs_g: roundMacro(item.carbs_g * doses),

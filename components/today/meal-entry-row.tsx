@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ChevronRight, Pencil, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { DiaryEntry } from "@/lib/diary";
+import { portionsLabel } from "@/lib/log";
 import { cn } from "@/lib/utils";
 
 interface MealEntryRowProps {
@@ -30,7 +31,10 @@ export function MealEntryRow({ entry, onEdit, onDelete, onRemoveItem }: MealEntr
           className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-sm px-1 text-left"
         >
           <ChevronRight className={cn("size-4 shrink-0 text-muted-foreground motion-safe:transition-transform", expanded && "rotate-90")} aria-hidden />
-          <span className="min-w-0 flex-1 truncate">{entry.name}</span>
+          <span className="min-w-0 flex-1 truncate">
+            {entry.name}
+            {entry.doses !== null && entry.doses !== 1 && <span className="text-sm text-muted-foreground"> · {portionsLabel(entry.doses)}</span>}
+          </span>
           <span className="shrink-0 text-sm tabular-nums">{entry.calories} kcal</span>
         </button>
         <Button type="button" variant="ghost" size="icon" className="size-11 shrink-0 text-muted-foreground" aria-label={`Editar ${entry.name}`} onClick={() => onEdit(entry)}>
@@ -46,7 +50,7 @@ export function MealEntryRow({ entry, onEdit, onDelete, onRemoveItem }: MealEntr
             <li key={`${item.name}-${index}`} className="flex items-center gap-1 text-sm">
               <span className="min-w-0 flex-1 truncate py-2">
                 {item.name}
-                <span className="text-muted-foreground"> · {item.quantity_g} g</span>
+                {item.quantity_g !== null && <span className="text-muted-foreground"> · {item.quantity_g} g</span>}
               </span>
               <span className="shrink-0 tabular-nums text-muted-foreground">{item.calories} kcal</span>
               {items.length > 1 && (

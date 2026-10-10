@@ -5,9 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { foodEditSchema } from "@/lib/diary-edit";
+import { foodEditSchema, type FoodEditValues } from "@/lib/diary-edit";
 import { savedFoodSchema, type SavedFoodValues } from "@/lib/log";
-import type { FoodItem } from "@/lib/nutrition";
 import { parseDecimalInput } from "@/lib/numbers";
 
 interface ManualEntryDialogProps {
@@ -15,7 +14,7 @@ interface ManualEntryDialogProps {
   pending: boolean;
   onClose: () => void;
   /** `saveAs`: the same food per 100 g, when "Guardar nos meus alimentos" is checked. */
-  onAdd: (item: FoodItem, saveAs: SavedFoodValues | null) => void;
+  onAdd: (item: FoodEditValues, saveAs: SavedFoodValues | null) => void;
 }
 
 const asNumber = (text: string) => parseDecimalInput(text) ?? Number.NaN;

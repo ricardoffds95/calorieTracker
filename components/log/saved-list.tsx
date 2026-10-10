@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil } from "lucide-react";
+import { Pencil, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { SavedFood } from "@/lib/food-search";
@@ -16,9 +16,10 @@ interface SavedListProps {
   onPickMeal: (meal: SavedMeal) => void;
   onEditFood: (food: SavedFood) => void;
   onEditMeal: (meal: SavedMeal) => void;
+  onNewMeal: () => void;
 }
 
-export function SavedList({ foods, meals, onPickFood, onPickMeal, onEditFood, onEditMeal }: SavedListProps) {
+export function SavedList({ foods, meals, onPickFood, onPickMeal, onEditFood, onEditMeal, onNewMeal }: SavedListProps) {
   const [tab, setTab] = useState<"foods" | "meals">("foods");
   const [limit, setLimit] = useState(PAGE);
   const list = tab === "foods" ? foods : meals;
@@ -45,12 +46,18 @@ export function SavedList({ foods, meals, onPickFood, onPickMeal, onEditFood, on
         ))}
       </div>
 
+      {tab === "meals" && (
+        <Button type="button" variant="outline" className="h-11" onClick={onNewMeal}>
+          <Plus aria-hidden />
+          Nova refeição
+        </Button>
+      )}
       {!list && <Skeleton className="h-32 w-full" aria-label="A carregar guardados" />}
       {list && list.length === 0 && (
         <p className="py-2 text-sm text-muted-foreground">
           {tab === "foods"
             ? "Ainda sem alimentos guardados. Os que adicionares pela pesquisa ficam aqui."
-            : "Ainda sem refeições guardadas. Cria uma a partir do registo com IA."}
+            : "Ainda sem refeições guardadas. Cria uma acima ou a partir do registo com IA."}
         </p>
       )}
       {list && list.length > 0 && (

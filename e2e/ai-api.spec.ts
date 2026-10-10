@@ -41,7 +41,8 @@ test.describe("AI call (live Gemini)", () => {
       data: { type: "text", text: "200g de frango grelhado e 150g de arroz branco cozido" },
     });
     expect(response.status()).toBe(200);
-    const { items } = (await response.json()) as { items: { name: string; quantity_g: number; calories: number; protein_g: number }[] };
+    const { name, items } = (await response.json()) as { name: string; items: { name: string; quantity_g: number; calories: number; protein_g: number }[] };
+    expect(name.trim().length).toBeGreaterThan(0);
     expect(items.length).toBeGreaterThanOrEqual(2);
     const total = items.reduce((sum, i) => sum + i.calories, 0);
     expect(total).toBeGreaterThan(400);

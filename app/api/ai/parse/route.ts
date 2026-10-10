@@ -28,11 +28,11 @@ export async function POST(request: Request) {
 
   try {
     const input = parsed.data;
-    const items =
+    const meal =
       input.type === "text"
         ? await parseFoodText(input.text)
         : await analyzeFoodImage(input.image, input.mimeType);
-    return NextResponse.json({ items });
+    return NextResponse.json(meal);
   } catch (error) {
     if (error instanceof AiUnavailableError) {
       return jsonError(503, "ai_unavailable", AI_UNAVAILABLE_MESSAGE);

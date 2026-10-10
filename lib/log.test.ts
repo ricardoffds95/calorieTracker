@@ -130,3 +130,15 @@ describe("savedMealRow / propagationFromDate", () => {
     expect(propagationFromDate("none", "2026-10-10")).toBeUndefined();
   });
 });
+
+describe("meals defined per portion (no grams)", () => {
+  const bifana = { name: "Bifana", quantity_g: null, calories: 450, protein_g: 25, carbs_g: 40, fat_g: 20.5 };
+  it("scales the portion totals and keeps the grams null", () => {
+    const row = mealEntryRow(target, { id: "sm2", name: "Bifana", items: [bifana] }, 1.5);
+    expect(row.items).toEqual([{ ...bifana, calories: 675, protein_g: 37.5, carbs_g: 60, fat_g: 30.8 }]);
+    expect(row).toMatchObject({ calories: 675, protein_g: 37.5, carbs_g: 60, fat_g: 30.8, doses: 1.5 });
+  });
+  it("saves a one-item meal with its totals", () => {
+    expect(savedMealRow("Bifana", [bifana])).toMatchObject({ total_calories: 450, total_fat: 20.5, items: [bifana] });
+  });
+});

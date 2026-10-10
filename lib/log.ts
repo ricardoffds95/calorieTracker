@@ -33,6 +33,11 @@ export const quantitySchema = z
   .gt(0, "Tem de ser maior que 0.")
   .max(MAX_QUANTITY_G, "Valor demasiado alto.");
 
+/** "1 porção", "1.5 porções" (meals are counted in portions; the DB column is `doses`). */
+export function portionsLabel(portions: number): string {
+  return `${portions} ${portions === 1 ? "porção" : "porções"}`;
+}
+
 export const DOSE_STEP = 0.5;
 export const MAX_DOSES = 20;
 export const dosesSchema = z.number().min(DOSE_STEP).max(MAX_DOSES);
@@ -55,10 +60,13 @@ export function foodEntryRow(
   };
 }
 
-/** A meal entry for `doses` portions of a saved meal; doses are stored so later edits re-apply them. */
+/**
+ * A meal entry for `doses` portions; doses are stored so later edits of the saved meal re-apply them.
+ * `id` null: a meal that is not saved (e.g. "Só adicionar ao diário" from the AI).
+ */
 export function mealEntryRow(
   target: LogTarget,
-  meal: { id: string; name: string; items: readonly FoodItem[] },
+  meal: { id: string | null; name: string; items: readonly FoodItem[] },
   doses: number,
 ): NewDiaryEntry {
   const items = doses === 1 ? [...meal.items] : scaleMealItems(meal.items, doses);
@@ -77,8 +85,8 @@ export function mealEntryRow(
   };
 }
 
-/** One food entry per item (AI result or manual entry); not linked to saved foods. */
-export function itemRows(target: LogTarget, items: readonly FoodItem[]): NewDiaryEntry[] {
+/** One food entry per item (manual entry, in grams); not linked to saved foods. */
+export function itemRows(target: LogTarget, items: readonly (FoodItem & { quantity_g: number })[]): NewDiaryEntry[] {
   return items.map((item) => ({
     ...target,
     kind: "food",

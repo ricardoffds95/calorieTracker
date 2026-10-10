@@ -207,7 +207,10 @@ test("removing an item recalculates the meal, and the last item cannot be remove
   await expect(page.getByTestId("macro-carbs")).toContainText("69"); // 125 - 56
   await expect(page.getByRole("button", { name: /^Remover .* de Frango com arroz$/ })).toHaveCount(0);
 
-  const meal = (await fetchDiary("A", DAY_DATA)).find((r) => r.kind === "meal");
+  // No toast confirms this write: wait for the DB instead of racing the optimistic update.
+  const savedMeal = () => fetchDiary("A", DAY_DATA).then((rows) => rows.find((r) => r.kind === "meal"));
+  await expect.poll(async () => (await savedMeal())?.calories).toBe(248);
+  const meal = await savedMeal();
   expect(meal).toMatchObject({ calories: 248, protein_g: 46.5, carbs_g: 0, fat_g: 5.4 });
   expect(meal?.items).toHaveLength(1);
 });

@@ -147,18 +147,21 @@ export function useUpdateSavedMeal(userId: string) {
   });
 }
 
+/** Error code of a unique violation: a saved meal/food with the same name already exists. */
+export const DUPLICATE_NAME = "23505";
+
 export function useCreateSavedMeal(userId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ name, items }: { name: string; items: FoodItem[] }) => {
-      const { error } = await createClient().from("saved_meals").insert(savedMealRow(name, items));
+    mutationFn: async ({ name, items }: { name: string; items: FoodItem[] }): Promise<SavedMeal> => {
+      const { data, error } = await createClient().from("saved_meals").insert(savedMealRow(name, items)).select().single();
       if (error) throw error;
+      return { ...data, items: foodItemsSchema.parse(data.items) };
     },
+    // A duplicate name is shown inline by the caller; everything else as a toast.
     onError: (error: { message?: string; code?: string }) => {
-      if (error.code === "23505") toast.error("Já tens uma refeição guardada com esse nome.");
-      else toastSaveError(error);
+      if (error.code !== DUPLICATE_NAME) toastSaveError(error);
     },
-    onSuccess: () => toast.success("Refeição guardada"),
     onSettled: () => queryClient.invalidateQueries({ queryKey: savedMealsKey(userId) }),
   });
 }

@@ -4,10 +4,15 @@ export const mealTypeSchema = z.enum(["breakfast", "lunch", "dinner", "snacks"])
 
 const nonNegative = z.coerce.number().finite().min(0);
 
-/** One food line, as stored in `items` (saved meals, diary meal entries). */
+const grams = z.coerce.number().finite().positive().max(100_000);
+
+/**
+ * One line of a meal, as stored in `items` (saved meals, diary meal entries). Meals are counted in
+ * portions: `quantity_g` is null for a meal defined by its totals per portion (e.g. "Bifana").
+ */
 export const foodItemSchema = z.object({
   name: z.string().trim().min(1).max(200),
-  quantity_g: z.coerce.number().finite().positive().max(100_000),
+  quantity_g: grams.nullable(),
   calories: nonNegative,
   protein_g: nonNegative,
   carbs_g: nonNegative,
@@ -16,8 +21,12 @@ export const foodItemSchema = z.object({
 
 export const foodItemsSchema = z.array(foodItemSchema).min(1).max(50);
 
-/** What the AI must return: a non-empty list of food lines. */
-export const aiResultSchema = foodItemsSchema.max(30);
+/** AI items always come with estimated grams (used to rescale when the user edits them). */
+export const aiItemSchema = foodItemSchema.extend({ quantity_g: grams });
+export const aiResultSchema = z.array(aiItemSchema).min(1).max(30);
+
+/** What the AI returns: one meal (e.g. "Frango com arroz") made of food lines. */
+export const aiMealSchema = z.object({ name: z.string().trim().min(1).max(200), items: aiResultSchema });
 
 export const AI_MAX_TEXT_LENGTH = 1000;
 /** Base64 characters (~4 MB of image data). The client resizes photos before sending. */
@@ -40,4 +49,5 @@ export const aiRequestSchema = z.discriminatedUnion("type", [
 ]);
 
 export type AiRequest = z.infer<typeof aiRequestSchema>;
-export type AiFoodItem = z.infer<typeof foodItemSchema>;
+export type AiFoodItem = z.infer<typeof aiItemSchema>;
+export type AiMeal = z.infer<typeof aiMealSchema>;

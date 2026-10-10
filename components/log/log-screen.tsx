@@ -12,6 +12,7 @@ import { EditSavedDialog, type SavedTarget } from "@/components/log/edit-saved-d
 import { FoodSearch } from "@/components/log/food-search";
 import { LogHeader, dayHref } from "@/components/log/log-header";
 import { ManualEntryDialog } from "@/components/log/manual-entry-dialog";
+import { NewMealDialog } from "@/components/log/new-meal-dialog";
 import { SavedList } from "@/components/log/saved-list";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -20,7 +21,7 @@ import { savedToResult, type FoodSearchResult } from "@/lib/food-search";
 import { foodEntryRow, itemRows, mealEntryRow, mealFromParam, type NewDiaryEntry } from "@/lib/log";
 import type { MealType } from "@/lib/macros";
 import { useAddEntries } from "@/lib/queries/diary";
-import { ensureSavedFood, useCreateSavedMeal, useSavedFoods, useSavedMeals, type SavedMeal } from "@/lib/queries/saved";
+import { ensureSavedFood, useSavedFoods, useSavedMeals, type SavedMeal } from "@/lib/queries/saved";
 import { mealLabel } from "@/lib/today";
 
 // The day and default meal depend on the browser's clock, so nothing date-based renders on the server.
@@ -33,7 +34,7 @@ export function LogScreen({ userId }: { userId: string }) {
   return <LogDay userId={userId} />;
 }
 
-type Panel = { kind: "food"; food: FoodSearchResult } | { kind: "meal"; meal: SavedMeal } | { kind: "ai" | "manual" | "scan" } | null;
+type Panel = { kind: "food"; food: FoodSearchResult } | { kind: "meal"; meal: SavedMeal } | { kind: "ai" | "manual" | "scan" | "newMeal" } | null;
 
 function LogDay({ userId }: { userId: string }) {
   const [now] = useState(() => new Date());
@@ -49,22 +50,16 @@ function LogDay({ userId }: { userId: string }) {
   const foods = useSavedFoods(userId);
   const meals = useSavedMeals(userId);
   const add = useAddEntries(userId);
-  const createMeal = useCreateSavedMeal(userId);
 
   const setMeal = (m: MealType) => router.replace(`/registar?meal=${m}&d=${dateKey}`, { scroll: false });
 
+  function showAdded(message: string) {
+    setPanel(null);
+    toast.success(message, { action: { label: "Ver dia", onClick: () => router.push(dayHref(dateKey, now)) } });
+  }
+
   function addRows(rows: NewDiaryEntry[] | (() => Promise<NewDiaryEntry[]>), what: string) {
-    add.mutate(
-      { rows },
-      {
-        onSuccess: () => {
-          setPanel(null);
-          toast.success(`${what} adicionado a ${name.toLowerCase()}`, {
-            action: { label: "Ver dia", onClick: () => router.push(dayHref(dateKey, now)) },
-          });
-        },
-      },
-    );
+    add.mutate({ rows }, { onSuccess: () => showAdded(`${what} adicionado a ${name.toLowerCase()}`) });
   }
 
   return (
@@ -84,6 +79,7 @@ function LogDay({ userId }: { userId: string }) {
           onPickMeal={(m) => setPanel({ kind: "meal", meal: m })}
           onEditFood={(item) => setEditing({ kind: "food", item })}
           onEditMeal={(item) => setEditing({ kind: "meal", item })}
+          onNewMeal={() => setPanel({ kind: "newMeal" })}
         />
       </FoodSearch>
 
@@ -113,14 +109,9 @@ function LogDay({ userId }: { userId: string }) {
           onAdd={(m, doses) => addRows([mealEntryRow(target, m, doses)], m.name)}
         />
       )}
-      {panel?.kind === "ai" && (
-        <AiPanel
-          mealName={name}
-          pending={add.isPending}
-          onClose={() => setPanel(null)}
-          onAdd={(items) => addRows(itemRows(target, items), items.length === 1 ? items[0]!.name : `${items.length} itens`)}
-          onSaveMeal={(title, items) => createMeal.mutate({ name: title, items })}
-        />
+      {panel?.kind === "ai" && <AiPanel userId={userId} target={target} mealName={name} onClose={() => setPanel(null)} onAdded={showAdded} />}
+      {panel?.kind === "newMeal" && (
+        <NewMealDialog userId={userId} target={target} mealName={name} foods={foods.data ?? []} onClose={() => setPanel(null)} onAdded={showAdded} />
       )}
       {panel?.kind === "manual" && (
         <ManualEntryDialog

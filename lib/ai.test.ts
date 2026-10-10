@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { AiInvalidResponseError, AiUnavailableError, analyzeFoodImage, parseFoodText } from "./ai";
 
 const items = [{ name: "frango grelhado", quantity_g: 200, calories: 330, protein_g: 62, carbs_g: 0, fat_g: 7.2 }];
+const meal = { name: "Frango grelhado", items };
 
 function geminiResponse(parts: unknown[], status = 200) {
   return new Response(JSON.stringify({ candidates: [{ content: { parts } }] }), { status });
@@ -12,9 +13,22 @@ const base = { apiKey: "test-key", model: "test-model" };
 afterEach(() => vi.unstubAllEnvs());
 
 describe("parseFoodText", () => {
-  it("returns validated items from clean JSON", async () => {
-    const fetchMock = vi.fn(async () => geminiResponse([{ text: JSON.stringify(items) }]));
-    expect(await parseFoodText("200g de frango", { ...base, fetch: fetchMock })).toEqual(items);
+  it("returns the validated meal (name + items) from clean JSON", async () => {
+    const fetchMock = vi.fn(async () => geminiResponse([{ text: JSON.stringify(meal) }]));
+    expect(await parseFoodText("200g de frango", { ...base, fetch: fetchMock })).toEqual(meal);
+  });
+
+  it("accepts a bare array of items (older answer) and names the meal", async () => {
+    const one = async () => geminiResponse([{ text: JSON.stringify(items) }]);
+    expect(await parseFoodText("x", { ...base, fetch: one })).toEqual({ name: "frango grelhado", items });
+    const two = [...items, { ...items[0]!, name: "arroz" }];
+    const many = async () => geminiResponse([{ text: JSON.stringify(two) }]);
+    expect((await parseFoodText("x", { ...base, fetch: many })).name).toBe("Refeição");
+  });
+
+  it("falls back to a name when the meal name is missing or blank", async () => {
+    const text = JSON.stringify({ name: "  ", items });
+    expect(await parseFoodText("x", { ...base, fetch: async () => geminiResponse([{ text }]) })).toEqual({ name: "frango grelhado", items });
   });
 
   it("sends the key in a header (never in the URL), the model in the path and the user text in the prompt", async () => {
@@ -30,26 +44,28 @@ describe("parseFoodText", () => {
   });
 
   it("strips markdown fences", async () => {
-    const text = "```json\n" + JSON.stringify(items) + "\n```";
-    expect(await parseFoodText("x", { ...base, fetch: async () => geminiResponse([{ text }]) })).toEqual(items);
+    const text = "```json\n" + JSON.stringify(meal) + "\n```";
+    expect(await parseFoodText("x", { ...base, fetch: async () => geminiResponse([{ text }]) })).toEqual(meal);
   });
 
   it("ignores thought parts and joins the others", async () => {
-    const json = JSON.stringify(items);
+    const json = JSON.stringify(meal);
     const parts = [{ text: "thinking about food...", thought: true }, { text: json.slice(0, 20) }, { text: json.slice(20) }];
-    expect(await parseFoodText("x", { ...base, fetch: async () => geminiResponse(parts) })).toEqual(items);
+    expect(await parseFoodText("x", { ...base, fetch: async () => geminiResponse(parts) })).toEqual(meal);
   });
 
   it("coerces numeric strings returned by the model", async () => {
-    const text = JSON.stringify([{ ...items[0], calories: "330" }]);
+    const text = JSON.stringify({ name: "Frango", items: [{ ...items[0], calories: "330" }] });
     const result = await parseFoodText("x", { ...base, fetch: async () => geminiResponse([{ text }]) });
-    expect(result[0]?.calories).toBe(330);
+    expect(result.items[0]?.calories).toBe(330);
   });
 
   it.each([
     ["not json", "claro, aqui está"],
     ["empty array", "[]"],
-    ["an object instead of an array", JSON.stringify(items[0])],
+    ["a single item instead of a meal", JSON.stringify(items[0])],
+    ["a meal without items", JSON.stringify({ name: "Frango", items: [] })],
+    ["an item without grams", JSON.stringify({ name: "Frango", items: [{ ...items[0], quantity_g: null }] })],
     ["negative calories", JSON.stringify([{ ...items[0], calories: -5 }])],
     ["missing fields", JSON.stringify([{ name: "x" }])],
     ["empty text", ""],
@@ -111,9 +127,9 @@ describe("parseFoodText", () => {
 
 describe("analyzeFoodImage", () => {
   it("sends the image inline with its mime type", async () => {
-    const fetchMock = vi.fn<typeof fetch>(async () => geminiResponse([{ text: JSON.stringify(items) }]));
+    const fetchMock = vi.fn<typeof fetch>(async () => geminiResponse([{ text: JSON.stringify(meal) }]));
     const result = await analyzeFoodImage("QUJD", "image/png", { ...base, fetch: fetchMock });
-    expect(result).toEqual(items);
+    expect(result).toEqual(meal);
     const body = JSON.parse(fetchMock.mock.calls[0]![1]?.body as string);
     expect(body.contents[0].parts[1]).toEqual({ inlineData: { mimeType: "image/png", data: "QUJD" } });
   });

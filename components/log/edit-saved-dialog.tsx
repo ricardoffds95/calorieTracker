@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ItemsEditor, fromEditable, toEditable, type EditableItem } from "@/components/log/items-editor";
+import { PortionTotalsFields, portionItems, totalsFromItem, type PortionTotals } from "@/components/log/portion-totals-fields";
 import { PropagationChoice } from "@/components/log/propagation-choice";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -34,7 +35,11 @@ export function EditSavedDialog({ userId, target, todayKey, onClose }: EditSaved
   const [per100, setPer100] = useState(() =>
     isFood ? Object.fromEntries(PER100.map(([k]) => [k, String((target.item as SavedFood)[k])])) : {},
   );
-  const [rows, setRows] = useState<EditableItem[]>(() => (isFood ? [] : toEditable((target.item as SavedMeal).items)));
+  const mealItems = isFood ? [] : (target.item as SavedMeal).items;
+  // A meal defined per portion (one item without grams) is edited through its totals.
+  const isPortion = mealItems.length === 1 && mealItems[0]!.quantity_g === null;
+  const [rows, setRows] = useState<EditableItem[]>(() => (isFood || isPortion ? [] : toEditable(mealItems)));
+  const [totals, setTotals] = useState<PortionTotals | null>(() => (isPortion ? totalsFromItem(mealItems[0]!) : null));
   const [linked, setLinked] = useState<{ all: number; fromToday: number } | null>(null);
   const [step, setStep] = useState<"edit" | "propagate" | "delete">("edit");
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +52,7 @@ export function EditSavedDialog({ userId, target, todayKey, onClose }: EditSaved
   const food = isFood
     ? savedFoodSchema.safeParse({ name, ...Object.fromEntries(PER100.map(([k]) => [k, parseDecimalInput(per100[k] ?? "") ?? Number.NaN])) })
     : null;
-  const meal = isFood ? null : savedMealSchema.safeParse({ name, items: fromEditable(rows) });
+  const meal = isFood ? null : savedMealSchema.safeParse({ name, items: totals ? portionItems(name, totals) : fromEditable(rows) });
   const valid = isFood ? food!.success : meal!.success;
 
   function save(scope: PropagationScope) {
@@ -74,7 +79,7 @@ export function EditSavedDialog({ userId, target, todayKey, onClose }: EditSaved
       <DialogContent className="max-h-[90dvh] max-w-sm overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Editar {isFood ? "alimento" : "refeição"} guardado</DialogTitle>
-          <DialogDescription>{isFood ? "Valores por 100 g." : "Os totais são a soma dos itens."}</DialogDescription>
+          <DialogDescription>{isFood ? "Valores por 100 g." : isPortion ? "Valores de 1 porção." : "1 porção é a soma dos itens."}</DialogDescription>
         </DialogHeader>
 
         {step === "edit" && (
@@ -92,6 +97,8 @@ export function EditSavedDialog({ userId, target, todayKey, onClose }: EditSaved
                   </div>
                 ))}
               </div>
+            ) : totals ? (
+              <PortionTotalsFields value={totals} onChange={setTotals} />
             ) : (
               <ItemsEditor rows={rows} onChange={setRows} />
             )}

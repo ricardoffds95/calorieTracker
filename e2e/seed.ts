@@ -124,3 +124,10 @@ export async function applySavedFoodAs(user: TestUser, foodId: string) {
   if (error) throw error;
   return data;
 }
+
+export async function fetchSavedMeals(user: TestUser) {
+  const supabase = await clientFor(user);
+  const { data, error } = await supabase.from("saved_meals").select("*");
+  if (error) throw error;
+  return data;
+}

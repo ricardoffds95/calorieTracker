@@ -6,13 +6,17 @@ const items = [{ name: "arroz", quantity_g: 100, calories: 130, protein_g: 2.7, 
 const respond = (body: unknown, status: number) => async () => new Response(JSON.stringify(body), { status });
 
 describe("requestAiParse", () => {
-  it("returns the items on success and posts JSON to the endpoint", async () => {
-    const fetchMock = vi.fn(respond({ items }, 200));
-    expect(await requestAiParse(input, fetchMock)).toEqual({ ok: true, items });
+  it("returns the meal on success and posts JSON to the endpoint", async () => {
+    const fetchMock = vi.fn(respond({ name: "Arroz", items }, 200));
+    expect(await requestAiParse(input, fetchMock)).toEqual({ ok: true, name: "Arroz", items });
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("/api/ai/parse");
     expect(init.method).toBe("POST");
     expect(JSON.parse(init.body as string)).toEqual(input);
+  });
+
+  it("names the meal when the server sends no name", async () => {
+    expect(await requestAiParse(input, respond({ items }, 200))).toEqual({ ok: true, name: "Refeição", items });
   });
 
   it("maps 503 to unavailable with the 'IA não disponível' message", async () => {

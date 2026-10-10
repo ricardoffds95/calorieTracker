@@ -1,5 +1,5 @@
 import "server-only";
-import { aiResultSchema, type AiFoodItem } from "./schemas";
+import { aiMealSchema, aiResultSchema, type AiMeal } from "./schemas";
 
 /** The AI service cannot be used right now (not configured, quota exhausted, down, timeout). */
 export class AiUnavailableError extends Error {
@@ -17,10 +17,11 @@ export class AiInvalidResponseError extends Error {
   }
 }
 
-const SYSTEM_PROMPT = `Identifica os alimentos descritos ou visíveis, estima as quantidades em gramas se não especificadas, e devolve APENAS um JSON array sem markdown nem texto extra:
-[{"name":"frango grelhado","quantity_g":150,"calories":165,"protein_g":31,"carbs_g":0,"fat_g":3.6}]
-Os valores (calories, protein_g, carbs_g, fat_g) são para a quantidade indicada em quantity_g, não por 100 g.
-Usa valores nutricionais padrão e nomes em português. Responde APENAS com o JSON array.`;
+const SYSTEM_PROMPT = `Identifica a refeição e os alimentos descritos ou visíveis, estima as quantidades em gramas se não especificadas, e devolve APENAS um objeto JSON sem markdown nem texto extra:
+{"name":"Frango com arroz","items":[{"name":"frango grelhado","quantity_g":150,"calories":248,"protein_g":46.5,"carbs_g":0,"fat_g":5.4},{"name":"arroz branco cozido","quantity_g":150,"calories":195,"protein_g":4.1,"carbs_g":42.3,"fat_g":0.5}]}
+"name" é um nome curto para a refeição inteira, em português, com maiúscula inicial (ex: "Frango com arroz", "Tosta mista").
+Os valores (calories, protein_g, carbs_g, fat_g) de cada item são para a quantidade indicada em quantity_g, não por 100 g.
+Usa valores nutricionais padrão e nomes em português. Responde APENAS com o objeto JSON.`;
 
 const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models";
 const TIMEOUT_MS = 20_000;
@@ -37,7 +38,7 @@ interface GeminiOptions {
   model?: string;
 }
 
-function parseModelText(text: string): AiFoodItem[] {
+function parseModelText(text: string): AiMeal {
   // responseMimeType should give clean JSON, but strip markdown fences defensively.
   const clean = text.replace(/```(?:json)?/gi, "").trim();
   let json: unknown;
@@ -46,12 +47,15 @@ function parseModelText(text: string): AiFoodItem[] {
   } catch {
     throw new AiInvalidResponseError();
   }
-  const parsed = aiResultSchema.safeParse(json);
-  if (!parsed.success) throw new AiInvalidResponseError();
-  return parsed.data;
+  const meal = aiMealSchema.safeParse(json);
+  if (meal.success) return meal.data;
+  // Older/looser answers: a bare array of items, or an object without a usable name.
+  const items = aiResultSchema.safeParse(Array.isArray(json) ? json : (json as { items?: unknown } | null)?.items);
+  if (!items.success) throw new AiInvalidResponseError();
+  return { name: items.data.length === 1 ? items.data[0]!.name : "Refeição", items: items.data };
 }
 
-async function callGemini(parts: GeminiPart[], options: GeminiOptions): Promise<AiFoodItem[]> {
+async function callGemini(parts: GeminiPart[], options: GeminiOptions): Promise<AiMeal> {
   const apiKey = options.apiKey ?? process.env.GEMINI_API_KEY;
   const model = options.model ?? process.env.GEMINI_MODEL;
   if (!apiKey || !model) throw new AiUnavailableError("not_configured");
@@ -93,7 +97,7 @@ async function callGemini(parts: GeminiPart[], options: GeminiOptions): Promise<
   return parseModelText(text);
 }
 
-export function parseFoodText(text: string, options: GeminiOptions = {}): Promise<AiFoodItem[]> {
+export function parseFoodText(text: string, options: GeminiOptions = {}): Promise<AiMeal> {
   return callGemini([{ text: `${SYSTEM_PROMPT}\n\n${text}` }], options);
 }
 
@@ -101,6 +105,6 @@ export function analyzeFoodImage(
   base64: string,
   mimeType: string,
   options: GeminiOptions = {},
-): Promise<AiFoodItem[]> {
+): Promise<AiMeal> {
   return callGemini([{ text: SYSTEM_PROMPT }, { inlineData: { mimeType, data: base64 } }], options);
 }
