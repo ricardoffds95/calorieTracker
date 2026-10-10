@@ -101,6 +101,7 @@ export type Database = {
           height_cm: number | null
           onboarding_done_at: string | null
           plan_summary: string | null
+          saved_plans: Json | null
           sex: string | null
           training_intensity: string | null
           training_notes: string | null
@@ -126,6 +127,7 @@ export type Database = {
           height_cm?: number | null
           onboarding_done_at?: string | null
           plan_summary?: string | null
+          saved_plans?: Json | null
           sex?: string | null
           training_intensity?: string | null
           training_notes?: string | null
@@ -151,6 +153,7 @@ export type Database = {
           height_cm?: number | null
           onboarding_done_at?: string | null
           plan_summary?: string | null
+          saved_plans?: Json | null
           sex?: string | null
           training_intensity?: string | null
           training_notes?: string | null

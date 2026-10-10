@@ -68,7 +68,10 @@ test("the plan endpoint always answers with a usable plan, even without the AI",
   await login(page, "A");
   const response = await page.request.post(PLAN_ENDPOINT, { data: ANSWERS });
   expect(response.status()).toBe(200);
-  const plan = (await response.json()) as { calories: number; protein_g: number; carbs_g: number; fat_g: number; summary: string; source: string };
+  const body = (await response.json()) as { plans: Record<"cut" | "maintain" | "bulk", { calories: number; protein_g: number; carbs_g: number; fat_g: number }>; summary: string; source: string };
+  const plan = { ...body.plans.maintain, summary: body.summary, source: body.source };
+  expect(body.plans.cut.calories).toBeLessThan(body.plans.maintain.calories); // a plan for each goal, going up
+  expect(body.plans.maintain.calories).toBeLessThan(body.plans.bulk.calories);
   expect(plan.calories).toBeGreaterThan(2300); // a trained 80 kg man: about 2760 kcal to maintain
   expect(plan.calories).toBeLessThan(3300);
   expect(plan.protein_g * 4 + plan.carbs_g * 4 + plan.fat_g * 9).toBeGreaterThan(plan.calories * 0.9);

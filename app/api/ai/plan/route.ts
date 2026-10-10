@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { AiInvalidResponseError, AiUnavailableError, generateNutritionPlan, type GeneratedPlan } from "@/lib/ai";
-import { planAnswersSchema, referencePlan, referenceSummary } from "@/lib/nutrition-plan";
+import { planAnswersSchema, referencePlans, referenceSummary } from "@/lib/nutrition-plan";
 import { createClient } from "@/lib/supabase/server";
 
 function jsonError(status: number, error: string, message: string) {
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     result = await generateNutritionPlan(parsed.data);
   } catch (error) {
     if (!(error instanceof AiUnavailableError) && !(error instanceof AiInvalidResponseError)) return jsonError(500, "internal", "Erro inesperado.");
-    result = { plan: referencePlan(parsed.data), summary: referenceSummary(parsed.data), source: "standard" };
+    result = { plans: referencePlans(parsed.data), summary: referenceSummary(parsed.data), source: "standard" };
   }
-  return NextResponse.json({ ...result.plan, summary: result.summary, source: result.source });
+  return NextResponse.json({ plans: result.plans, summary: result.summary, source: result.source });
 }

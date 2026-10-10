@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Sparkles } from "lucide-react";
+import { ManageProfile } from "@/components/profile/manage-profile";
 import { ProfileForm } from "@/components/profile/profile-form";
 import { ProfileSummary } from "@/components/profile-summary";
 import { buttonVariants } from "@/components/ui/button";
@@ -29,7 +30,7 @@ export function ProfileScreen({ userId }: { userId: string }) {
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
             <p className="text-sm text-muted-foreground">
-              {data.plan_summary ?? "Responde a algumas perguntas e a IA calcula as calorias e as macros de que precisas."}
+              {data.plan_summary ?? "Calcula as tuas metas com a IA."}
             </p>
             <Link href="/onboarding?de=perfil" className={cn(buttonVariants({ variant: "outline", size: "lg" }), "h-11")}>
               <Sparkles aria-hidden />
@@ -39,6 +40,7 @@ export function ProfileScreen({ userId }: { userId: string }) {
         </Card>
       )}
       {data && <ProfileForm profile={data} />}
+      {data && <ManageProfile profile={data} />}
     </div>
   );
 }

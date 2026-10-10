@@ -11,10 +11,15 @@ vi.mock("@/lib/ai", async (importOriginal) => ({
 }));
 
 import { AiInvalidResponseError, AiUnavailableError, generateNutritionPlan } from "@/lib/ai";
-import { referencePlan } from "@/lib/nutrition-plan";
+import { referencePlans } from "@/lib/nutrition-plan";
 import { POST } from "./route";
 
 const answers = { sex: "male", age: 30, height_cm: 180, weight_kg: 80, body_fat_pct: null, goal: "maintain", aerobic_sessions: 1, anaerobic_sessions: 2, intensity: "moderate", daily_activity: "light", notes: "" } as const;
+const PLANS = {
+  cut: { calories: 2300, protein_g: 160, carbs_g: 250, fat_g: 70 },
+  maintain: { calories: 2800, protein_g: 150, carbs_g: 330, fat_g: 85 },
+  bulk: { calories: 3050, protein_g: 160, carbs_g: 380, fat_g: 90 },
+};
 const post = (body: unknown) => POST(new Request("http://localhost/api/ai/plan", { method: "POST", body: typeof body === "string" ? body : JSON.stringify(body) }));
 
 beforeEach(() => {
@@ -38,17 +43,17 @@ describe("POST /api/ai/plan", () => {
   });
 
   it("returns the AI's plan with its summary", async () => {
-    vi.mocked(generateNutritionPlan).mockResolvedValue({ plan: { calories: 2800, protein_g: 150, carbs_g: 330, fat_g: 85 }, summary: "Porque sim.", source: "ai" });
+    vi.mocked(generateNutritionPlan).mockResolvedValue({ plans: PLANS, summary: "Porque sim.", source: "ai" });
     const response = await post(answers);
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ calories: 2800, protein_g: 150, carbs_g: 330, fat_g: 85, summary: "Porque sim.", source: "ai" });
+    expect(await response.json()).toEqual({ plans: PLANS, summary: "Porque sim.", source: "ai" });
   });
 
   it.each([new AiUnavailableError("quota"), new AiInvalidResponseError()])("falls back to the standard plan when the AI fails (%s)", async (error) => {
     vi.mocked(generateNutritionPlan).mockRejectedValue(error);
     const response = await post(answers);
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ ...referencePlan(answers), source: "standard" });
+    expect(await response.json()).toMatchObject({ plans: referencePlans(answers), source: "standard" });
   });
 
   it("is 500 for an unexpected error", async () => {

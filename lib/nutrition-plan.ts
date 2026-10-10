@@ -2,17 +2,17 @@ import { z } from "zod";
 import { CALORIE_PER_GRAM, type GoalMode } from "./macros";
 
 export const INTENSITIES = [
-  { key: "low", label: "Leve", description: "Dá para conversar sem esforço" },
-  { key: "moderate", label: "Moderada", description: "Respiração acelerada, a suar" },
-  { key: "high", label: "Intensa", description: "Perto do limite, difícil falar" },
+  { key: "low", label: "Leve", description: "Conversa fácil" },
+  { key: "moderate", label: "Moderada", description: "A suar" },
+  { key: "high", label: "Intensa", description: "Perto do limite" },
 ] as const;
 export type Intensity = (typeof INTENSITIES)[number]["key"];
 
 export const DAILY_ACTIVITIES = [
-  { key: "sedentary", label: "Sedentário", description: "Quase sempre sentado (teletrabalho, escritório)" },
-  { key: "light", label: "Pouco ativo", description: "Algum movimento, mas muito tempo parado" },
-  { key: "active", label: "Ativo", description: "Em pé ou a andar a maior parte do dia (loja, saúde, ensino)" },
-  { key: "very_active", label: "Muito ativo", description: "Trabalho físico pesado (obras, agricultura, cargas)" },
+  { key: "sedentary", label: "Sedentário", description: "Sentado quase todo o dia" },
+  { key: "light", label: "Pouco ativo", description: "Algum movimento" },
+  { key: "active", label: "Ativo", description: "Em pé ou a andar" },
+  { key: "very_active", label: "Muito ativo", description: "Trabalho físico (obras, campo)" },
 ] as const;
 export type DailyActivity = (typeof DAILY_ACTIVITIES)[number]["key"];
 
@@ -72,23 +72,42 @@ export function activityFactor(aerobicSessions: number, anaerobicSessions: numbe
 }
 
 /** A standard, explainable plan: the safety net around the AI's answer and the fallback when it is not available. */
-export function referencePlan(a: PlanAnswers): NutritionPlan {
+export function referencePlan(a: PlanAnswers, goal: GoalMode = a.goal): NutritionPlan {
   const maintenance = basalMetabolicRate(a) * activityFactor(a.aerobic_sessions, a.anaerobic_sessions, a.intensity, a.daily_activity);
-  const calories = Math.max(MIN_PLAN_CALORIES, Math.round((maintenance * GOAL_FACTOR[a.goal]) / 10) * 10);
-  const protein_g = Math.round(a.weight_kg * PROTEIN_PER_KG[a.goal]);
+  const calories = Math.max(MIN_PLAN_CALORIES, Math.round((maintenance * GOAL_FACTOR[goal]) / 10) * 10);
+  const protein_g = Math.round(a.weight_kg * PROTEIN_PER_KG[goal]);
   const fat_g = Math.round((calories * 0.25) / CALORIE_PER_GRAM.fat);
   const carbs_g = Math.max(0, Math.round((calories - protein_g * CALORIE_PER_GRAM.protein - fat_g * CALORIE_PER_GRAM.fat) / CALORIE_PER_GRAM.carbs));
   return { calories, protein_g, carbs_g, fat_g };
 }
 
-/** What the AI returns. */
-export const aiPlanSchema = z.object({
+/** The three plans (lose, maintain, gain) for the same person: they are all kept, so the goal can change later without redoing the questionnaire. */
+export type PlansByGoal = Record<GoalMode, NutritionPlan>;
+export const GOALS: readonly GoalMode[] = ["cut", "maintain", "bulk"];
+
+export function referencePlans(a: PlanAnswers): PlansByGoal {
+  return { cut: referencePlan(a, "cut"), maintain: referencePlan(a, "maintain"), bulk: referencePlan(a, "bulk") };
+}
+
+const aiMacros = z.object({
   calories: z.number().finite(),
   protein_g: z.number().finite().min(0),
   carbs_g: z.number().finite().min(0),
   fat_g: z.number().finite().min(0),
-  summary: z.string().trim().min(1).max(800),
 });
+
+/** What the AI returns: a plan for each goal and one short sentence. */
+export const aiPlanSchema = z.object({
+  plans: z.object({ cut: aiMacros, maintain: aiMacros, bulk: aiMacros }),
+  summary: z.string().trim().min(1).max(300),
+});
+
+/** The plans as stored in the profile (jsonb): anything that is not three well-formed plans is ignored. */
+export const savedPlansSchema = z.object({ cut: aiMacros, maintain: aiMacros, bulk: aiMacros });
+export function parseSavedPlans(value: unknown): PlansByGoal | null {
+  const parsed = savedPlansSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+}
 
 /** How far the AI's calories may be from the reference before it is not trusted. */
 const MAX_CALORIE_DEVIATION = 0.25;
@@ -115,9 +134,19 @@ export function reconcilePlan(ai: Pick<NutritionPlan, "calories" | "protein_g" |
   return { plan: { calories, protein_g, carbs_g, fat_g }, trusted: true };
 }
 
-/** The explanation shown with the standard plan. */
+/**
+ * The AI's three plans made safe, one by one against the reference of each goal. If they do not go up from losing to
+ * gaining (or any of them is not trusted), the standard plans are used for all three: mixing the two would be incoherent.
+ */
+export function reconcilePlans(ai: PlansByGoal, answers: PlanAnswers): { plans: PlansByGoal; trusted: boolean } {
+  const reference = referencePlans(answers);
+  const checked = { cut: reconcilePlan(ai.cut, reference.cut), maintain: reconcilePlan(ai.maintain, reference.maintain), bulk: reconcilePlan(ai.bulk, reference.bulk) };
+  const plans: PlansByGoal = { cut: checked.cut.plan, maintain: checked.maintain.plan, bulk: checked.bulk.plan };
+  const trusted = GOALS.every((g) => checked[g].trusted) && plans.cut.calories <= plans.maintain.calories && plans.maintain.calories <= plans.bulk.calories;
+  return trusted ? { plans, trusted } : { plans: reference, trusted: false };
+}
+
+/** The explanation shown with the standard plans. */
 export function referenceSummary(a: PlanAnswers): string {
-  const goal = a.goal === "cut" ? "um défice de cerca de 20 %" : a.goal === "bulk" ? "um excedente de cerca de 10 %" : "as calorias de manutenção";
-  const method = a.body_fat_pct !== null ? "a tua massa magra" : "o teu peso, altura e idade";
-  return `Cálculo padrão com base em ${method} , no dia a dia ${DAILY_ACTIVITIES.find((d) => d.key === a.daily_activity)?.label.toLowerCase()} e nos ${a.aerobic_sessions + a.anaerobic_sessions} treinos por semana (${INTENSITIES.find((i) => i.key === a.intensity)?.label.toLowerCase()}), com ${goal} e cerca de ${Math.round((a.goal === "cut" ? 2 : a.goal === "bulk" ? 1.8 : 1.6) * 10) / 10} g de proteína por kg.`;
+  return `Cálculo padrão: ${a.weight_kg} kg, ${a.aerobic_sessions + a.anaerobic_sessions} treinos por semana.`;
 }

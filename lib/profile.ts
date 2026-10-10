@@ -63,11 +63,6 @@ const percent = z.number({ error: "Valor inválido." }).int("Usa números inteir
 
 export const profileFormSchema = z
   .object({
-    name: z
-      .string()
-      .trim()
-      .max(50, "O nome pode ter no máximo 50 caracteres.")
-      .transform((value) => (value === "" ? DEFAULT_NAME : value)),
     mode: z.enum(["cut", "maintain", "bulk"]),
     calories: z
       .number({ error: "Insere um valor de calorias válido." })
@@ -90,7 +85,6 @@ export type ProfileFormValues = z.input<typeof profileFormSchema>;
 export type ProfileFormData = z.output<typeof profileFormSchema>;
 
 export interface ProfileUpdate {
-  name: string;
   mode: GoalMode;
   goal_calories: number;
   goal_protein: number;
@@ -101,7 +95,6 @@ export interface ProfileUpdate {
 /** Row values to store: the calories and the grams as the user set them (the percentages are only another way to edit them). */
 export function toProfileUpdate(data: ProfileFormData): ProfileUpdate {
   return {
-    name: data.name,
     mode: data.mode,
     goal_calories: data.calories,
     goal_protein: data.proteinG,

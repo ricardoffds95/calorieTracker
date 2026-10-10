@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { activityFactor, basalMetabolicRate, planAnswersSchema, reconcilePlan, referencePlan, type PlanAnswers } from "./nutrition-plan";
+import { activityFactor, basalMetabolicRate, parseSavedPlans, planAnswersSchema, reconcilePlan, reconcilePlans, referencePlan, referencePlans, type PlanAnswers } from "./nutrition-plan";
 
 const man: PlanAnswers = { sex: "male", age: 30, height_cm: 180, weight_kg: 80, body_fat_pct: null, goal: "maintain", aerobic_sessions: 1, anaerobic_sessions: 2, intensity: "moderate", daily_activity: "sedentary", notes: "" };
 const woman: PlanAnswers = { sex: "female", age: 28, height_cm: 165, weight_kg: 60, body_fat_pct: null, goal: "cut", aerobic_sessions: 0, anaerobic_sessions: 0, intensity: "low", daily_activity: "sedentary", notes: "" };
@@ -127,5 +127,36 @@ describe("planAnswersSchema", () => {
     expect(planAnswersSchema.safeParse({ ...man, intensity: "extreme" }).success).toBe(false);
     expect(planAnswersSchema.safeParse({ ...man, sex: undefined }).error?.issues[0]?.message).toBe("Indica o sexo.");
     expect(planAnswersSchema.parse({ ...man, notes: "  musculação 4x  " }).notes).toBe("musculação 4x");
+  });
+});
+
+describe("plans for the three goals", () => {
+  it("the reference gives a plan per goal, going up from losing to gaining", () => {
+    const plans = referencePlans(man);
+    expect(plans.cut.calories).toBeLessThan(plans.maintain.calories);
+    expect(plans.maintain.calories).toBeLessThan(plans.bulk.calories);
+    expect(plans.maintain).toEqual(referencePlan(man)); // the goal of the answers (maintain)
+    expect(plans.bulk).toEqual(referencePlan(man, "bulk"));
+  });
+
+  it("keeps the AI's three plans when each is sensible and they go up", () => {
+    const ref = referencePlans(man);
+    const { plans, trusted } = reconcilePlans(ref, man);
+    expect(trusted).toBe(true);
+    expect(plans).toEqual(ref);
+  });
+
+  it("uses the reference for all three when one is off or they do not go up", () => {
+    const ref = referencePlans(man);
+    expect(reconcilePlans({ ...ref, cut: { ...ref.cut, calories: 800 } }, man)).toEqual({ plans: ref, trusted: false });
+    expect(reconcilePlans({ cut: ref.maintain, maintain: ref.maintain, bulk: ref.cut }, man).trusted).toBe(false);
+  });
+
+  it("reads the saved plans of the profile, or nothing when they are not three plans", () => {
+    const ref = referencePlans(man);
+    expect(parseSavedPlans(JSON.parse(JSON.stringify(ref)))).toEqual(ref);
+    expect(parseSavedPlans(null)).toBeNull();
+    expect(parseSavedPlans({ cut: ref.cut })).toBeNull();
+    expect(parseSavedPlans("x")).toBeNull();
   });
 });

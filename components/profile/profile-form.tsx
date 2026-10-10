@@ -6,9 +6,9 @@ import { MacroGrams, type MacroGramInputs } from "@/components/profile/macro-gra
 import { MacroSplit, type MacroPercentInputs } from "@/components/profile/macro-split";
 import { NumberStepper } from "@/components/profile/number-stepper";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { calculateTotalCalories, type GoalMode } from "@/lib/macros";
+import { parseSavedPlans } from "@/lib/nutrition-plan";
 import {
   CALORIE_STEP,
   gramsFromPercentages,
@@ -44,14 +44,12 @@ function gramsFor(calories: string, pcts: MacroPercentInputs): MacroGramInputs |
 
 export function ProfileForm({ profile }: { profile: Profile }) {
   const update = useUpdateProfile(profile.user_id);
-  const [name, setName] = useState(profile.name);
   const [mode, setMode] = useState(profile.mode as GoalMode);
   const [calories, setCalories] = useState(String(profile.goal_calories));
   const [pcts, setPcts] = useState<MacroPercentInputs>(() => initialPercentages(profile));
   const [grams, setGrams] = useState<MacroGramInputs>(() => initialGrams(profile));
 
   const values = {
-    name,
     mode,
     calories: asNumber(calories),
     proteinPct: asNumber(pcts.protein),
@@ -72,19 +70,29 @@ export function ProfileForm({ profile }: { profile: Profile }) {
       if (key) gramsErrors[key] ??= issue.message;
     }
   }
-  const nameError = parsed.success ? undefined : parsed.error.issues.find((i) => i.path[0] === "name")?.message;
 
   const next = parsed.success ? toProfileUpdate(parsed.data) : null;
   const dirty =
     next !== null &&
-    (next.name !== profile.name ||
-      next.mode !== profile.mode ||
+    (next.mode !== profile.mode ||
       next.goal_calories !== profile.goal_calories ||
       next.goal_protein !== profile.goal_protein ||
       next.goal_carbs !== profile.goal_carbs ||
       next.goal_fat !== profile.goal_fat);
 
+  // The plans calculated by the questionnaire (one per goal): changing the goal switches to its own plan, no recalculation.
+  const savedPlans = parseSavedPlans(profile.saved_plans);
+
   function selectMode(newMode: GoalMode) {
+    const saved = savedPlans?.[newMode];
+    if (saved) {
+      const p = percentagesFromGoals({ protein: saved.protein_g, carbs: saved.carbs_g, fat: saved.fat_g });
+      setMode(newMode);
+      setCalories(String(saved.calories));
+      setPcts({ protein: String(p.protein), carbs: String(p.carbs), fat: String(p.fat) });
+      setGrams({ protein: String(saved.protein_g), carbs: String(saved.carbs_g), fat: String(saved.fat_g) });
+      return;
+    }
     const preset = presetPercentages(newMode);
     const nextPcts = { protein: String(preset.protein), carbs: String(preset.carbs), fat: String(preset.fat) };
     setMode(newMode);
@@ -128,16 +136,9 @@ export function ProfileForm({ profile }: { profile: Profile }) {
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-6" noValidate>
       <div className="flex flex-col gap-2">
-        <Label htmlFor="profile-name">O teu nome</Label>
-        <Input id="profile-name" value={name} onChange={(e) => setName(e.target.value)} className="h-11" maxLength={60} autoComplete="given-name" />
-        {nameError && (
-          <p role="alert" className="text-sm text-destructive">
-            {nameError}
-          </p>
-        )}
+        <GoalModePicker value={mode} onChange={selectMode} />
+        {savedPlans && <p className="text-xs text-muted-foreground">Cada objetivo usa o teu plano guardado.</p>}
       </div>
-
-      <GoalModePicker value={mode} onChange={selectMode} />
 
       <div className="flex flex-col gap-2">
         <Label>Calorias diárias</Label>

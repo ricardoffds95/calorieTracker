@@ -1,7 +1,7 @@
-import type { NutritionPlan, PlanAnswers } from "./nutrition-plan";
+import { parseSavedPlans, type PlanAnswers, type PlansByGoal } from "./nutrition-plan";
 
 export type PlanClientResult =
-  | { ok: true; plan: NutritionPlan; summary: string; source: "ai" | "standard" }
+  | { ok: true; plans: PlansByGoal; summary: string; source: "ai" | "standard" }
   | { ok: false; reason: "invalid" | "unauthorized" | "network" | "unavailable"; message: string };
 
 const FALLBACK = {
@@ -19,18 +19,10 @@ export async function requestPlan(answers: PlanAnswers, fetchFn: typeof fetch = 
   } catch {
     return { ok: false, reason: "network", message: FALLBACK.network };
   }
-  const body = (await response.json().catch(() => null)) as
-    | { calories?: number; protein_g?: number; carbs_g?: number; fat_g?: number; summary?: string; source?: string; message?: string }
-    | null;
+  const body = (await response.json().catch(() => null)) as { plans?: unknown; summary?: string; source?: string; message?: string } | null;
 
-  if (response.ok && body && [body.calories, body.protein_g, body.carbs_g, body.fat_g].every((n) => typeof n === "number")) {
-    return {
-      ok: true,
-      plan: { calories: body.calories!, protein_g: body.protein_g!, carbs_g: body.carbs_g!, fat_g: body.fat_g! },
-      summary: body.summary ?? "",
-      source: body.source === "ai" ? "ai" : "standard",
-    };
-  }
+  const plans = response.ok ? parseSavedPlans(body?.plans) : null;
+  if (plans) return { ok: true, plans, summary: body?.summary ?? "", source: body?.source === "ai" ? "ai" : "standard" };
   if (response.status === 401) return { ok: false, reason: "unauthorized", message: FALLBACK.unauthorized };
   if (response.status === 400) return { ok: false, reason: "invalid", message: body?.message ?? FALLBACK.invalid };
   return { ok: false, reason: "unavailable", message: FALLBACK.unavailable };

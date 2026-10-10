@@ -3,7 +3,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { toastSaveError } from "@/lib/queries/errors";
-import type { ProfileUpdate } from "@/lib/profile";
 import { createClient } from "@/lib/supabase/client";
 import type { Tables, TablesUpdate } from "@/lib/supabase/database.types";
 
@@ -26,12 +25,12 @@ export function useProfile(userId: string) {
  * Write-through: always updates the DB. The cache is updated optimistically and rolled back on failure,
  * so nothing is ever shown as saved that the DB does not have.
  */
-export function useUpdateProfile(userId: string) {
+export function useUpdateProfile(userId: string, message = "Objetivos guardados") {
   const queryClient = useQueryClient();
   const key = profileKey(userId);
 
   return useMutation({
-    mutationFn: async (update: ProfileUpdate): Promise<Profile> => {
+    mutationFn: async (update: TablesUpdate<"profiles">): Promise<Profile> => {
       const { data, error } = await createClient().from("profiles").update(update).eq("user_id", userId).select().single();
       if (error) throw error;
       return data;
@@ -48,7 +47,7 @@ export function useUpdateProfile(userId: string) {
     },
     onSuccess: (saved) => {
       queryClient.setQueryData(key, saved);
-      toast.success("Objetivos guardados");
+      toast.success(message);
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: key }),
   });

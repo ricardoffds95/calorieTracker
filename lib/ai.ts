@@ -1,5 +1,5 @@
 import "server-only";
-import { DAILY_ACTIVITIES, INTENSITIES, aiPlanSchema, reconcilePlan, referencePlan, referenceSummary, type NutritionPlan, type PlanAnswers } from "./nutrition-plan";
+import { DAILY_ACTIVITIES, INTENSITIES, aiPlanSchema, reconcilePlans, referenceSummary, type PlanAnswers, type PlansByGoal } from "./nutrition-plan";
 import { aiMealSchema, aiResultSchema, type AiMeal } from "./schemas";
 
 /** The AI service cannot be used right now (not configured, quota exhausted, down, timeout). */
@@ -123,9 +123,9 @@ export function analyzeFoodImage(
   return callGemini([{ text: SYSTEM_PROMPT }, { inlineData: { mimeType, data: base64 } }], options);
 }
 
-const PLAN_PROMPT = `És um nutricionista desportivo. Com os dados abaixo calcula as necessidades diárias e devolve APENAS um objeto JSON sem markdown nem texto extra:
-{"calories":2400,"protein_g":160,"carbs_g":260,"fat_g":75,"summary":"duas ou três frases em português europeu, simples, a explicar porque estes valores"}
-Regras: usa calorias de manutenção pelo gasto estimado (taxa metabólica basal x atividade). A atividade do dia a dia (profissão, deslocações) conta tanto como o treino: um trabalho físico pesado gasta muito mais do que teletrabalho. Para "perder" aplica um défice moderado (cerca de 15-20 %), para "ganhar" um excedente pequeno (cerca de 5-10 %), para "manter" a manutenção. Nunca menos de 1200 kcal. Proteína entre 1,6 e 2,2 g por kg de peso (mais no défice e com treino de força). Gordura cerca de 25 % das calorias. Os hidratos completam o resto, de forma que 4 x proteína + 4 x hidratos + 9 x gordura seja igual às calorias. Se houver notas sobre os treinos, usa-as para estimar melhor o gasto energético (duração, tipo, intensidade). Todos os números inteiros. É uma estimativa, não aconselhamento médico: não faças diagnósticos.`;
+const PLAN_PROMPT = `És um nutricionista desportivo. Com os dados abaixo calcula as necessidades diárias para os TRÊS objetivos (perder gordura, manter, ganhar massa) e devolve APENAS um objeto JSON sem markdown nem texto extra:
+{"plans":{"cut":{"calories":2100,"protein_g":170,"carbs_g":190,"fat_g":60},"maintain":{"calories":2600,"protein_g":150,"carbs_g":300,"fat_g":80},"bulk":{"calories":2850,"protein_g":160,"carbs_g":350,"fat_g":85}},"summary":"UMA frase curta em português europeu (máximo 120 caracteres) a dizer o essencial"}
+Regras: parte das calorias de manutenção pelo gasto estimado (taxa metabólica basal x atividade). A atividade do dia a dia (profissão, deslocações) conta tanto como o treino: um trabalho físico pesado gasta muito mais do que teletrabalho. "cut": défice moderado (cerca de 15-20 %). "maintain": manutenção. "bulk": excedente pequeno (cerca de 5-10 %). Nunca menos de 1200 kcal. Proteína entre 1,6 e 2,2 g por kg de peso (mais no défice e com treino de força). Gordura cerca de 25 % das calorias. Os hidratos completam o resto, de forma que 4 x proteína + 4 x hidratos + 9 x gordura seja igual às calorias de cada plano. Se houver notas sobre os treinos, usa-as para estimar melhor o gasto energético (duração, tipo, intensidade). Todos os números inteiros. É uma estimativa, não aconselhamento médico: não faças diagnósticos.`;
 
 const GOAL_TEXT: Record<PlanAnswers["goal"], string> = { cut: "perder gordura", maintain: "manter o peso", bulk: "ganhar massa muscular" };
 
@@ -149,14 +149,15 @@ export function describeAnswers(a: PlanAnswers): string {
 }
 
 export interface GeneratedPlan {
-  plan: NutritionPlan;
+  /** A plan for each goal; the one of `answers.goal` is the active one. */
+  plans: PlansByGoal;
   summary: string;
-  /** "ai": the model's plan (checked); "standard": the reference calculation, because the model's answer could not be trusted. */
+  /** "ai": the model's plans (checked); "standard": the reference calculation, because the model's answer could not be trusted. */
   source: "ai" | "standard";
 }
 
 /**
- * The daily calories and macros for the questionnaire, from Gemini and checked against the reference calculation.
+ * The daily calories and macros for each goal, from Gemini and checked against the reference calculation.
  * Throws AiUnavailableError / AiInvalidResponseError when the model cannot answer (the caller falls back to the reference).
  */
 export async function generateNutritionPlan(answers: PlanAnswers, options: GeminiOptions = {}): Promise<GeneratedPlan> {
@@ -170,7 +171,6 @@ export async function generateNutritionPlan(answers: PlanAnswers, options: Gemin
   const parsed = aiPlanSchema.safeParse(json);
   if (!parsed.success) throw new AiInvalidResponseError();
 
-  const reference = referencePlan(answers);
-  const { plan, trusted } = reconcilePlan(parsed.data, reference);
-  return trusted ? { plan, summary: parsed.data.summary, source: "ai" } : { plan, summary: referenceSummary(answers), source: "standard" };
+  const { plans, trusted } = reconcilePlans(parsed.data.plans, answers);
+  return { plans, summary: trusted ? parsed.data.summary : referenceSummary(answers), source: trusted ? "ai" : "standard" };
 }

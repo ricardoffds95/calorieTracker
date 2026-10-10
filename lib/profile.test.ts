@@ -9,7 +9,7 @@ import {
   toProfileUpdate,
 } from "./profile";
 
-const valid = { name: "Ana", mode: "maintain", calories: 2000, proteinPct: 30, carbsPct: 40, fatPct: 30, proteinG: 150, carbsG: 200, fatG: 67 } as const;
+const valid = { mode: "maintain", calories: 2000, proteinPct: 30, carbsPct: 40, fatPct: 30, proteinG: 150, carbsG: 200, fatG: 67 } as const;
 
 describe("presetPercentages", () => {
   it("returns integers that sum to 100 for every mode", () => {
@@ -40,14 +40,6 @@ describe("percentagesFromGoals", () => {
 describe("profileFormSchema", () => {
   it("accepts a valid form", () => {
     expect(profileFormSchema.safeParse(valid).success).toBe(true);
-  });
-  it("trims the name and defaults an empty one to 'Utilizador'", () => {
-    expect(profileFormSchema.parse({ ...valid, name: "  Ana  " }).name).toBe("Ana");
-    expect(profileFormSchema.parse({ ...valid, name: "   " }).name).toBe("Utilizador");
-  });
-  it("rejects names above 50 characters", () => {
-    expect(profileFormSchema.safeParse({ ...valid, name: "a".repeat(51) }).success).toBe(false);
-    expect(profileFormSchema.safeParse({ ...valid, name: "a".repeat(50) }).success).toBe(true);
   });
   it.each([
     [499, false],
@@ -94,7 +86,6 @@ describe("profile form grams", () => {
 describe("toProfileUpdate", () => {
   it("stores the calories and the grams exactly as set", () => {
     expect(toProfileUpdate(profileFormSchema.parse({ ...valid, mode: "cut", calories: 2400, proteinG: 240, carbsG: 180, fatG: 80 }))).toEqual({
-      name: "Ana",
       mode: "cut",
       goal_calories: 2400,
       goal_protein: 240,

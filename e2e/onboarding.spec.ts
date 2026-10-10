@@ -8,7 +8,12 @@ test.beforeEach(() => resetProfileRow("A", { onboardingDone: false }));
 test.afterEach(() => resetProfileRow("A", { onboardingDone: true }));
 test.afterAll(() => resetProfileRow("A", { onboardingDone: true }));
 
-const PLAN = { calories: 2800, protein_g: 150, carbs_g: 330, fat_g: 85, summary: "Excedente pequeno para ganhar massa.", source: "ai" };
+const PLANS = {
+  cut: { calories: 2300, protein_g: 160, carbs_g: 260, fat_g: 70 },
+  maintain: { calories: 2600, protein_g: 150, carbs_g: 300, fat_g: 80 },
+  bulk: { calories: 2800, protein_g: 150, carbs_g: 330, fat_g: 85 },
+};
+const PLAN = { plans: PLANS, summary: "Excedente pequeno para ganhar massa.", source: "ai" };
 
 /** Mocks the plan endpoint and returns what the page sent. */
 async function mockPlan(page: Page, answer: unknown = PLAN, status = 200) {
@@ -68,11 +73,19 @@ test("first login: the questionnaire, the AI plan, and the goals are saved", asy
   await page.getByRole("button", { name: "Aumentar Treinos aeróbicos por semana" }).click(); // 2 → 3
   await page.getByRole("button", { name: "Diminuir Treinos anaeróbicos por semana" }).click(); // 2 → 1
   await page.getByRole("button", { name: /^Intensa/ }).click();
-  await page.getByLabel("Notas sobre os teus treinos (opcional)").fill("Musculação 1x (1h) e corrida 3x de 5 km.");
+  await page.getByLabel("Notas sobre os treinos (opcional)").fill("Musculação 1x (1h) e corrida 3x de 5 km.");
   await page.getByRole("button", { name: "Calcular o meu plano" }).click();
 
-  await expect(page.getByTestId("plan-calories")).toHaveText("2800");
+  await expect(page.getByTestId("plan-calories")).toHaveText("2800"); // the goal chosen (bulk) is shown first
   await expect(page.getByTestId("plan-result")).toContainText("150 g");
+  await expect(page.getByRole("button", { name: "Ganhar massa (o teu objetivo)" })).toHaveAttribute("aria-pressed", "true");
+  // the three plans are there to look at
+  await page.getByRole("button", { name: "Perder peso" }).click();
+  await expect(page.getByTestId("plan-calories")).toHaveText("2300");
+  await page.getByRole("button", { name: "Manter peso" }).click();
+  await expect(page.getByTestId("plan-calories")).toHaveText("2600");
+  await page.getByRole("button", { name: /^Ganhar massa/ }).click();
+  await expect(page.getByTestId("plan-calories")).toHaveText("2800");
   await expect(page.getByTestId("plan-result")).toContainText("Excedente pequeno para ganhar massa.");
   expect(sent.body).toEqual({
     sex: "male",
@@ -111,6 +124,7 @@ test("first login: the questionnaire, the AI plan, and the goals are saved", asy
     training_intensity: "high",
     training_notes: "Musculação 1x (1h) e corrida 3x de 5 km.",
     plan_summary: "Excedente pequeno para ganhar massa.",
+    saved_plans: PLANS, // all three are kept
   });
   expect((await fetchProfile("A")).onboarding_done_at).not.toBeNull();
   await expect(page.getByText(/2800 kcal/).first()).toBeVisible(); // the day screen uses the new goal
@@ -151,7 +165,7 @@ test("each step explains what is wrong", async ({ page }) => {
 });
 
 test("without the AI, the standard calculation is shown and says so", async ({ page }) => {
-  await mockPlan(page, { ...PLAN, calories: 2210, summary: "Cálculo padrão.", source: "standard" });
+  await mockPlan(page, { ...PLAN, summary: "Cálculo padrão.", source: "standard" });
   await signIn(page, "A");
   await fillAboutYou(page);
   await next(page).click();
@@ -162,8 +176,8 @@ test("without the AI, the standard calculation is shown and says so", async ({ p
   await next(page).click();
   await page.getByRole("button", { name: /^Moderada/ }).click();
   await page.getByRole("button", { name: "Calcular o meu plano" }).click();
-  await expect(page.getByTestId("plan-calories")).toHaveText("2210");
-  await expect(page.getByRole("status").filter({ hasText: "usei um cálculo padrão" })).toBeVisible();
+  await expect(page.getByTestId("plan-calories")).toHaveText("2300"); // lose weight was chosen
+  await expect(page.getByRole("status").filter({ hasText: "Cálculo padrão" })).toBeVisible();
 });
 
 test("a failed calculation shows the error and can be tried again", async ({ page }) => {
@@ -183,7 +197,7 @@ test("a failed calculation shows the error and can be tried again", async ({ pag
   await page.unroute("**/api/ai/plan");
   await mockPlan(page);
   await page.getByRole("button", { name: "Calcular o meu plano" }).click();
-  await expect(page.getByTestId("plan-calories")).toHaveText("2800");
+  await expect(page.getByTestId("plan-calories")).toHaveText("2600");
 });
 
 test("Perfil: the button redoes the plan with the saved answers, 'Cancelar' changes nothing", async ({ page }) => {
@@ -212,12 +226,27 @@ test("Perfil: the button redoes the plan with the saved answers, 'Cancelar' chan
   await page.getByRole("button", { name: /^Pouco ativo/ }).click();
   await next(page).click();
   await page.getByRole("button", { name: /^Moderada/ }).click();
-  await page.getByLabel("Notas sobre os teus treinos (opcional)").fill("Treino de pernas à segunda.");
+  await page.getByLabel("Notas sobre os treinos (opcional)").fill("Treino de pernas à segunda.");
   await page.getByRole("button", { name: "Calcular o meu plano" }).click();
-  await page.getByRole("button", { name: "Usar e ajustar à mão" }).click();
+  await page.getByRole("button", { name: "Usar e ajustar" }).click();
   await expect(page).toHaveURL(/\/perfil$/);
   await expect(page.getByLabel("Calorias diárias", { exact: true })).toHaveValue("2800");
   await expect(page.getByLabel("Proteína (g)", { exact: true })).toHaveValue("150");
+
+  // the other goals use their own saved plan: no new questionnaire
+  await page.getByRole("radio", { name: /Perder peso/ }).check({ force: true });
+  await expect(page.getByLabel("Calorias diárias", { exact: true })).toHaveValue("2300");
+  await expect(page.getByLabel("Proteína (g)", { exact: true })).toHaveValue("160");
+  await expect(page.getByLabel("Hidratos (g)", { exact: true })).toHaveValue("260");
+  await expect(page.getByLabel("Gordura (g)", { exact: true })).toHaveValue("70");
+  await page.getByRole("radio", { name: /Manter peso/ }).check({ force: true });
+  await expect(page.getByLabel("Calorias diárias", { exact: true })).toHaveValue("2600");
+  await page.getByRole("button", { name: "Guardar objetivos" }).click();
+  await expect(page.getByText("Objetivos guardados")).toBeVisible();
+  expect(await fetchProfile("A")).toMatchObject({ mode: "maintain", goal_calories: 2600, goal_protein: 150, goal_carbs: 300, goal_fat: 80 });
+  expect(await fetchProfile("A")).toMatchObject({ saved_plans: PLANS }); // still there to switch back
+  await page.getByRole("radio", { name: /Ganhar massa/ }).check({ force: true });
+  await expect(page.getByLabel("Calorias diárias", { exact: true })).toHaveValue("2800");
   await expect(page.getByTestId("plan-card")).toContainText("Excedente pequeno para ganhar massa.");
   await expect(page.getByTestId("plan-card").getByRole("link", { name: "Refazer o meu plano" })).toBeVisible();
 
@@ -232,6 +261,6 @@ test("Perfil: the button redoes the plan with the saved answers, 'Cancelar' chan
   await expect(page.getByRole("button", { name: /^Pouco ativo/ })).toHaveAttribute("aria-pressed", "true");
   await next(page).click();
   await expect(page.getByRole("button", { name: /^Moderada/ })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByLabel("Notas sobre os teus treinos (opcional)")).toHaveValue("Treino de pernas à segunda.");
+  await expect(page.getByLabel("Notas sobre os treinos (opcional)")).toHaveValue("Treino de pernas à segunda.");
   await expect(page.getByLabel("Treinos aeróbicos por semana", { exact: true })).toHaveValue("2");
 });
