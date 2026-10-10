@@ -51,16 +51,16 @@ test("lists foods and meals with counts and usage, and filters them without acce
 test("editing from the tab can update the whole diary history", async ({ page }) => {
   const today = toDateKey(new Date());
   const yesterday = addDays(today, -1);
-  const food = await seedSavedFood("A", { name: "Pão E2E", calories_100g: 250, protein_100g: 9, carbs_100g: 48, fat_100g: 3 });
+  const food = await seedSavedFood("A", { name: "Pão E2E com sementes de girassol linhaça e abóbora muito longo", calories_100g: 250, protein_100g: 9, carbs_100g: 48, fat_100g: 3 });
   const entry = (date: string) => ({
-    entry_date: date, meal: "breakfast", kind: "food", name: "Pão E2E", quantity_g: 50,
+    entry_date: date, meal: "breakfast", kind: "food", name: "Pão E2E com sementes de girassol linhaça e abóbora muito longo", quantity_g: 50,
     calories: 125, protein_g: 4.5, carbs_g: 24, fat_g: 1.5, saved_food_id: food.id,
   });
   await seedDiary("A", [entry(yesterday), entry(today)]);
   await login(page, "A");
   await openSaved(page);
 
-  await page.getByRole("button", { name: "Abrir Pão E2E" }).click();
+  await page.getByRole("button", { name: "Abrir Pão E2E com sementes de girassol linhaça e abóbora muito longo" }).click();
   await page.getByRole("button", { name: "Editar", exact: true }).click();
   await page.getByLabel("Calorias").fill("200");
   await page.getByRole("button", { name: "Guardar" }).click();
@@ -206,7 +206,7 @@ test("new food: the search fills the form, the values can be changed before savi
   await page.route("**/api/food-search**", (route) =>
     route.fulfill({
       json: {
-        results: [{ id: "560", source: "off", name: "Pão E2E", brand: "Padaria", off_code: "560", calories_100g: 265, protein_100g: 9, carbs_100g: 49, fat_100g: 3.2 }],
+        results: [{ id: "560", source: "off", name: "Pão E2E com sementes de girassol linhaça e abóbora muito longo", brand: "Padaria", off_code: "560", calories_100g: 265, protein_100g: 9, carbs_100g: 49, fat_100g: 3.2 }],
         page: 1,
         pageCount: 1,
         total: 1,
@@ -220,15 +220,19 @@ test("new food: the search fills the form, the values can be changed before savi
   await page.getByRole("button", { name: "Novo alimento" }).click();
   await page.getByRole("dialog").getByRole("searchbox", { name: "Pesquisar alimento" }).fill("pao e2e");
   await page.getByRole("button", { name: /^Open Food Facts · / }).click();
-  await page.getByRole("button", { name: "Escolher Pão E2E" }).click();
+  // the keyboard closes by itself once the search ran, and the dialog never grows wider than the screen
+  await expect(page.getByRole("button", { name: "Escolher Pão E2E com sementes de girassol linhaça e abóbora muito longo" })).toBeVisible();
+  await expect(page.getByRole("dialog").getByRole("searchbox", { name: "Pesquisar alimento" })).not.toBeFocused();
+  expect(await page.getByRole("dialog").evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+  await page.getByRole("button", { name: "Escolher Pão E2E com sementes de girassol linhaça e abóbora muito longo" }).click();
 
-  await expect(page.getByLabel("Nome", { exact: true })).toHaveValue("Pão E2E");
+  await expect(page.getByLabel("Nome", { exact: true })).toHaveValue("Pão E2E com sementes de girassol linhaça e abóbora muito longo");
   await expect(page.getByLabel("Marca (opcional)")).toHaveValue("Padaria");
   await expect(page.getByLabel("Calorias (kcal)")).toHaveValue("265");
   await page.getByLabel("Calorias (kcal)").fill("270");
   await page.getByRole("button", { name: "Guardar" }).click();
-  await expect(page.getByTestId("saved-foods")).toContainText("Pão E2E");
-  expect(await fetchSavedFoods("A")).toMatchObject([{ name: "Pão E2E", brand: "Padaria", calories_100g: 270, protein_100g: 9, carbs_100g: 49, fat_100g: 3.2 }]);
+  await expect(page.getByTestId("saved-foods")).toContainText("Pão E2E com sementes de girassol linhaça e abóbora muito longo");
+  expect(await fetchSavedFoods("A")).toMatchObject([{ name: "Pão E2E com sementes de girassol linhaça e abóbora muito longo", brand: "Padaria", calories_100g: 270, protein_100g: 9, carbs_100g: 49, fat_100g: 3.2 }]);
 });
 
 test("new food: the AI fills the form per 100 g of the total weight", async ({ page }) => {
@@ -250,7 +254,8 @@ test("new food: the AI fills the form per 100 g of the total weight", async ({ p
   await page.getByRole("dialog").getByRole("button", { name: "Com IA" }).click();
   await page.getByLabel("O que comeste?").fill("frango com arroz");
   await page.getByRole("button", { name: "Analisar" }).click();
-  await page.getByRole("button", { name: "Usar estes valores" }).click();
+  await expect(page.getByText("Isto é uma refeição com vários alimentos")).toBeVisible();
+  await page.getByRole("button", { name: "Usar na mesma" }).click();
 
   await expect(page.getByLabel("Nome", { exact: true })).toHaveValue("Frango com arroz");
   await expect(page.getByLabel("Calorias (kcal)")).toHaveValue("148"); // 295 kcal / 200 g

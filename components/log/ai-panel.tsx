@@ -24,15 +24,18 @@ interface AiPanelProps {
   onClose: () => void;
   onAdded?: (message: string, day: string) => void;
   /** Instead of logging, hand the result back (used while creating a saved meal or food). */
-  onUse?: (result: { name: string; items: FoodItem[] }, close: () => void) => void;
+  onUse?: (result: { name: string; kind: "food" | "meal"; items: FoodItem[] }, close: () => void) => void;
   /** A single food (not a meal): hand it over per 100 g with the estimated grams, to be added like a searched food. */
   onFood?: (food: FoodSearchResult, grams: number) => void;
-  useLabel?: string;
+  /** Button text for each kind of result (a single food or a whole meal). */
+  useLabels?: { food: string; meal: string };
+  /** Shown under a whole-meal result when `onUse` only wants one food. */
+  mealNote?: string;
 }
 
-type Result = { name: string; items: FoodItem[] };
+type Result = { name: string; kind: "food" | "meal"; items: FoodItem[] };
 
-export function AiPanel({ userId, initialTarget, now, onClose, onAdded, onUse, onFood, useLabel = "Usar" }: AiPanelProps) {
+export function AiPanel({ userId, initialTarget, now, onClose, onAdded, onUse, onFood, useLabels = { food: "Usar", meal: "Usar" }, mealNote }: AiPanelProps) {
   const [text, setText] = useState("");
   const [photo, setPhoto] = useState<AiImage | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -52,7 +55,7 @@ export function AiPanel({ userId, initialTarget, now, onClose, onAdded, onUse, o
         onFood({ id: `ai-${Date.now()}`, source: "off", name: response.name, ...per100 }, item.quantity_g);
         return;
       }
-      setResult({ name: response.name, items: response.items });
+      setResult({ name: response.name, kind: response.kind, items: response.items });
     }
     else setError(response.message);
   }
@@ -69,7 +72,7 @@ export function AiPanel({ userId, initialTarget, now, onClose, onAdded, onUse, o
             {editing
               ? "Corrige o nome, as quantidades ou remove itens."
               : result
-                ? "Estimativa da IA: confirma os valores antes de guardar."
+                ? `${result.kind === "food" ? "Alimento" : `Refeição com ${result.items.length} ${result.items.length === 1 ? "alimento" : "alimentos"}`} · estimativa da IA: confirma os valores.`
                 : "Descreve o que comeste ou tira uma foto do prato."}
           </SheetDescription>
         </SheetHeader>
@@ -117,8 +120,9 @@ export function AiPanel({ userId, initialTarget, now, onClose, onAdded, onUse, o
               </ul>
               {onUse || !initialTarget || !now || !onAdded ? (
                 <>
+                  {result.kind === "meal" && mealNote && <p className="text-sm text-muted-foreground">{mealNote}</p>}
                   <Button type="button" size="lg" className="h-11" onClick={() => onUse?.(result, onClose)}>
-                    {useLabel}
+                    {useLabels[result.kind]}
                   </Button>
                   <Button type="button" variant="ghost" className="h-11" onClick={() => setResult(null)}>
                     Tentar outra vez
@@ -153,7 +157,7 @@ export function AiPanel({ userId, initialTarget, now, onClose, onAdded, onUse, o
                 disabled={!editedItems || !editedName}
                 onClick={() => {
                   if (!editedItems) return;
-                  setResult({ name: editedName, items: editedItems });
+                  setResult({ kind: result?.kind ?? "meal", name: editedName, items: editedItems });
                   setEditing(null);
                 }}
               >

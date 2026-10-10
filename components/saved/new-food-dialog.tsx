@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { AiPanel } from "@/components/log/ai-panel";
 import { BarcodeScannerDialog } from "@/components/log/barcode-scanner-dialog";
 import { FoodSearch } from "@/components/log/food-search";
@@ -36,6 +36,7 @@ export function NewFoodDialog({ userId, foods, onClose }: { userId: string; food
   const [panel, setPanel] = useState<"scan" | "ai" | null>(null);
   const [fillNote, setFillNote] = useState<string | null>(null);
   const [searchKey, setSearchKey] = useState(0); // remounts the search to clear it after a pick
+  const contentRef = useRef<HTMLDivElement>(null);
   const [touched, setTouched] = useState(false);
   const [duplicate, setDuplicate] = useState(false);
   const create = useCreateSavedFood(userId);
@@ -60,13 +61,14 @@ export function NewFoodDialog({ userId, foods, onClose }: { userId: string; food
       carbs_100g: String(next.carbs_100g),
       fat_100g: String(next.fat_100g),
     });
-    setFillNote("Preenchido: confirma os valores e guarda.");
+    setFillNote(`Preenchido com «${next.name}»: confirma os valores e guarda.`);
+    contentRef.current?.scrollTo({ top: 0 });
     setDuplicate(false);
     setPanel(null);
     setSearchKey((k) => k + 1);
   }
 
-  function fillFromAi(result: { name: string; items: FoodItem[] }, close: () => void) {
+  function fillFromAi(result: { name: string; kind: "food" | "meal"; items: FoodItem[] }, close: () => void) {
     const per100 = per100gFromItems(result.items);
     close();
     if (!per100) return setFillNote(NO_GRAMS);
@@ -86,7 +88,7 @@ export function NewFoodDialog({ userId, foods, onClose }: { userId: string; food
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[90dvh] max-w-sm overflow-y-auto">
+      <DialogContent ref={contentRef} className="max-h-[90dvh] max-w-sm overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Novo alimento</DialogTitle>
           <DialogDescription>Preenche à mão (valores por 100 g, como no rótulo) ou procura acima.</DialogDescription>
@@ -141,7 +143,7 @@ export function NewFoodDialog({ userId, foods, onClose }: { userId: string; food
         </form>
       </DialogContent>
       <BarcodeScannerDialog open={panel === "scan"} onOpenChange={(open) => !open && setPanel((p) => (p === "scan" ? null : p))} onFound={fill} />
-      {panel === "ai" && <AiPanel userId={userId} onClose={() => setPanel(null)} onUse={fillFromAi} useLabel="Usar estes valores" />}
+      {panel === "ai" && <AiPanel userId={userId} onClose={() => setPanel(null)} onUse={fillFromAi} useLabels={{ food: "Usar estes valores", meal: "Usar na mesma" }} mealNote="Isto é uma refeição com vários alimentos: os valores seriam por 100 g do conjunto. Para uma refeição usa «Nova refeição»; ou descreve só um alimento." />}
     </Dialog>
   );
 }

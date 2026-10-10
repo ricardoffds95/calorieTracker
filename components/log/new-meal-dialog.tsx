@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { AiPanel } from "@/components/log/ai-panel";
 import { BarcodeScannerDialog } from "@/components/log/barcode-scanner-dialog";
 import { FoodSearch } from "@/components/log/food-search";
+import { JoinFoodSheet } from "@/components/log/join-food-sheet";
 import { ItemsEditor, fromEditable, toEditable, type EditableItem } from "@/components/log/items-editor";
 import { MealActions } from "@/components/log/meal-actions";
 import { PortionTotalsFields, portionItems, type PortionTotals } from "@/components/log/portion-totals-fields";
@@ -27,8 +28,6 @@ interface NewMealDialogProps {
   onSaved?: (meal: SavedMeal) => void;
 }
 
-const DEFAULT_GRAMS = 100;
-
 type Panel = "scan" | "ai" | null;
 
 export function NewMealDialog({ userId, initialTarget, now, foods, onClose, onAdded, onSaved }: NewMealDialogProps) {
@@ -36,6 +35,8 @@ export function NewMealDialog({ userId, initialTarget, now, foods, onClose, onAd
   const [name, setName] = useState("");
   const [searching, setSearching] = useState(false);
   const [panel, setPanel] = useState<Panel>(null);
+  const [picked, setPicked] = useState<FoodSearchResult | null>(null); // a food waiting for its quantity
+  const contentRef = useRef<HTMLDivElement>(null);
   const [searchKey, setSearchKey] = useState(0); // remounts the search to clear it after a pick
   const [rows, setRows] = useState<EditableItem[]>([]);
   const [totals, setTotals] = useState<PortionTotals>({ calories: "", protein_g: "0", carbs_g: "0", fat_g: "0" });
@@ -43,23 +44,25 @@ export function NewMealDialog({ userId, initialTarget, now, foods, onClose, onAd
   const trimmed = name.trim();
   const items = mode === "foods" ? fromEditable(rows) : portionItems(trimmed, totals);
 
-  // A food from the search, the scanner or the AI joins with 100 g (changed in the list below).
-  function addFood(food: FoodSearchResult) {
-    const item = { name: food.name, quantity_g: DEFAULT_GRAMS, ...scaleFromPer100g(food, DEFAULT_GRAMS) };
+  // A food from the search or the scanner asks its quantity first; the AI brings its own grams.
+  function joinFood(food: FoodSearchResult, grams: number) {
+    const item = { name: food.name, quantity_g: grams, ...scaleFromPer100g(food, grams) };
     setRows((r) => [...r, ...toEditable([item])]);
-    setPanel(null);
+    setPicked(null);
     setSearchKey((k) => k + 1);
+    contentRef.current?.scrollTo({ top: 0 });
   }
 
-  function addAiItems(result: { name: string; items: FoodItem[] }, close: () => void) {
+  function addAiItems(result: { name: string; kind: "food" | "meal"; items: FoodItem[] }, close: () => void) {
     setRows((r) => [...r, ...toEditable(result.items)]);
-    setName((current) => current || result.name);
+    if (result.kind === "meal") setName((current) => current || result.name); // a single food does not name the meal
     close();
+    contentRef.current?.scrollTo({ top: 0 });
   }
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[90dvh] max-w-sm overflow-y-auto">
+      <DialogContent ref={contentRef} className="max-h-[90dvh] max-w-sm overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Nova refeição</DialogTitle>
           <DialogDescription>Uma porção é a soma dos alimentos, ou os valores que indicares.</DialogDescription>
@@ -88,7 +91,7 @@ export function NewMealDialog({ userId, initialTarget, now, foods, onClose, onAd
 
           {mode === "foods" ? (
             <>
-              <FoodSearch key={searchKey} saved={foods} onPick={addFood} onScan={() => setPanel("scan")} onAi={() => setPanel("ai")} onSearchingChange={setSearching} />
+              <FoodSearch key={searchKey} saved={foods} onPick={(food) => setPicked(food)} onScan={() => setPanel("scan")} onAi={() => setPanel("ai")} onSearchingChange={setSearching} />
               {!searching &&
                 (rows.length > 0 ? (
                   <ItemsEditor rows={rows} onChange={setRows} />
@@ -117,9 +120,10 @@ export function NewMealDialog({ userId, initialTarget, now, foods, onClose, onAd
           )}
         </div>
       </DialogContent>
-      <BarcodeScannerDialog open={panel === "scan"} onOpenChange={(open) => !open && setPanel((p) => (p === "scan" ? null : p))} onFound={addFood} />
+      <BarcodeScannerDialog open={panel === "scan"} onOpenChange={(open) => !open && setPanel((p) => (p === "scan" ? null : p))} onFound={(food) => setPicked(food)} />
+      {picked && <JoinFoodSheet food={picked} onJoin={(grams) => joinFood(picked, grams)} onClose={() => setPicked(null)} />}
       {panel === "ai" && (
-        <AiPanel userId={userId} onClose={() => setPanel(null)} onUse={addAiItems} useLabel="Juntar à refeição" />
+        <AiPanel userId={userId} onClose={() => setPanel(null)} onUse={addAiItems} useLabels={{ food: "Juntar alimento", meal: "Usar refeição completa" }} />
       )}
     </Dialog>
   );

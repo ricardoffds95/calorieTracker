@@ -53,6 +53,11 @@ export function FoodSearch({ saved, onPick, onScan, onAi, onSearchingChange, chi
   const searching = term.length >= MIN_QUERY_LENGTH;
   const current = view.term === term ? view : { term, savedPage: 1, offPage: 1 };
 
+  // A search running (pause in typing, button, Enter) closes the keyboard so the results are visible.
+  useEffect(() => {
+    if (searching) inputRef.current?.blur();
+  }, [term, searching]);
+
   useEffect(() => {
     onSearchingChange?.(searching);
   }, [searching, onSearchingChange]);

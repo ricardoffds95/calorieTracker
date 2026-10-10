@@ -560,7 +560,7 @@ test("new meal by values per portion: 1.5 portions, shown without grams on Today
   await expect(row.getByText(/ g$/)).toHaveCount(0);
 });
 
-test("new meal: a food from the Open Food Facts search joins with 100 g", async ({ page }) => {
+test("new meal: a food from the Open Food Facts search asks its quantity", async ({ page }) => {
   await mockOff(page);
   await login(page, "A");
   await openLog(page);
@@ -570,9 +570,11 @@ test("new meal: a food from the Open Food Facts search joins with 100 g", async 
   await page.getByRole("dialog").getByRole("searchbox", { name: "Pesquisar alimento" }).fill("arroz teste e2e");
   await offTab(page).click();
   await page.getByRole("button", { name: "Escolher Arroz Teste E2E" }).click();
-  await expect(page.getByLabel("Quantidade de Arroz Teste E2E (g)")).toHaveValue("100");
+  await typeGrams(page, "200");
+  await page.getByRole("button", { name: "Juntar à refeição" }).click();
+  await expect(page.getByLabel("Quantidade de Arroz Teste E2E (g)")).toHaveValue("200");
   await page.getByLabel("Nome da refeição").fill("Arroz simples");
-  await expect(page.getByTestId("nutrient-summary")).toContainText("130");
+  await expect(page.getByTestId("nutrient-summary")).toContainText("260");
 });
 
 test("AI knows a single food from a meal: it opens the food sheet with the estimated grams and saves it as a food", async ({ page }) => {
@@ -614,7 +616,8 @@ test("new meal: the AI result joins the meal and names it", async ({ page }) => 
   await page.getByRole("dialog").getByRole("button", { name: "Com IA" }).click();
   await page.getByLabel("O que comeste?").fill("frango com arroz");
   await page.getByRole("button", { name: "Analisar" }).click();
-  await page.getByRole("button", { name: "Juntar à refeição" }).click();
+  await expect(page.getByText("Refeição com 2 alimentos")).toBeVisible();
+  await page.getByRole("button", { name: "Usar refeição completa" }).click();
 
   await expect(page.getByLabel("Nome da refeição")).toHaveValue("Frango com arroz");
   await expect(page.getByLabel("Quantidade de Frango grelhado (g)")).toHaveValue("150");
@@ -633,9 +636,11 @@ test("new meal by joining saved foods: totals are the sum of the foods", async (
   await page.getByLabel("Nome da refeição").fill("Papas E2E");
   await page.getByRole("dialog").getByRole("searchbox", { name: "Pesquisar alimento" }).fill("aveia");
   await page.getByRole("button", { name: "Escolher Aveia E2E" }).click();
+  await page.getByRole("button", { name: "Juntar à refeição" }).click();
   await page.getByLabel("Quantidade de Aveia E2E (g)").fill("60");
   await page.getByRole("dialog").getByRole("searchbox", { name: "Pesquisar alimento" }).fill("leite");
   await page.getByRole("button", { name: "Escolher Leite E2E" }).click();
+  await page.getByRole("button", { name: "Juntar à refeição" }).click();
   await page.getByLabel("Quantidade de Leite E2E (g)").fill("250");
   await expect(page.getByTestId("nutrient-summary")).toContainText("343"); // 228 + 115
   await page.getByRole("button", { name: "Guardar nas refeições" }).click();
