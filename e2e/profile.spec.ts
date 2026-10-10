@@ -199,6 +199,10 @@ test("Gerir perfil: the name and the personal data are edited by hand, at the bo
     // after the goals, before the account; closed until opened
     const goalsY = (await save(page).boundingBox())!.y;
     expect((await manage.boundingBox())!.y).toBeGreaterThan(goalsY);
+    // one card for the account (e-mail, manage profile, sign out); the nutrition plan comes last
+    await expect(manage.getByTestId("user-email")).toBeVisible();
+    await expect(manage.getByRole("button", { name: "Sair" })).toBeVisible();
+    expect((await page.getByTestId("plan-card").boundingBox())!.y).toBeGreaterThan((await manage.boundingBox())!.y);
     await expect(page.getByLabel("Nome", { exact: true })).toHaveCount(0);
     await manage.getByRole("button", { name: /Gerir perfil/ }).click();
 

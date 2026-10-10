@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useProfile } from "@/lib/queries/profile";
 import { cn } from "@/lib/utils";
 
-export function ProfileScreen({ userId }: { userId: string }) {
+export function ProfileScreen({ userId, email }: { userId: string; email: string }) {
   const { data, isPending, isError } = useProfile(userId);
 
   return (
@@ -23,6 +23,8 @@ export function ProfileScreen({ userId }: { userId: string }) {
           Não foi possível carregar o perfil.
         </p>
       )}
+      {data && <ProfileForm profile={data} />}
+      {data && <ManageProfile profile={data} email={email} />}
       {data && (
         <Card data-testid="plan-card">
           <CardHeader>
@@ -39,8 +41,6 @@ export function ProfileScreen({ userId }: { userId: string }) {
           </CardContent>
         </Card>
       )}
-      {data && <ProfileForm profile={data} />}
-      {data && <ManageProfile profile={data} />}
     </div>
   );
 }
