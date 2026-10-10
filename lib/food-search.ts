@@ -20,13 +20,16 @@ export interface OffProduct {
   product_name_en?: string;
   product_name_es?: string;
   product_name_fr?: string;
-  brands?: string;
+  /** A string in the old API ("A,B"), a list in the newer one. */
+  brands?: string | string[];
   serving_size?: string;
   nutriments?: Record<string, unknown>;
 }
 
+export type FoodSearchErrorKind = "network" | "http" | "timeout" | "unavailable" | "unauthorized";
+
 export class FoodSearchError extends Error {
-  constructor(message: string, readonly kind: "network" | "http" | "timeout") {
+  constructor(message: string, readonly kind: FoodSearchErrorKind) {
     super(message);
     this.name = "FoodSearchError";
   }
@@ -43,7 +46,10 @@ export interface SearchCache {
 }
 
 export const SEARCH_CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
+/** Saved foods are filtered locally from this many letters. */
 export const MIN_QUERY_LENGTH = 2;
+/** Open Food Facts is only asked from this many letters (shorter queries return noise and waste requests). */
+export const OFF_MIN_QUERY_LENGTH = 3;
 
 const OFF_FIELDS =
   "code,product_name,product_name_pt,product_name_en,product_name_es,product_name_fr,brands,nutriments,serving_size";
@@ -81,7 +87,7 @@ export function mapProduct(product: OffProduct): FoodSearchResult {
     id: product.code ?? "",
     source: "off",
     name,
-    brand: product.brands?.trim() || undefined,
+    brand: formatBrands(product.brands),
     off_code: product.code,
     calories_100g: roundCalories(kcal),
     protein_100g: roundMacro(pick(nutriments, "proteins_100g", "protein_100g", "proteins") ?? 0),
@@ -91,8 +97,18 @@ export function mapProduct(product: OffProduct): FoodSearchResult {
   };
 }
 
+function formatBrands(brands: OffProduct["brands"]): string | undefined {
+  const list = Array.isArray(brands) ? brands : (brands ?? "").split(",");
+  const text = list
+    .map((b) => b.trim())
+    .filter(Boolean)
+    .slice(0, 2)
+    .join(", ");
+  return text || undefined;
+}
+
 /** Products without a name or without any energy are not useful to log. */
-function isUsable(result: FoodSearchResult): boolean {
+export function isUsable(result: FoodSearchResult): boolean {
   return result.name.length > 0 && result.calories_100g > 0;
 }
 
@@ -131,37 +147,49 @@ export interface SearchOffOptions extends FetchOptions {
   ttlMs?: number;
 }
 
+const SEARCH_ENDPOINT = "/api/food-search";
+// The server tries twice (8 s each) before giving up.
+const SEARCH_TIMEOUT_MS = 20_000;
+
+export const FOOD_SEARCH_MESSAGES: Record<"network" | "timeout" | "unavailable" | "unauthorized" | "http", string> = {
+  network: "Sem ligação. Verifica a internet e tenta novamente.",
+  timeout: "A pesquisa demorou demasiado. Tenta novamente.",
+  unavailable: "O Open Food Facts não respondeu. Tenta daqui a pouco ou insere manualmente.",
+  unauthorized: "Sessão expirada. Entra novamente.",
+  http: "Erro ao pesquisar alimento. Tenta novamente.",
+};
+
+/** Searches Open Food Facts through our server (`/api/food-search`), which retries and shares a cache. */
 export async function searchOpenFoodFacts(
   query: string,
   options: SearchOffOptions = {},
 ): Promise<{ results: FoodSearchResult[]; fromCache: boolean }> {
   const normalized = normalizeQuery(query);
-  if (normalized.length < MIN_QUERY_LENGTH) return { results: [], fromCache: false };
+  if (normalized.length < OFF_MIN_QUERY_LENGTH) return { results: [], fromCache: false };
 
-  const { cache, now = Date.now, ttlMs = SEARCH_CACHE_TTL_MS } = options;
+  const { cache, now = Date.now, ttlMs = SEARCH_CACHE_TTL_MS, fetch: fetchFn = fetch, signal } = options;
   const cached = await cache?.get(normalized);
   if (cached && now() - cached.timestamp < ttlMs) return { results: cached.results, fromCache: true };
 
-  const url =
-    "https://world.openfoodfacts.org/cgi/search.pl?" +
-    new URLSearchParams({
-      search_terms: normalized,
-      search_simple: "1",
-      action: "process",
-      json: "1",
-      fields: OFF_FIELDS,
-      lc: "pt",
-      page_size: "20",
+  const timeout = AbortSignal.timeout(SEARCH_TIMEOUT_MS);
+  let response: Response;
+  try {
+    response = await fetchFn(`${SEARCH_ENDPOINT}?${new URLSearchParams({ q: normalized })}`, {
+      signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
     });
-  const data = (await getJson(url, options, 15_000)) as { products?: OffProduct[] };
+  } catch (error) {
+    if (signal?.aborted) throw error; // caller cancelled (e.g. new keystroke): not an error to show
+    throw new FoodSearchError(FOOD_SEARCH_MESSAGES[timeout.aborted ? "timeout" : "network"], timeout.aborted ? "timeout" : "network");
+  }
+  if (response.status === 401) throw new FoodSearchError(FOOD_SEARCH_MESSAGES.unauthorized, "unauthorized");
+  if (response.status === 503) throw new FoodSearchError(FOOD_SEARCH_MESSAGES.unavailable, "unavailable");
+  if (!response.ok) throw new FoodSearchError(FOOD_SEARCH_MESSAGES.http, "http");
 
-  const results = (data.products ?? [])
-    .filter((p) => p.nutriments)
-    .map(mapProduct)
-    .filter(isUsable);
+  const data = (await response.json().catch(() => null)) as { results?: FoodSearchResult[] } | null;
+  if (!data || !Array.isArray(data.results)) throw new FoodSearchError(FOOD_SEARCH_MESSAGES.http, "http");
 
-  await cache?.set(normalized, { results, timestamp: now() });
-  return { results, fromCache: false };
+  await cache?.set(normalized, { results: data.results, timestamp: now() });
+  return { results: data.results, fromCache: false };
 }
 
 /** A product barcode (EAN/UPC): 8 to 14 digits. */

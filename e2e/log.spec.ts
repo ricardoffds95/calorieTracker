@@ -19,23 +19,27 @@ const clearAll = () => Promise.all([clearDiary("A"), clearDiary("B"), clearSaved
 test.beforeEach(clearAll);
 test.afterAll(clearAll);
 
-/** Open Food Facts is mocked: no rate limits, stable data. */
+const ARROZ = {
+  id: "5601234567890",
+  source: "off",
+  name: "Arroz Teste E2E",
+  brand: "Marca Teste",
+  off_code: "5601234567890",
+  serving_size: "75 g",
+  calories_100g: 130,
+  protein_100g: 2.7,
+  carbs_100g: 28.2,
+  fat_100g: 0.3,
+};
+
+/** Our search route is mocked (no Open Food Facts quota, stable data); returns the queries it received. */
 async function mockOff(page: Page) {
-  await page.route("https://world.openfoodfacts.org/**", (route) =>
-    route.fulfill({
-      json: {
-        products: [
-          {
-            code: "5601234567890",
-            product_name: "Arroz Teste E2E",
-            brands: "Marca Teste",
-            serving_size: "75 g",
-            nutriments: { "energy-kcal_100g": 130, proteins_100g: 2.7, carbohydrates_100g: 28.2, fat_100g: 0.3 },
-          },
-        ],
-      },
-    }),
-  );
+  const queries: string[] = [];
+  await page.route("**/api/food-search**", (route) => {
+    queries.push(new URL(route.request().url()).searchParams.get("q") ?? "");
+    return route.fulfill({ json: { results: [ARROZ] } });
+  });
+  return queries;
 }
 
 async function openLog(page: Page, date = DAY, meal = "lunch") {
@@ -70,6 +74,81 @@ test("search → add 150 g: diary row, auto-saved food with times_used and the T
 
   await page.goto(`/?d=${DAY}`);
   await expect(page.getByTestId("meal-lunch-kcal")).toHaveText("195 kcal");
+});
+
+test("pausing while typing never searches below 3 letters, and typing on makes a single request", async ({ page }) => {
+  const queries = await mockOff(page);
+  await login(page, "A");
+  await openLog(page);
+  const box = page.getByRole("searchbox", { name: "Pesquisar alimento" });
+
+  await box.fill("ar");
+  await page.waitForTimeout(1_000); // longer than the debounce
+  expect(queries).toEqual([]);
+  await expect(page.getByText("Escreve pelo menos 3 letras")).toBeVisible();
+
+  await box.pressSequentially("roz teste", { delay: 60 }); // typed on without pausing
+  await expect(page.getByRole("button", { name: "Escolher Arroz Teste E2E" })).toBeVisible();
+  expect(queries).toEqual(["arroz teste"]);
+});
+
+test("matching saved foods are enough: Open Food Facts is only asked on request", async ({ page }) => {
+  await seedSavedFood("A", { name: "Iogurte grego E2E", calories_100g: 97, protein_100g: 9, carbs_100g: 4, fat_100g: 5 });
+  const queries = await mockOff(page);
+  await login(page, "A");
+  await openLog(page);
+  const box = page.getByRole("searchbox", { name: "Pesquisar alimento" });
+
+  await box.fill("iogurte");
+  await expect(page.getByRole("button", { name: "Escolher Iogurte grego E2E" })).toBeVisible();
+  await page.waitForTimeout(1_000); // longer than the debounce
+  expect(queries).toEqual([]);
+  await expect(page.getByRole("button", { name: "Escolher Arroz Teste E2E" })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Pesquisar no Open Food Facts" }).click();
+  await expect(page.getByRole("button", { name: "Escolher Arroz Teste E2E" })).toBeVisible();
+  expect(queries).toEqual(["iogurte"]);
+  await expect(page.getByRole("button", { name: "Escolher Iogurte grego E2E" })).toBeVisible(); // saved stays first
+
+  // nothing saved matches: it goes online by itself
+  await box.fill("queijo");
+  await expect.poll(() => queries).toEqual(["iogurte", "queijo"]); // previous results stay on screen meanwhile
+});
+
+test("when Open Food Facts is down: clear message, saved foods stay, and 'Tentar novamente' recovers", async ({ page }) => {
+  await seedSavedFood("A", { name: "Arroz guardado E2E", calories_100g: 120, protein_100g: 2.5, carbs_100g: 26, fat_100g: 0.3 });
+  let down = true;
+  await page.route("**/api/food-search**", (route) =>
+    down ? route.fulfill({ status: 503, json: { error: "off_unavailable" } }) : route.fulfill({ json: { results: [ARROZ] } }),
+  );
+  await login(page, "A");
+  await openLog(page);
+
+  await page.getByRole("searchbox", { name: "Pesquisar alimento" }).fill("arroz");
+  await page.getByRole("button", { name: "Pesquisar no Open Food Facts" }).click(); // the saved "Arroz" already matches
+  const problem = page.getByRole("alert").filter({ hasText: "O Open Food Facts não respondeu" }); // Next.js adds its own empty alert
+  await expect(problem).toBeVisible();
+  await expect(page.getByText("Sem ligação")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Escolher Arroz guardado E2E" })).toBeVisible();
+
+  down = false;
+  await page.getByRole("button", { name: "Tentar novamente" }).click();
+  await expect(page.getByRole("button", { name: "Escolher Arroz Teste E2E" })).toBeVisible();
+  await expect(problem).toHaveCount(0);
+});
+
+test.describe("live Open Food Facts", () => {
+  test.skip(!process.env.E2E_LIVE_OFF, "Set E2E_LIVE_OFF=1 to search the real Open Food Facts through our route");
+
+  test("'peito de frango' returns real, usable foods", async ({ page }) => {
+    await login(page, "A");
+    const response = await page.request.get("/api/food-search?q=peito%20de%20frango");
+    expect(response.status()).toBe(200);
+    const { results } = (await response.json()) as { results: { name: string; calories_100g: number }[] };
+    expect(results.length).toBeGreaterThan(3);
+    expect(results.every((r) => r.name && r.calories_100g > 0)).toBe(true);
+    expect((await page.request.get("/api/food-search?q=ar")).status()).toBe(400);
+  });
 });
 
 test("a saved meal with 2 portions stores doses and doubled items", async ({ page }) => {

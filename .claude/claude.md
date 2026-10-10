@@ -52,13 +52,15 @@ Migração de uma app React Native (Expo) de contagem de calorias e macros para 
 - O plano gratuito do Supabase pode pausar projetos inativos: confirmar as condições atuais.
 
 ## Pesquisa de alimentos
-- Ordem: 1) alimentos guardados do utilizador (instantâneo), 2) Open Food Facts, 3) opcional: USDA FoodData Central para alimentos genéricos (chave gratuita, 1000 pedidos/h por IP).
-- Pesquisa com debounce (~500 ms), chamada **do cliente** (o limite do Open Food Facts é por IP: 10 pesquisas/min e 15 leituras de produto/min). Nunca pesquisar a cada tecla.
-- Enviar `User-Agent` próprio no formato `CalorieTracker/1.0 (email)` quando possível.
+- Ordem: 1) alimentos guardados do utilizador (instantâneo, local, a partir de 2 letras), 2) Open Food Facts (a partir de **3 letras**, e **só se nenhum guardado corresponder**; havendo guardados, mostra-os e oferece o botão "Pesquisar no Open Food Facts"), 3) opcional: USDA FoodData Central para alimentos genéricos (chave gratuita, 1000 pedidos/h por IP).
+- **A pesquisa online passa pelo servidor** (`GET /api/food-search?q=`, sessão obrigatória, zod 3 a 100 letras), que chama a API nova `search.openfoodfacts.org` (`lib/off-search.ts`, `server-only`). Razões, medidas em 2026-10: a API antiga (`world.openfoodfacts.org/cgi/search.pl`) respondia 503 em ~50% dos pedidos, e esses 503 vêm **sem CORS**, pelo que o browser só via "falhou" (e a app dizia "Sem ligação"); a nova respondeu 30 em 30. A API nova não tem CORS para o nosso domínio, por isso só o servidor a pode chamar.
+- O servidor envia `User-Agent: CalorieTracker/1.0 (OFF_CONTACT_EMAIL)` (variável de ambiente, não é segredo), tem timeout de 8 s e **1 repetição** em 5xx/429/timeout. Falhando, responde 503 `off_unavailable`.
+- **Sem cache no servidor** (decisão do utilizador: não compensa); também não criar cache de pesquisas na BD. A cache é só local no browser (IndexedDB, 30 dias).
+- Limites oficiais do Open Food Facts, **por IP**: pesquisa 10/min, leitura de produto 15/min, mais limites globais que dão 503. Como o servidor partilha o IP da Vercel, manter: mínimo de 3 letras, debounce de 600 ms (nunca pesquisar a cada tecla) e a cache local do browser. A API nova não documenta limite: se for limitada, trocar a fonte atrás de `lib/off-search.ts` sem mexer na UI.
+- No cliente, `searchOpenFoodFacts` (`lib/food-search.ts`) chama a rota e mantém a cache local em IndexedDB (30 dias, é a única). Erros com mensagem própria: "Sem ligação" **só** quando o pedido falha; 503 → "O Open Food Facts não respondeu. Tenta daqui a pouco ou insere manualmente."; botão "Tentar novamente"; os guardados continuam visíveis.
 - Sempre que um alimento vindo da pesquisa é adicionado ao diário, **guardá-lo automaticamente em `saved_foods`** (por 100g), para a próxima vez não chamar a API.
-- Código de barras: leitura direta de produto no Open Food Facts.
-- Cache de pesquisas: apenas local no browser (localStorage/IndexedDB, 30 dias). **Não** criar cache partilhada na BD (risco de dados falsos entre utilizadores).
-- A API do Open Food Facts é lenta: mostrar estado de "a pesquisar" (skeleton) e os guardados primeiro. Medir a latência antes de trocar de fonte.
+- Código de barras: leitura direta de produto no Open Food Facts, **do browser** (`/api/v2/product/<código>`, limite por utilizador).
+- A API do Open Food Facts pode ser lenta: mostrar estado de "a pesquisar" (skeleton) e os guardados primeiro.
 
 ## IA (Gemini)
 - Modelo definido em variável de ambiente `GEMINI_MODEL` (nunca hardcoded). Usar um modelo estável sem sufixo `-preview` (modelos preview podem ser descontinuados e têm limites mais restritos). Atual: `gemini-3.5-flash-lite` (os 2.5 só estão acessíveis a quem já os usava, segundo a documentação em 2026-10; confirmar na lista de modelos estáveis antes de trocar).

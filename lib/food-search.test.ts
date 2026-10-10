@@ -43,6 +43,12 @@ describe("mapProduct", () => {
       serving_size: undefined,
     });
   });
+  it("accepts brands as a list (newer API) or a comma separated string (old API), at most two", () => {
+    expect(mapProduct({ ...oats, brands: ["Arroz Brilhante", " Cigala "] }).brand).toBe("Arroz Brilhante, Cigala");
+    expect(mapProduct({ ...oats, brands: "A,B,C" }).brand).toBe("A, B");
+    expect(mapProduct({ ...oats, brands: [] }).brand).toBeUndefined();
+    expect(mapProduct({ ...oats, brands: undefined }).brand).toBeUndefined();
+  });
   it("converts kJ to kcal when kcal is missing", () => {
     expect(mapProduct({ code: "1", product_name: "X", nutriments: { energy_100g: 1046 } }).calories_100g).toBe(250);
   });
@@ -63,35 +69,26 @@ describe("mapProduct", () => {
   });
 });
 
-describe("searchOpenFoodFacts", () => {
-  const body = {
-    products: [
-      oats,
-      { code: "2", product_name: "No nutriments" },
-      { code: "3", product_name: "Zero kcal", nutriments: { "energy-kcal_100g": 0 } },
-      { code: "4", nutriments: { "energy-kcal_100g": 100 } },
-    ],
-  };
+describe("searchOpenFoodFacts (through our server)", () => {
+  const results = [mapProduct(oats)];
 
-  it("returns only usable products and sends the expected query", async () => {
-    const fetchMock = vi.fn<typeof fetch>(async () => jsonResponse(body));
-    const { results, fromCache } = await searchOpenFoodFacts("  Aveia  ", { fetch: fetchMock });
-    expect(fromCache).toBe(false);
-    expect(results.map((r) => r.name)).toEqual(["Aveia"]);
-    const url = new URL(String(fetchMock.mock.calls[0]![0]));
-    expect(url.searchParams.get("search_terms")).toBe("aveia");
-    expect(url.searchParams.get("lc")).toBe("pt");
-    expect(url.searchParams.get("page_size")).toBe("20");
+  it("asks /api/food-search with the normalized query and returns the results", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => jsonResponse({ results }));
+    const found = await searchOpenFoodFacts("  Aveia  ", { fetch: fetchMock });
+    expect(found).toEqual({ results, fromCache: false });
+    const url = new URL(String(fetchMock.mock.calls[0]![0]), "http://localhost");
+    expect(url.pathname).toBe("/api/food-search");
+    expect(url.searchParams.get("q")).toBe("aveia");
   });
 
-  it("does not call the network for queries shorter than 2 characters", async () => {
+  it("does not call the network for queries shorter than 3 characters", async () => {
     const fetchMock = vi.fn();
-    expect(await searchOpenFoodFacts(" a ", { fetch: fetchMock })).toEqual({ results: [], fromCache: false });
+    expect(await searchOpenFoodFacts(" ar ", { fetch: fetchMock })).toEqual({ results: [], fromCache: false });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("serves the second identical search from the cache", async () => {
-    const fetchMock = vi.fn(async () => jsonResponse(body));
+    const fetchMock = vi.fn(async () => jsonResponse({ results }));
     const cache = memoryCache();
     await searchOpenFoodFacts("aveia", { fetch: fetchMock, cache });
     const second = await searchOpenFoodFacts("AVEIA ", { fetch: fetchMock, cache });
@@ -101,7 +98,7 @@ describe("searchOpenFoodFacts", () => {
   });
 
   it("refetches once the cache entry is older than the TTL", async () => {
-    const fetchMock = vi.fn(async () => jsonResponse(body));
+    const fetchMock = vi.fn(async () => jsonResponse({ results }));
     const cache = memoryCache();
     let now = 1_000;
     await searchOpenFoodFacts("aveia", { fetch: fetchMock, cache, now: () => now, ttlMs: 500 });
@@ -118,12 +115,25 @@ describe("searchOpenFoodFacts", () => {
     expect(cache.store.size).toBe(0);
   });
 
-  it("throws a typed error on HTTP errors and network failures", async () => {
-    await expect(searchOpenFoodFacts("aveia", { fetch: async () => jsonResponse({}, 503) })).rejects.toMatchObject({ kind: "http" });
+  it.each([
+    [503, "unavailable", /Open Food Facts não respondeu/],
+    [401, "unauthorized", /Sessão expirada/],
+    [500, "http", /Erro ao pesquisar/],
+  ] as const)("maps HTTP %i to the '%s' error with its own message", async (status, kind, message) => {
+    const error = await searchOpenFoodFacts("aveia", { fetch: async () => jsonResponse({}, status) }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(FoodSearchError);
+    expect(error).toMatchObject({ kind });
+    expect((error as Error).message).toMatch(message);
+  });
+
+  it("only says 'Sem ligação' when the request itself fails", async () => {
     const offline = vi.fn().mockRejectedValue(new TypeError("fetch failed"));
     const error = await searchOpenFoodFacts("aveia", { fetch: offline }).catch((e: unknown) => e);
-    expect(error).toBeInstanceOf(FoodSearchError);
-    expect(error).toMatchObject({ kind: "network" });
+    expect(error).toMatchObject({ kind: "network", message: expect.stringMatching(/^Sem ligação/) });
+  });
+
+  it("rejects a malformed answer instead of showing garbage", async () => {
+    await expect(searchOpenFoodFacts("aveia", { fetch: async () => jsonResponse({ nope: true }) })).rejects.toMatchObject({ kind: "http" });
   });
 
   it("rethrows the abort when the caller cancels (new keystroke)", async () => {

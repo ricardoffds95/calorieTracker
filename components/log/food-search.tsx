@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { ScanBarcode, Search, Sparkles } from "lucide-react";
 import { FoodResultRow } from "@/components/log/food-result-row";
 import { useDebouncedValue } from "@/components/log/use-debounced-value";
@@ -10,8 +10,10 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { createIdbSearchCache } from "@/lib/food-search-cache";
 import {
+  FOOD_SEARCH_MESSAGES,
   FoodSearchError,
   MIN_QUERY_LENGTH,
+  OFF_MIN_QUERY_LENGTH,
   mergeResults,
   normalizeQuery,
   searchOpenFoodFacts,
@@ -20,7 +22,8 @@ import {
   type SavedFood,
 } from "@/lib/food-search";
 
-const SEARCH_DEBOUNCE_MS = 500;
+// Open Food Facts allows few searches per minute: only ask once the user has really stopped typing.
+const SEARCH_DEBOUNCE_MS = 600;
 const searchCache = typeof window === "undefined" ? undefined : createIdbSearchCache();
 
 interface FoodSearchProps {
@@ -34,23 +37,30 @@ interface FoodSearchProps {
 
 export function FoodSearch({ saved, onPick, onScan, onAi, children }: FoodSearchProps) {
   const [query, setQuery] = useState("");
+  // The user asked for Open Food Facts even though saved foods already match.
+  const [forced, setForced] = useState(false);
   const debounced = normalizeQuery(useDebouncedValue(query, SEARCH_DEBOUNCE_MS));
-  const searching = normalizeQuery(query).length >= MIN_QUERY_LENGTH;
+  const typed = normalizeQuery(query);
+  const searching = typed.length >= MIN_QUERY_LENGTH;
+  const online = typed.length >= OFF_MIN_QUERY_LENGTH;
 
   const savedMatches = useMemo(() => searchSavedFoods(saved, query), [saved, query]);
+  // Saved foods that match are enough: Open Food Facts is only asked when none match, or on request.
+  const useOff = online && (savedMatches.length === 0 || forced);
   const off = useQuery({
     queryKey: ["off-search", debounced],
     queryFn: ({ signal }) => searchOpenFoodFacts(debounced, { signal, cache: searchCache }),
-    enabled: searching && debounced.length >= MIN_QUERY_LENGTH,
+    enabled: useOff && debounced.length >= OFF_MIN_QUERY_LENGTH,
+    placeholderData: keepPreviousData,
     staleTime: Infinity,
     gcTime: 1000 * 60 * 5,
     retry: false,
     meta: { persist: false }, // has its own 30-day IndexedDB cache
   });
 
-  const results = mergeResults(savedMatches, off.data?.results ?? []);
-  const waiting = searching && (debounced !== normalizeQuery(query) || off.isFetching);
-  const error = off.error instanceof FoodSearchError ? off.error.message : off.error ? "Erro ao pesquisar. Tenta novamente." : null;
+  const results = mergeResults(savedMatches, useOff ? (off.data?.results ?? []) : []);
+  const waiting = useOff && (debounced !== typed || off.isFetching);
+  const error = !useOff ? null : off.error instanceof FoodSearchError ? off.error.message : off.error ? FOOD_SEARCH_MESSAGES.http : null;
 
   return (
     <section aria-label="Pesquisar alimento" className="flex flex-col gap-3">
@@ -65,7 +75,10 @@ export function FoodSearch({ saved, onPick, onScan, onAi, children }: FoodSearch
             autoComplete="off"
             className="h-11 pl-9"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setForced(false);
+            }}
           />
         </div>
         <Button type="button" variant="outline" size="icon" className="size-11" aria-label="Ler código de barras" onClick={onScan}>
@@ -92,11 +105,24 @@ export function FoodSearch({ saved, onPick, onScan, onAi, children }: FoodSearch
             </div>
           )}
           {error && (
-            <p role="alert" className="text-sm text-destructive">
-              {error}
-            </p>
+            <div className="flex items-center justify-between gap-3">
+              <p role="alert" className="text-sm text-destructive">
+                {error}
+              </p>
+              <Button type="button" variant="outline" className="h-11 shrink-0" disabled={off.isFetching} onClick={() => void off.refetch()}>
+                Tentar novamente
+              </Button>
+            </div>
           )}
-          {!waiting && !error && results.length === 0 && (
+          {!online && (
+            <p className="text-sm text-muted-foreground">Escreve pelo menos {OFF_MIN_QUERY_LENGTH} letras para pesquisar também no Open Food Facts.</p>
+          )}
+          {online && !useOff && (
+            <Button type="button" variant="outline" className="h-11" onClick={() => setForced(true)}>
+              Pesquisar no Open Food Facts
+            </Button>
+          )}
+          {useOff && !waiting && !error && results.length === 0 && (
             <p className="text-sm text-muted-foreground">Sem resultados. Experimenta outro nome ou insere manualmente.</p>
           )}
         </div>
