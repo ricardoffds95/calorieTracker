@@ -135,8 +135,7 @@ test("a saved meal is added to the diary from here, in portions", async ({ page 
   await page.getByRole("button", { name: "Refeições · 1" }).click();
   await page.getByRole("button", { name: "Abrir Papas de aveia" }).click();
   await page.getByRole("button", { name: "Adicionar ao diário" }).click();
-  await page.getByRole("button", { name: "Mais porções" }).click();
-  await page.getByRole("button", { name: "Mais porções" }).click();
+  await page.getByRole("button", { name: "Usar 2 porções" }).click();
   await expect(page.getByRole("status", { name: "Porções" })).toHaveText("2 porções");
   await page.getByRole("group", { name: "Refeição", exact: true }).getByRole("button", { name: "Pequeno-almoço", exact: true }).click();
   await page.getByRole("button", { name: "Adicionar ao diário" }).click();

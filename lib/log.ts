@@ -44,7 +44,11 @@ export function portionsLabel(portions: number): string {
   return `${portions} ${portions === 1 ? "porção" : "porções"}`;
 }
 
-export const DOSE_STEP = 0.5;
+/** Portions move 0.1 at a time (a bit of a meal), with shortcuts for the usual amounts. */
+export const DOSE_STEP = 0.1;
+export const DOSE_PRESETS = [0.5, 1, 1.5, 2] as const;
+/** Rounds away the floating point noise of repeated 0.1 steps. */
+export const roundDoses = (value: number) => Math.round(value * 10) / 10;
 export const MAX_DOSES = 20;
 export const dosesSchema = z.number().min(DOSE_STEP).max(MAX_DOSES);
 

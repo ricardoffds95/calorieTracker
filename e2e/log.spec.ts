@@ -377,8 +377,7 @@ test("a saved meal with 2 portions stores doses and doubled items", async ({ pag
 
   await page.getByRole("button", { name: "Refeições" }).click();
   await page.getByRole("button", { name: "Escolher Almoço E2E" }).click();
-  await page.getByRole("button", { name: "Mais porções" }).click();
-  await page.getByRole("button", { name: "Mais porções" }).click();
+  await page.getByRole("button", { name: "Usar 2 porções" }).click();
   await expect(page.getByRole("status", { name: "Porções" })).toHaveText("2 porções");
   await page.getByRole("button", { name: "Adicionar ao diário" }).click();
   await expect(page.getByText(/Almoço E2E adicionado a jantar/)).toBeVisible();
@@ -491,8 +490,7 @@ test("AI from a photo → one meal → 'Guardar e adicionar' with 2 portions", a
   expect(sent.body).toMatchObject({ type: "image", mimeType: "image/jpeg" });
   await expect(page.getByTestId("nutrient-summary")).toContainText("443"); // 1 portion
 
-  await page.getByRole("button", { name: "Mais porções" }).click();
-  await page.getByRole("button", { name: "Mais porções" }).click();
+  await page.getByRole("button", { name: "Usar 2 porções" }).click();
   await page.getByRole("button", { name: "Guardar e adicionar ao diário" }).click();
   await expect(page.getByText("Frango com arroz adicionado a almoço")).toBeVisible();
 
@@ -539,6 +537,27 @@ test("AI 'Só adicionar' logs an unlinked meal; a duplicate name is explained in
   expect(row).toMatchObject({ kind: "meal", saved_meal_id: null, doses: 1, calories: 443 });
 });
 
+test("portions change 0.1 at a time, without floating point noise, and have shortcuts", async ({ page }) => {
+  await seedSavedMeal("A", { name: "Sopa E2E", items: [{ name: "Sopa", quantity_g: null, calories: 100, protein_g: 5, carbs_g: 10, fat_g: 2 }], total_calories: 100, total_protein: 5, total_carbs: 10, total_fat: 2 });
+  await login(page, "A");
+  await openLog(page);
+
+  await page.getByRole("button", { name: "Refeições" }).click();
+  await page.getByRole("button", { name: "Escolher Sopa E2E" }).click();
+  const portions = page.getByLabel("Porções", { exact: true });
+  await expect(portions).toHaveText("1 porção");
+  for (let i = 0; i < 3; i++) await page.getByRole("button", { name: "Mais porções" }).click();
+  await expect(portions).toHaveText("1.3 porções");
+  await expect(page.getByTestId("nutrient-summary")).toContainText("130");
+  for (let i = 0; i < 5; i++) await page.getByRole("button", { name: "Menos porções" }).click();
+  await expect(portions).toHaveText("0.8 porções");
+  await page.getByRole("button", { name: "Usar 0.5 porções" }).click();
+  await expect(portions).toHaveText("0.5 porções");
+  await page.getByRole("button", { name: "Adicionar ao diário" }).click();
+  await expect(page.getByText("Sopa E2E adicionado a almoço")).toBeVisible();
+  expect((await fetchDiary("A", DAY))[0]).toMatchObject({ doses: 0.5, calories: 50 });
+});
+
 test("new meal by values per portion: 1.5 portions, shown without grams on Today", async ({ page }) => {
   await login(page, "A");
   await openLog(page, DAY, "dinner");
@@ -549,7 +568,7 @@ test("new meal by values per portion: 1.5 portions, shown without grams on Today
   await page.getByLabel("Nome da refeição").fill("Bifana");
   await page.getByLabel("Calorias (kcal)").fill("450");
   await page.getByLabel("Proteína (g)").fill("25");
-  await page.getByRole("button", { name: "Mais porções" }).click();
+  await page.getByRole("button", { name: "Usar 1.5 porções" }).click();
   await page.getByRole("button", { name: "Guardar e adicionar ao diário" }).click();
   await expect(page.getByText("Bifana adicionado a jantar")).toBeVisible();
 
