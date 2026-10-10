@@ -734,6 +734,50 @@ test("new meal: the list of saved foods always has the filter, even with few foo
   await expect(page.getByText("Nenhum alimento com esse nome.")).toBeVisible();
 });
 
+test("new meal: every food can be removed, and the warning says exactly what is missing", async ({ page }) => {
+  await seedSavedFood("A", { name: "Aveia E2E", calories_100g: 380, protein_100g: 13, carbs_100g: 60, fat_100g: 7 });
+  await seedSavedFood("A", { name: "Leite E2E", calories_100g: 46, protein_100g: 3, carbs_100g: 5, fat_100g: 2 });
+  await login(page, "A");
+  await openLog(page);
+
+  await page.getByRole("button", { name: "Refeições", exact: true }).click();
+  await page.getByRole("button", { name: "Nova refeição" }).click();
+  const warning = page.getByRole("status").filter({ hasText: "Falta" });
+  await expect(warning).toHaveText("Falta indicar o nome da refeição e juntar pelo menos um alimento para poderes guardar.");
+
+  await page.getByRole("button", { name: /^Escolher dos meus alimentos/ }).click();
+  await page.getByRole("checkbox", { name: "Aveia E2E" }).click();
+  await page.getByRole("checkbox", { name: "Leite E2E" }).click();
+  await page.getByRole("button", { name: "Juntar 2 alimentos" }).click();
+  await expect(warning).toHaveText("Falta indicar o nome da refeição para poderes guardar.");
+
+  await page.getByRole("button", { name: "Remover Aveia E2E" }).click();
+  await page.getByRole("button", { name: "Remover Leite E2E" }).click(); // the last one too
+  await expect(page.getByTestId("items-editor")).toHaveCount(0);
+  await page.getByLabel("Nome da refeição").fill("Vazia");
+  await expect(warning).toHaveText("Falta juntar pelo menos um alimento para poderes guardar.");
+
+  await page.getByRole("button", { name: /^Escolher dos meus alimentos/ }).click();
+  await page.getByRole("checkbox", { name: "Leite E2E" }).click();
+  await page.getByRole("button", { name: "Juntar 1 alimento" }).click();
+  await expect(warning).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Guardar e adicionar ao diário" })).toBeVisible();
+
+  await page.getByLabel("Quantidade de Leite E2E (g)").fill("0");
+  await expect(page.getByRole("status").filter({ hasText: "quantidade maior que 0" })).toBeVisible();
+});
+
+test("new meal by values per portion: the warning asks for the calories", async ({ page }) => {
+  await login(page, "A");
+  await openLog(page);
+  await page.getByRole("button", { name: "Refeições", exact: true }).click();
+  await page.getByRole("button", { name: "Nova refeição" }).click();
+  await page.getByRole("button", { name: "Valores por porção" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Falta" })).toHaveText("Falta indicar o nome da refeição e as calorias para poderes guardar.");
+  await page.getByLabel("Nome da refeição").fill("Bifana");
+  await expect(page.getByRole("status").filter({ hasText: "Falta" })).toHaveText("Falta indicar as calorias para poderes guardar.");
+});
+
 test("new meal by joining saved foods: totals are the sum of the foods", async ({ page }) => {
   await seedSavedFood("A", { name: "Aveia E2E", calories_100g: 380, protein_100g: 13.2, carbs_100g: 60, fat_100g: 7 });
   await seedSavedFood("A", { name: "Leite E2E", calories_100g: 46, protein_100g: 3.3, carbs_100g: 4.8, fat_100g: 1.6 });

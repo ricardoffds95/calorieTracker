@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { ListChecks } from "lucide-react";
+import { Info, ListChecks } from "lucide-react";
 import { AiPanel } from "@/components/log/ai-panel";
 import { BarcodeScannerDialog } from "@/components/log/barcode-scanner-dialog";
 import { FoodSearch } from "@/components/log/food-search";
@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { FoodSearchResult, SavedFood } from "@/lib/food-search";
 import type { LogTarget } from "@/lib/log";
+import { parseDecimalInput } from "@/lib/numbers";
 import { scaleFromPer100g, type FoodItem } from "@/lib/nutrition";
 import type { SavedMeal } from "@/lib/queries/saved";
 
@@ -45,6 +46,18 @@ export function NewMealDialog({ userId, initialTarget, now, foods, onClose, onAd
 
   const trimmed = name.trim();
   const items = mode === "foods" ? fromEditable(rows) : portionItems(trimmed, totals);
+
+  // What is still needed before the meal can be saved, in words.
+  const missing = (() => {
+    const needs: string[] = [];
+    if (!trimmed) needs.push("indicar o nome da refeição");
+    if (mode === "foods") {
+      if (rows.length === 0) needs.push("juntar pelo menos um alimento");
+      else if (!items) return `${needs.length ? `Falta ${needs.join(" e ")}. ` : ""}Corrige os alimentos: cada um precisa de nome e de uma quantidade maior que 0.`;
+    } else if (parseDecimalInput(totals.calories) === null) needs.push(needs.length ? "as calorias" : "indicar as calorias");
+    else if (!items && trimmed) return "Os valores têm de ser números (0 ou mais).";
+    return needs.length ? `Falta ${needs.join(" e ")} para poderes guardar.` : "";
+  })();
 
   // A food from the search or the scanner asks its quantity first; the AI brings its own grams.
   function joinFood(food: FoodSearchResult, grams: number) {
@@ -107,7 +120,7 @@ export function NewMealDialog({ userId, initialTarget, now, foods, onClose, onAd
               <FoodSearch key={searchKey} saved={foods} onPick={(food) => setPicked(food)} onScan={() => setPanel("scan")} onAi={() => setPanel("ai")} onSearchingChange={setSearching} />
               {!searching &&
                 (rows.length > 0 ? (
-                  <ItemsEditor rows={rows} onChange={setRows} />
+                  <ItemsEditor rows={rows} onChange={setRows} allowEmpty />
                 ) : (
                   <p className="text-sm text-muted-foreground">Ainda sem alimentos. Procura acima, lê um código de barras ou usa a IA (100 g por omissão).</p>
                 ))}
@@ -129,7 +142,10 @@ export function NewMealDialog({ userId, initialTarget, now, foods, onClose, onAd
               onSaved={onSaved}
             />
           ) : (
-            <p className="text-xs text-muted-foreground">Indica o nome e {mode === "foods" ? "pelo menos um alimento" : "as calorias"} para guardar.</p>
+            <p role="status" className="flex items-start gap-2 rounded-md bg-muted p-3 text-sm">
+              <Info aria-hidden className="mt-0.5 size-4 shrink-0 text-primary" />
+              <span>{missing}</span>
+            </p>
           )}
         </div>
       </DialogContent>

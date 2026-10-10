@@ -49,9 +49,11 @@ export function fromEditable(rows: readonly EditableItem[]): FoodItem[] | null {
 interface ItemsEditorProps {
   rows: EditableItem[];
   onChange: (rows: EditableItem[]) => void;
+  /** A meal being created may be emptied; an existing one always keeps at least one item. */
+  allowEmpty?: boolean;
 }
 
-export function ItemsEditor({ rows, onChange }: ItemsEditorProps) {
+export function ItemsEditor({ rows, onChange, allowEmpty = false }: ItemsEditorProps) {
   const update = (key: string, patch: Partial<EditableItem>) => onChange(rows.map((r) => (r.key === key ? { ...r, ...patch } : r)));
 
   return (
@@ -81,7 +83,7 @@ export function ItemsEditor({ rows, onChange }: ItemsEditorProps) {
                 size="icon"
                 className="size-11 text-muted-foreground"
                 aria-label={`Remover ${row.name}`}
-                disabled={rows.length <= 1}
+                disabled={!allowEmpty && rows.length <= 1}
                 onClick={() => onChange(rows.filter((r) => r.key !== row.key))}
               >
                 <X aria-hidden />
