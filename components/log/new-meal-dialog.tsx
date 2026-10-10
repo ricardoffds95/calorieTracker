@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Info, ListChecks } from "lucide-react";
+import { ListChecks } from "lucide-react";
 import { AiPanel } from "@/components/log/ai-panel";
 import { BarcodeScannerDialog } from "@/components/log/barcode-scanner-dialog";
 import { FoodSearch } from "@/components/log/food-search";
@@ -12,6 +12,7 @@ import { MealActions } from "@/components/log/meal-actions";
 import { PortionTotalsFields, portionItems, type PortionTotals } from "@/components/log/portion-totals-fields";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Hint } from "@/components/ui/hint";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { FoodSearchResult, SavedFood } from "@/lib/food-search";
@@ -142,10 +143,7 @@ export function NewMealDialog({ userId, initialTarget, now, foods, onClose, onAd
               onSaved={onSaved}
             />
           ) : (
-            <p role="status" className="flex items-start gap-2 rounded-md bg-muted p-3 text-sm">
-              <Info aria-hidden className="mt-0.5 size-4 shrink-0 text-primary" />
-              <span>{missing}</span>
-            </p>
+            <Hint>{missing}</Hint>
           )}
         </div>
       </DialogContent>

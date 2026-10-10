@@ -5,6 +5,7 @@ import { ItemsEditor, fromEditable, toEditable, type EditableItem } from "@/comp
 import { MealActions } from "@/components/log/meal-actions";
 import { PhotoPicker } from "@/components/log/photo-picker";
 import { Button } from "@/components/ui/button";
+import { Hint } from "@/components/ui/hint";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -99,6 +100,7 @@ export function AiPanel({ userId, initialTarget, now, onClose, onAdded, onUse, o
                   {error}
                 </p>
               )}
+              {!analyzing && !photo && !text.trim() && <Hint>Escreve o que comeste, ou tira uma foto ao prato, para analisar.</Hint>}
               <Button type="button" size="lg" className="h-11" disabled={analyzing || (!photo && !text.trim())} onClick={analyze}>
                 {analyzing ? "A analisar…" : "Analisar"}
               </Button>
@@ -153,6 +155,11 @@ export function AiPanel({ userId, initialTarget, now, onClose, onAdded, onUse, o
                 <Input id="ai-meal-name" className="h-11" value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} />
               </div>
               <ItemsEditor rows={editing.rows} onChange={(rows) => setEditing({ ...editing, rows })} />
+              {(!editedName || !editedItems) && (
+                <Hint>
+                  {!editedName ? "Indica o nome da refeição." : "Corrige os alimentos: cada um precisa de nome e de uma quantidade maior que 0."}
+                </Hint>
+              )}
               <Button
                 type="button"
                 size="lg"

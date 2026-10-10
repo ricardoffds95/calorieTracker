@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Check, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Hint } from "@/components/ui/hint";
 import { Input } from "@/components/ui/input";
 import { ScrollList } from "@/components/ui/scroll-list";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -90,6 +91,7 @@ export function PickSavedFoodsSheet({ foods, onJoin, onClose }: PickSavedFoodsSh
           )}
         </div>
         <SheetFooter>
+          {foods.length > 0 && selected.size === 0 && <Hint className="mx-0">Marca pelo menos um alimento para o juntar à refeição.</Hint>}
           <Button
             type="button"
             size="lg"

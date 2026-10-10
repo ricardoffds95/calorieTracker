@@ -1,10 +1,11 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { Hint } from "@/components/ui/hint";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MEAL_TYPES } from "@/lib/macros";
-import type { LogTarget } from "@/lib/log";
+import { isValidTarget, type LogTarget } from "@/lib/log";
 import { mealLabel } from "@/lib/today";
 
 interface DiaryTargetPickerProps {
@@ -20,6 +21,7 @@ export function DiaryTargetPicker({ value, onChange }: DiaryTargetPickerProps) {
         <Label htmlFor="target-date">Data</Label>
         <Input id="target-date" type="date" className="block h-11 w-full min-w-0 max-w-full appearance-none" value={value.entry_date} onChange={(e) => onChange({ ...value, entry_date: e.target.value })} />
       </div>
+      {!isValidTarget(value) && <Hint>Escolhe uma data para poderes adicionar ao diário.</Hint>}
       <div role="group" aria-label="Refeição" className="grid grid-cols-4 gap-1">
         {MEAL_TYPES.map((meal) => (
           <Button

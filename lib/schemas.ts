@@ -19,7 +19,7 @@ export const foodItemSchema = z.object({
   fat_g: nonNegative,
 });
 
-export const foodItemsSchema = z.array(foodItemSchema).min(1).max(50);
+export const foodItemsSchema = z.array(foodItemSchema, { error: "Corrige os alimentos: cada um precisa de nome e de uma quantidade maior que 0." }).min(1, "Falta juntar pelo menos um alimento.").max(50, "Máximo de 50 alimentos.");
 
 /** AI items always come with estimated grams (used to rescale when the user edits them). */
 export const aiItemSchema = foodItemSchema.extend({ quantity_g: grams });

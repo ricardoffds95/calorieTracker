@@ -114,6 +114,7 @@ export function ProfileForm({ profile }: { profile: Profile }) {
         fatPct={values.fatPct || 0}
       />
 
+      {parsed.success && !dirty && <p className="text-center text-sm text-muted-foreground">Sem alterações para guardar.</p>}
       <Button type="submit" size="lg" disabled={!parsed.success || !dirty || update.isPending}>
         {update.isPending ? "A guardar…" : "Guardar objetivos"}
       </Button>

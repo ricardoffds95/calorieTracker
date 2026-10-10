@@ -778,6 +778,53 @@ test("new meal by values per portion: the warning asks for the calories", async 
   await expect(page.getByRole("status").filter({ hasText: "Falta" })).toHaveText("Falta indicar as calorias para poderes guardar.");
 });
 
+test("other forms explain what is missing: short search, empty AI, no day, no selection", async ({ page }) => {
+  await seedSavedFood("A", { name: "Aveia E2E", calories_100g: 380, protein_100g: 13, carbs_100g: 60, fat_100g: 7 });
+  await mockOff(page);
+  await login(page, "A");
+  await openLog(page);
+
+  // a search with one letter
+  await searchBox(page).fill("a");
+  await expect(page.getByRole("status").filter({ hasText: "pelo menos 2 letras" })).toBeVisible();
+  await searchBox(page).fill("");
+  await expect(page.getByRole("status").filter({ hasText: "pelo menos 2 letras" })).toHaveCount(0);
+
+  // the AI with nothing to analyse
+  await page.getByRole("button", { name: "Com IA" }).click();
+  await expect(page.getByRole("button", { name: "Analisar" })).toBeDisabled();
+  await expect(page.getByRole("status").filter({ hasText: "Escreve o que comeste" })).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  // the day of an entry cleared
+  await page.getByRole("button", { name: "Escolher Aveia E2E" }).click();
+  await page.getByLabel("Data", { exact: true }).fill("");
+  await expect(page.getByRole("status").filter({ hasText: "Escolhe uma data" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Adicionar ao diário" })).toBeDisabled();
+  await page.keyboard.press("Escape");
+
+  // new meal: the list of saved foods with nothing ticked
+  await page.getByRole("button", { name: "Refeições", exact: true }).click();
+  await page.getByRole("button", { name: "Nova refeição" }).click();
+  await page.getByRole("button", { name: /^Escolher dos meus alimentos/ }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Marca pelo menos um alimento" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Juntar à refeição" })).toBeDisabled();
+});
+
+test("AI 'Editar': says why 'Concluir' is not available", async ({ page }) => {
+  await mockAi(page);
+  await login(page, "A");
+  await openLog(page);
+  await analyzeText(page);
+  await page.getByRole("button", { name: "Editar" }).click();
+  await page.getByLabel("Nome da refeição").fill("");
+  await expect(page.getByRole("status").filter({ hasText: "Indica o nome da refeição" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Concluir" })).toBeDisabled();
+  await page.getByLabel("Nome da refeição").fill("Frango");
+  await page.getByLabel("Quantidade de Arroz (g)").fill("0");
+  await expect(page.getByRole("status").filter({ hasText: "quantidade maior que 0" })).toBeVisible();
+});
+
 test("new meal by joining saved foods: totals are the sum of the foods", async ({ page }) => {
   await seedSavedFood("A", { name: "Aveia E2E", calories_100g: 380, protein_100g: 13.2, carbs_100g: 60, fat_100g: 7 });
   await seedSavedFood("A", { name: "Leite E2E", calories_100g: 46, protein_100g: 3.3, carbs_100g: 4.8, fat_100g: 1.6 });

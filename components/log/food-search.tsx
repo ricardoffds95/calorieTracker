@@ -8,6 +8,7 @@ import { Pagination } from "@/components/log/pagination";
 import { useDebouncedValue } from "@/components/log/use-debounced-value";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Hint } from "@/components/ui/hint";
 import { ScrollList } from "@/components/ui/scroll-list";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -170,6 +171,8 @@ export function FoodSearch({ saved, onPick, onScan, onAi, kind = "foods", meals 
           Com IA
         </Button>
       </div>
+
+      {query.trim().length > 0 && normalizeQuery(query).length < MIN_QUERY_LENGTH && <Hint>Escreve pelo menos {MIN_QUERY_LENGTH} letras para pesquisar.</Hint>}
 
       {searching && kind === "meals" ? (
         <div className="flex flex-col gap-2" data-testid="search-results">

@@ -260,3 +260,21 @@ test("new food: the AI fills the form per 100 g of the total weight", async ({ p
   await expect(page.getByLabel("Calorias (kcal)")).toHaveValue("148"); // 295 kcal / 200 g
   await expect(page.getByLabel("Proteína (g)")).toHaveValue("16.9");
 });
+
+test("editing a saved meal explains problems in Portuguese words", async ({ page }) => {
+  await seedSavedMeal("A", { name: "Papas de aveia", items: ITEMS, total_calories: 343, total_protein: 16.2, total_carbs: 48, total_fat: 8.2 });
+  await login(page, "A");
+  await openSaved(page);
+  await page.getByRole("button", { name: "Refeições · 1" }).click();
+  await page.getByRole("button", { name: "Abrir Papas de aveia" }).click();
+  await page.getByRole("button", { name: "Editar" }).click();
+
+  await page.getByLabel("Quantidade de Aveia (g)").fill("0");
+  const alert = page.getByRole("alert").filter({ hasText: "Corrige os alimentos" });
+  await expect(alert).toHaveText("Corrige os alimentos: cada um precisa de nome e de uma quantidade maior que 0.");
+  await expect(page.getByRole("button", { name: "Guardar", exact: true })).toBeDisabled();
+  await page.getByLabel("Quantidade de Aveia (g)").fill("60");
+  await page.getByLabel("Nome", { exact: true }).fill("");
+  await expect(page.getByRole("alert").filter({ hasText: "Indica um nome." })).toBeVisible();
+  await expect(page.getByText(/expected array|Invalid input/)).toHaveCount(0);
+});

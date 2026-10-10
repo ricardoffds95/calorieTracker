@@ -53,6 +53,14 @@ export function EditSavedDialog({ userId, target, todayKey, onClose }: EditSaved
     : null;
   const meal = isFood ? null : savedMealSchema.safeParse({ name, items: totals ? portionItems(name, totals) : fromEditable(rows) });
   const valid = isFood ? food!.success : meal!.success;
+  // zod's own wording is for developers: say it in words
+  const problem = (() => {
+    if (valid) return null;
+    if (isFood) return food?.error?.issues[0]?.message ?? "Valores inválidos.";
+    if (!name.trim()) return "Indica um nome.";
+    if (totals) return parseDecimalInput(totals.calories) === null ? "Indica as calorias (um número)." : "Os valores têm de ser números (0 ou mais).";
+    return rows.length === 0 ? "Falta juntar pelo menos um alimento." : "Corrige os alimentos: cada um precisa de nome e de uma quantidade maior que 0.";
+  })();
 
   function save(scope: PropagationScope) {
     const options = { onSuccess: onClose };
@@ -101,9 +109,9 @@ export function EditSavedDialog({ userId, target, todayKey, onClose }: EditSaved
             ) : (
               <ItemsEditor rows={rows} onChange={setRows} />
             )}
-            {!valid && (
-              <p role="alert" className="text-xs text-destructive">
-                {(isFood ? food?.error : meal?.error)?.issues[0]?.message ?? "Valores inválidos."}
+            {problem && (
+              <p role="alert" className="text-sm text-destructive">
+                {problem}
               </p>
             )}
             {error && (
