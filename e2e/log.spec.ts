@@ -688,6 +688,36 @@ test("new meal: the AI result joins the meal and names it", async ({ page }) => 
   await expect(page.getByTestId("nutrient-summary")).toContainText("378"); // 248 + 130
 });
 
+test("new meal: tick several saved foods in one list (with a filter) and join them all at once", async ({ page }) => {
+  const names = ["Aveia", "Leite", "Banana", "Ovo", "Arroz", "Frango", "Maçã"];
+  for (const [i, name] of names.entries()) await seedSavedFood("A", { name: `${name} E2E`, calories_100g: 100 + i * 10, protein_100g: 2, carbs_100g: 10, fat_100g: 1 });
+  await login(page, "A");
+  await openLog(page);
+
+  await page.getByRole("button", { name: "Refeições", exact: true }).click();
+  await page.getByRole("button", { name: "Nova refeição" }).click();
+  await page.getByLabel("Nome da refeição").fill("Pequeno-almoço E2E");
+  await page.getByRole("button", { name: /^Escolher dos meus alimentos/ }).click();
+
+  await expect(page.getByRole("checkbox")).toHaveCount(7);
+  await page.getByRole("checkbox", { name: "Aveia E2E" }).click();
+  await page.getByRole("searchbox", { name: "Filtrar alimentos" }).fill("banana");
+  await expect(page.getByRole("checkbox")).toHaveCount(1);
+  await page.getByRole("checkbox", { name: "Banana E2E" }).click();
+  await page.getByRole("searchbox", { name: "Filtrar alimentos" }).fill("");
+  await expect(page.getByRole("checkbox", { name: "Aveia E2E" })).toBeChecked(); // ticks survive the filter
+  await page.getByRole("button", { name: "Juntar 2 alimentos" }).click();
+
+  await expect(page.getByLabel("Quantidade de Aveia E2E (g)")).toHaveValue("100");
+  await expect(page.getByLabel("Quantidade de Banana E2E (g)")).toHaveValue("100");
+  await expect(page.getByTestId("nutrient-summary")).toContainText("220"); // 100 + 120
+  await page.getByRole("button", { name: "Guardar nas refeições" }).click();
+  await expect(page.getByRole("button", { name: "Guardada" })).toBeDisabled();
+  const [meal] = await fetchSavedMeals("A");
+  expect(meal).toMatchObject({ name: "Pequeno-almoço E2E", total_calories: 220 });
+  expect((meal!.items as { name: string }[]).map((i) => i.name)).toEqual(["Aveia E2E", "Banana E2E"]);
+});
+
 test("new meal by joining saved foods: totals are the sum of the foods", async ({ page }) => {
   await seedSavedFood("A", { name: "Aveia E2E", calories_100g: 380, protein_100g: 13.2, carbs_100g: 60, fat_100g: 7 });
   await seedSavedFood("A", { name: "Leite E2E", calories_100g: 46, protein_100g: 3.3, carbs_100g: 4.8, fat_100g: 1.6 });

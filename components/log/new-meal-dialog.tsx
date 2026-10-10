@@ -1,9 +1,11 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { ListChecks } from "lucide-react";
 import { AiPanel } from "@/components/log/ai-panel";
 import { BarcodeScannerDialog } from "@/components/log/barcode-scanner-dialog";
 import { FoodSearch } from "@/components/log/food-search";
+import { PickSavedFoodsSheet } from "@/components/log/pick-saved-foods-sheet";
 import { JoinFoodSheet } from "@/components/log/join-food-sheet";
 import { ItemsEditor, fromEditable, toEditable, type EditableItem } from "@/components/log/items-editor";
 import { MealActions } from "@/components/log/meal-actions";
@@ -28,7 +30,7 @@ interface NewMealDialogProps {
   onSaved?: (meal: SavedMeal) => void;
 }
 
-type Panel = "scan" | "ai" | null;
+type Panel = "scan" | "ai" | "saved" | null;
 
 export function NewMealDialog({ userId, initialTarget, now, foods, onClose, onAdded, onSaved }: NewMealDialogProps) {
   const [mode, setMode] = useState<"foods" | "portion">("foods");
@@ -50,6 +52,13 @@ export function NewMealDialog({ userId, initialTarget, now, foods, onClose, onAd
     setRows((r) => [...r, ...toEditable([item])]);
     setPicked(null);
     setSearchKey((k) => k + 1);
+    contentRef.current?.scrollTo({ top: 0 });
+  }
+
+  function joinSaved(picked: SavedFood[]) {
+    const items = picked.map((food) => ({ name: food.name, quantity_g: 100, ...scaleFromPer100g(food, 100) }));
+    setRows((r) => [...r, ...toEditable(items)]);
+    setPanel(null);
     contentRef.current?.scrollTo({ top: 0 });
   }
 
@@ -91,6 +100,10 @@ export function NewMealDialog({ userId, initialTarget, now, foods, onClose, onAd
 
           {mode === "foods" ? (
             <>
+              <Button type="button" variant="outline" className="h-11" disabled={foods.length === 0} onClick={() => setPanel("saved")}>
+                <ListChecks aria-hidden />
+                Escolher dos meus alimentos · {foods.length}
+              </Button>
               <FoodSearch key={searchKey} saved={foods} onPick={(food) => setPicked(food)} onScan={() => setPanel("scan")} onAi={() => setPanel("ai")} onSearchingChange={setSearching} />
               {!searching &&
                 (rows.length > 0 ? (
@@ -121,6 +134,7 @@ export function NewMealDialog({ userId, initialTarget, now, foods, onClose, onAd
         </div>
       </DialogContent>
       <BarcodeScannerDialog open={panel === "scan"} onOpenChange={(open) => !open && setPanel((p) => (p === "scan" ? null : p))} onFound={(food) => setPicked(food)} />
+      {panel === "saved" && <PickSavedFoodsSheet foods={foods} onJoin={joinSaved} onClose={() => setPanel(null)} />}
       {picked && <JoinFoodSheet food={picked} onJoin={(grams) => joinFood(picked, grams)} onClose={() => setPicked(null)} />}
       {panel === "ai" && (
         <AiPanel userId={userId} onClose={() => setPanel(null)} onUse={addAiItems} useLabels={{ food: "Juntar alimento", meal: "Usar refeição completa" }} />
