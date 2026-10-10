@@ -1,4 +1,18 @@
-node_modules
-.env
-dist/
-.expo/
+node_modules/
+.next/
+out/
+.env*
+!.env.example
+.vercel/
+*.tsbuildinfo
+next-env.d.ts
+
+# old Expo app (reference only)
+calorieTracker/
+
+# playwright
+test-results/
+playwright-report/
+
+# zxing wasm (copied from node_modules by scripts/copy-zxing-wasm.mjs)
+public/zxing/

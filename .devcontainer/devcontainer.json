@@ -1,0 +1,22 @@
+{
+  "name": "CalorieTracker",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:24-bookworm",
+  "runArgs": ["--dns=1.1.1.1", "--dns=8.8.8.8"],
+  "postCreateCommand": "if [ -f package.json ]; then npm install && npx playwright install --with-deps chromium; fi",
+  "forwardPorts": [3000],
+  "portsAttributes": {
+    "3000": {
+      "label": "Next.js",
+      "onAutoForward": "openPreview"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "bradlc.vscode-tailwindcss"
+      ]
+    }
+  }
+}

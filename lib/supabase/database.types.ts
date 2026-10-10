@@ -1,0 +1,242 @@
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
+
+export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.18"
+  }
+  public: {
+    Tables: {
+      diary_entries: {
+        Row: {
+          calories: number
+          carbs_g: number
+          created_at: string
+          entry_date: string
+          fat_g: number
+          id: string
+          items: Json | null
+          kind: string
+          meal: string
+          name: string
+          protein_g: number
+          quantity_g: number | null
+          saved_food_id: string | null
+          saved_meal_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          calories: number
+          carbs_g: number
+          created_at?: string
+          entry_date: string
+          fat_g: number
+          id?: string
+          items?: Json | null
+          kind: string
+          meal: string
+          name: string
+          protein_g: number
+          quantity_g?: number | null
+          saved_food_id?: string | null
+          saved_meal_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          calories?: number
+          carbs_g?: number
+          created_at?: string
+          entry_date?: string
+          fat_g?: number
+          id?: string
+          items?: Json | null
+          kind?: string
+          meal?: string
+          name?: string
+          protein_g?: number
+          quantity_g?: number | null
+          saved_food_id?: string | null
+          saved_meal_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "diary_entries_user_id_saved_food_id_fkey"
+            columns: ["user_id", "saved_food_id"]
+            isOneToOne: false
+            referencedRelation: "saved_foods"
+            referencedColumns: ["user_id", "id"]
+          },
+          {
+            foreignKeyName: "diary_entries_user_id_saved_meal_id_fkey"
+            columns: ["user_id", "saved_meal_id"]
+            isOneToOne: false
+            referencedRelation: "saved_meals"
+            referencedColumns: ["user_id", "id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          goal_calories: number
+          goal_carbs: number
+          goal_fat: number
+          goal_protein: number
+          mode: string
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          goal_calories?: number
+          goal_carbs?: number
+          goal_fat?: number
+          goal_protein?: number
+          mode?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          goal_calories?: number
+          goal_carbs?: number
+          goal_fat?: number
+          goal_protein?: number
+          mode?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      saved_foods: {
+        Row: {
+          brand: string | null
+          calories_100g: number
+          carbs_100g: number
+          created_at: string
+          fat_100g: number
+          id: string
+          name: string
+          off_code: string | null
+          protein_100g: number
+          times_used: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          brand?: string | null
+          calories_100g: number
+          carbs_100g: number
+          created_at?: string
+          fat_100g: number
+          id?: string
+          name: string
+          off_code?: string | null
+          protein_100g: number
+          times_used?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          brand?: string | null
+          calories_100g?: number
+          carbs_100g?: number
+          created_at?: string
+          fat_100g?: number
+          id?: string
+          name?: string
+          off_code?: string | null
+          protein_100g?: number
+          times_used?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      saved_meals: {
+        Row: {
+          created_at: string
+          id: string
+          items: Json
+          name: string
+          times_used: number
+          total_calories: number
+          total_carbs: number
+          total_fat: number
+          total_protein: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          items?: Json
+          name: string
+          times_used?: number
+          total_calories: number
+          total_carbs: number
+          total_fat: number
+          total_protein: number
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          items?: Json
+          name?: string
+          times_used?: number
+          total_calories?: number
+          total_carbs?: number
+          total_fat?: number
+          total_protein?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+}
+
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  TableName extends keyof DefaultSchema["Tables"],
+> = DefaultSchema["Tables"][TableName]["Row"]
+
+export type TablesInsert<
+  TableName extends keyof DefaultSchema["Tables"],
+> = DefaultSchema["Tables"][TableName]["Insert"]
+
+export type TablesUpdate<
+  TableName extends keyof DefaultSchema["Tables"],
+> = DefaultSchema["Tables"][TableName]["Update"]

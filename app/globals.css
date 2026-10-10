@@ -1,0 +1,114 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens. Single source of truth: see DESIGN.md.
+ * Neutral scale + ONE accent (--primary). Macro colors are for data only.
+ * Light on :root, dark via prefers-color-scheme.
+ */
+:root {
+  color-scheme: light;
+  --radius: 0.875rem;
+
+  --background: #fafafb;
+  --foreground: #14171f;
+  --card: #ffffff;
+  --card-foreground: #14171f;
+  --popover: #ffffff;
+  --popover-foreground: #14171f;
+  --muted: #f1f2f5;
+  --muted-foreground: #5f6675;
+  --secondary: #f1f2f5;
+  --secondary-foreground: #14171f;
+  --accent: #eceef3;
+  --accent-foreground: #14171f;
+  --border: #e3e5ea;
+  --input: #d5d8df;
+
+  --primary: #2d6be4;
+  --primary-foreground: #ffffff;
+  --ring: #2d6be4;
+  --destructive: #d92d4a;
+
+  --protein: #3a6fd8;
+  --carbs: #b87708;
+  --fat: #d6456b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    --background: #0e1015;
+    --foreground: #f2f3f5;
+    --card: #171a21;
+    --card-foreground: #f2f3f5;
+    --popover: #171a21;
+    --popover-foreground: #f2f3f5;
+    --muted: #1f232c;
+    --muted-foreground: #9aa1b0;
+    --secondary: #1f232c;
+    --secondary-foreground: #f2f3f5;
+    --accent: #262b36;
+    --accent-foreground: #f2f3f5;
+    --border: #2a2f3a;
+    --input: #333946;
+
+    --primary: #5b8df0;
+    --primary-foreground: #0b1220;
+    --ring: #5b8df0;
+    --destructive: #f0607a;
+
+    --protein: #6e9bf2;
+    --carbs: #f0b342;
+    --fat: #f27a98;
+  }
+}
+
+@theme inline {
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-protein: var(--protein);
+  --color-carbs: var(--carbs);
+  --color-fat: var(--fat);
+
+  --radius-sm: 0.625rem;
+  --radius-md: var(--radius);
+  --radius-lg: 1.25rem;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* Layout tokens */
+:root {
+  --tab-bar-height: 4rem;
+}
