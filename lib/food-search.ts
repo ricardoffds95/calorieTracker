@@ -80,8 +80,9 @@ export function mapProduct(product: OffProduct): FoodSearchResult {
     ""
   ).trim();
 
-  const kj = pick(nutriments, "energy_100g");
-  const kcal = pick(nutriments, "energy-kcal_100g", "energy-kcal") ?? (kj !== undefined ? kj / 4.184 : 0);
+  // Only the *_100g fields: the ones without suffix are "as entered" and may be per serving (e.g. 250 ml).
+  const kj = pick(nutriments, "energy-kj_100g", "energy_100g");
+  const kcal = pick(nutriments, "energy-kcal_100g") ?? (kj !== undefined ? kj / 4.184 : 0);
 
   return {
     id: product.code ?? "",
@@ -90,9 +91,9 @@ export function mapProduct(product: OffProduct): FoodSearchResult {
     brand: formatBrands(product.brands),
     off_code: product.code,
     calories_100g: roundCalories(kcal),
-    protein_100g: roundMacro(pick(nutriments, "proteins_100g", "protein_100g", "proteins") ?? 0),
-    carbs_100g: roundMacro(pick(nutriments, "carbohydrates_100g", "carbohydrates") ?? 0),
-    fat_100g: roundMacro(pick(nutriments, "fat_100g", "fat") ?? 0),
+    protein_100g: roundMacro(pick(nutriments, "proteins_100g") ?? 0),
+    carbs_100g: roundMacro(pick(nutriments, "carbohydrates_100g") ?? 0),
+    fat_100g: roundMacro(pick(nutriments, "fat_100g") ?? 0),
     serving_size: product.serving_size?.trim() || undefined,
   };
 }

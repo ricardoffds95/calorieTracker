@@ -107,10 +107,11 @@ export interface QuantityPreset {
 /** Quick quantities: 100 g plus one serving when Open Food Facts gives it in grams ("30 g", "1 tablet (40g)"). */
 export function servingPresets(servingSize: string | undefined): QuantityPreset[] {
   const presets: QuantityPreset[] = [{ label: "100 g", grams: 100 }];
-  const match = servingSize?.match(/(\d+(?:[.,]\d+)?)\s*g\b/i);
-  const grams = match ? Number(match[1]!.replace(",", ".")) : Number.NaN;
-  if (grams > 0 && grams <= MAX_QUANTITY_G && grams !== 100) {
-    presets.push({ label: `1 dose (${roundMacro(grams)} g)`, grams: roundMacro(grams) });
+  const match = servingSize?.match(/(\d+(?:[.,]\d+)?)\s*(g|ml)\b/i);
+  const amount = match ? Number(match[1]!.replace(",", ".")) : Number.NaN;
+  // Drinks are given in ml: 1 ml is counted as 1 g (water-like), the unit the food is stored in.
+  if (amount > 0 && amount <= MAX_QUANTITY_G && amount !== 100) {
+    presets.push({ label: `1 dose (${roundMacro(amount)} ${match![2]!.toLowerCase()})`, grams: roundMacro(amount) });
   }
   return presets;
 }

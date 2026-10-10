@@ -29,7 +29,8 @@ function HistoryPeriod({ userId }: { userId: string }) {
 
   const days = useMemo(() => history.data ?? [], [history.data]);
   const summary = useMemo(() => summarize(days, period, toDateKey(now)), [days, period, now]);
-  const buckets = useMemo(() => bucketize(days, period), [days, period]);
+  const todayKey = toDateKey(now);
+  const buckets = useMemo(() => bucketize(days, period, todayKey), [days, period, todayKey]);
   return (
     <div className="flex flex-col gap-6">
       <PeriodPicker period={period} now={now} />
@@ -53,7 +54,7 @@ function HistoryPeriod({ userId }: { userId: string }) {
           {summary.average && (
             <>
               <MacroAverages average={summary.average} />
-              <KcalChart key={`${period.kind}-${period.from}-${period.to}`} buckets={buckets} />
+              <KcalChart key={`${period.kind}-${period.from}-${period.to}`} buckets={buckets} kind={period.kind} />
               <BucketList buckets={buckets} now={now} />
             </>
           )}

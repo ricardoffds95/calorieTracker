@@ -225,17 +225,43 @@ describe("granularityFor / bucketize", () => {
   });
 });
 
+describe("bucketize never shows days that have not happened yet", () => {
+  it("ends the current month, week and year today", () => {
+    const month = bucketize([], periodFor("month", "2026-10-10"), "2026-10-10");
+    expect(month).toHaveLength(10);
+    expect(month.at(-1)).toMatchObject({ from: "2026-10-10", to: "2026-10-10" });
+    expect(bucketize([], periodFor("week", "2026-10-10"), "2026-10-07").map((b) => b.from)).toEqual(["2026-10-05", "2026-10-06", "2026-10-07"]);
+    const year = bucketize([], periodFor("year", "2026-10-10"), "2026-10-10");
+    expect(year).toHaveLength(10); // Jan to Oct
+    expect(year.at(-1)).toMatchObject({ from: "2026-10-01", to: "2026-10-10" }); // October is partial
+  });
+  it("clips the last week of a range that includes today", () => {
+    const buckets = bucketize([], custom("2026-09-01", "2026-11-30"), "2026-10-10");
+    expect(buckets.at(-1)).toMatchObject({ granularity: "week", to: "2026-10-10" });
+  });
+  it("leaves past periods whole and a period that has not started empty", () => {
+    expect(bucketize([], periodFor("month", "2026-01-10"), "2026-10-10")).toHaveLength(31);
+    expect(bucketize([], periodFor("week", "2099-01-04"), "2026-10-10")).toEqual([]);
+  });
+  it("still covers every day when no 'today' is given", () => {
+    expect(bucketize([], periodFor("month", "2026-10-10"))).toHaveLength(31);
+  });
+});
+
 describe("labels and links", () => {
   const week = periodFor("week", "2026-10-10");
   it("labels buckets and axis ticks", () => {
     const days = bucketize([], week);
     expect(bucketLabel(days[0]!)).toBe("seg, 5 out");
-    expect(days.map((b, i) => axisLabel(b, i, days.length))).toEqual(["S", "T", "Q", "Q", "S", "S", "D"]);
+    expect(days.map((b, i) => axisLabel(b, i, days.length, "week"))).toEqual(["S", "T", "Q", "Q", "S", "S", "D"]);
     const month = bucketize([], periodFor("month", "2026-10-10"));
-    const ticks = month.map((b, i) => axisLabel(b, i, month.length)).filter(Boolean);
+    const ticks = month.map((b, i) => axisLabel(b, i, month.length, "month")).filter(Boolean);
     expect(ticks).toEqual(["1", "5", "10", "15", "20", "25", "30"]);
     const year = bucketize([], periodFor("year", "2026-10-10"));
-    expect(year.map((b, i) => axisLabel(b, i, year.length)).join("")).toBe("JFMAMJJASOND");
+    expect(year.map((b, i) => axisLabel(b, i, year.length, "year")).join("")).toBe("JFMAMJJASOND");
+    // the first days of a month are numbered, not turned into weekday letters
+    const early = bucketize([], periodFor("month", "2026-10-10"), "2026-10-04");
+    expect(early.map((b, i) => axisLabel(b, i, early.length, "month")).filter(Boolean)).toEqual(["1"]);
     expect(bucketLabel(year[9]!)).toBe("outubro");
   });
   it("opens a day in Hoje and drills weeks and months into their own period", () => {

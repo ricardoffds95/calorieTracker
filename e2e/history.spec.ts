@@ -53,7 +53,18 @@ test("opens on the current week and shows only what was logged", async ({ page }
   await expect(page.getByTestId("avg-kcal")).toHaveText("1850");
   await expect(page.getByTestId("logged-days")).toContainText(`1 de ${elapsedDays(week, today)} `);
   await expect(page.getByRole("link", { name: "Voltar a hoje" })).toHaveCount(0);
-  await expect(page.getByTestId("kcal-bar")).toHaveCount(7);
+  await expect(page.getByTestId("kcal-bar")).toHaveCount(elapsedDays(week, today)); // days that have not happened are not drawn
+});
+
+test("the current month and year stop today: no future days in the chart or the list", async ({ page }) => {
+  const today = now();
+  await seedDiary("A", [row(toDateKey(today), 1800, 100, 180, 50)]); // the chart only exists once something was logged
+  await login(page, "A");
+  await openHistory(page, `p=month&d=${toDateKey(today)}`);
+  await expect(page.getByTestId("kcal-bar")).toHaveCount(today.getDate());
+  await expect(page.getByTestId("bucket-list").getByRole("listitem")).toHaveCount(today.getDate());
+  await page.getByRole("link", { name: "Ano" }).click();
+  await expect(page.getByTestId("kcal-bar")).toHaveCount(today.getMonth() + 1); // January up to this month
 });
 
 test("averages are per logged day: exact numbers, days summed, empty days left out", async ({ page }) => {
@@ -108,7 +119,8 @@ test("arrows, kind links, going to a date and 'Voltar a hoje'", async ({ page })
 
   await page.getByRole("link", { name: "Ano" }).click();
   await expect(page).toHaveURL(/p=year&d=2026-01-01/);
-  await expect(page.getByTestId("kcal-bar")).toHaveCount(12);
+  // a past year has 12 months; the current one stops at this month
+  await expect(page.getByTestId("kcal-bar")).toHaveCount(now().getFullYear() === 2026 ? now().getMonth() + 1 : 12);
   await expect(page.getByTestId("avg-kcal")).toHaveText("1925");
   await page.getByTestId("bucket-list").getByRole("link", { name: /janeiro/i }).click(); // drill into the month
   await expect(page).toHaveURL(/p=month&d=2026-01-01/);

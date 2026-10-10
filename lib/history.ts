@@ -229,15 +229,19 @@ function boundsOf(granularity: Granularity, key: string): { from: string; to: st
   return { from: key, to: key };
 }
 
-/** Consecutive buckets covering the whole period (empty ones included, so the axis never has holes). */
-export function bucketize(days: readonly DayTotals[], period: Period): Bucket[] {
+/**
+ * Consecutive buckets covering the period (empty ones included, so the axis never has holes).
+ * With `todayKey`, days that have not happened yet are left out: the current month ends today, not on the 31st.
+ */
+export function bucketize(days: readonly DayTotals[], period: Period, todayKey?: string): Bucket[] {
   const granularity = granularityFor(period);
+  const end = todayKey !== undefined && todayKey < period.to ? todayKey : period.to;
   const buckets: Bucket[] = [];
   let cursor = period.from;
-  while (cursor <= period.to) {
+  while (cursor <= end) {
     const bounds = boundsOf(granularity, cursor);
     const from = bounds.from < period.from ? period.from : bounds.from;
-    const to = bounds.to > period.to ? period.to : bounds.to;
+    const to = bounds.to > end ? end : bounds.to;
     const inside = days.filter((d) => d.date >= from && d.date <= to && d.entries > 0);
     buckets.push({ key: from, granularity, from, to, loggedDays: inside.length, average: averageOf(inside) });
     cursor = addDays(bounds.to, 1);
@@ -260,10 +264,11 @@ export function bucketLabel(bucket: Bucket): string {
 }
 
 /** The x-axis text of a bar; empty for the bars that would crowd the axis. */
-export function axisLabel(bucket: Bucket, index: number, total: number): string {
+export function axisLabel(bucket: Bucket, index: number, total: number, kind: PeriodKind): string {
   const date = dateOf(bucket.from);
   if (bucket.granularity === "day") {
-    if (total <= 7) return format(date, "EEEEE", { locale: pt }).toUpperCase();
+    // weekday initials for a week (or a short range); the first days of a month still get day numbers
+    if (total <= 7 && kind !== "month") return format(date, "EEEEE", { locale: pt }).toUpperCase();
     return index === 0 || date.getDate() % 5 === 0 ? String(date.getDate()) : "";
   }
   if (bucket.granularity === "month") return format(date, "MMMMM", { locale: pt }).toUpperCase();

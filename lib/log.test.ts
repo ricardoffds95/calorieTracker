@@ -96,11 +96,17 @@ describe("servingPresets", () => {
     ]);
     expect(servingPresets("1 tablet (12,5g)")[1]).toEqual({ label: "1 dose (12.5 g)", grams: 12.5 });
   });
+  it("reads drinks in ml, counting 1 ml as 1 g", () => {
+    expect(servingPresets("250 ml")).toEqual([
+      { label: "100 g", grams: 100 },
+      { label: "1 dose (250 ml)", grams: 250 },
+    ]);
+    expect(servingPresets("1 copo (200ML)")[1]).toEqual({ label: "1 dose (200 ml)", grams: 200 });
+  });
   it("only offers 100 g otherwise", () => {
     expect(servingPresets(undefined)).toEqual([{ label: "100 g", grams: 100 }]);
     expect(servingPresets("1 cup")).toHaveLength(1);
     expect(servingPresets("100 g")).toHaveLength(1);
-    expect(servingPresets("250 ml")).toHaveLength(1);
   });
 });
 

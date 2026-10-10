@@ -56,9 +56,21 @@ describe("mapProduct", () => {
   it("converts kJ to kcal when kcal is missing", () => {
     expect(mapProduct({ code: "1", product_name: "X", nutriments: { energy_100g: 1046 } }).calories_100g).toBe(250);
   });
-  it("accepts numeric strings and falls back across keys", () => {
-    const p = mapProduct({ code: "1", product_name: "X", nutriments: { "energy-kcal": "100", protein_100g: "2.25", carbohydrates: 3, fat: "0.04" } });
+  it("accepts numeric strings", () => {
+    const p = mapProduct({ code: "1", product_name: "X", nutriments: { "energy-kcal_100g": "100", proteins_100g: "2.25", carbohydrates_100g: 3, fat_100g: "0.04" } });
     expect(p).toMatchObject({ calories_100g: 100, protein_100g: 2.3, carbs_100g: 3, fat_100g: 0 });
+  });
+  it("never reads values without the _100g suffix: they may be per serving (e.g. 250 ml)", () => {
+    const perServing = { "energy-kcal": 147, "energy-kcal_serving": 147, proteins: 25, carbohydrates: 11, fat: 0.4, protein_100g: 25 };
+    expect(mapProduct({ code: "1", product_name: "Leite", nutriments: perServing })).toMatchObject({
+      calories_100g: 0,
+      protein_100g: 0,
+      carbs_100g: 0,
+      fat_100g: 0,
+    });
+  });
+  it("converts the kJ of the newer API (energy-kj_100g) when kcal is missing", () => {
+    expect(mapProduct({ code: "1", product_name: "X", nutriments: { "energy-kj_100g": 317 } }).calories_100g).toBe(76);
   });
   it("falls back to other languages and then to the generic name", () => {
     expect(mapProduct({ product_name_en: "Rice", product_name: "Arroz?" }).name).toBe("Rice");

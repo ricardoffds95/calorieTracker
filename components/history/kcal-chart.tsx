@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { axisLabel, bucketLabel, type Bucket } from "@/lib/history";
+import { axisLabel, bucketLabel, type Bucket, type PeriodKind } from "@/lib/history";
 import { cn } from "@/lib/utils";
 
 interface KcalChartProps {
   buckets: readonly Bucket[];
+  kind: PeriodKind;
 }
 
 const STEP = 500;
@@ -23,7 +24,7 @@ function readout(bucket: Bucket): string {
 }
 
 /** Average kcal per bar (one bar = a day, a week or a month). Each bar is a button: tap to read the values. */
-export function KcalChart({ buckets }: KcalChartProps) {
+export function KcalChart({ buckets, kind }: KcalChartProps) {
   const [selected, setSelected] = useState<string | null>(null);
   const top = niceMax(Math.max(0, ...buckets.map((b) => b.average?.calories ?? 0)) * 1.05);
   const chosen = buckets.find((b) => b.key === selected) ?? null;
@@ -72,7 +73,7 @@ export function KcalChart({ buckets }: KcalChartProps) {
           <div aria-hidden className="flex pt-1">
             {buckets.map((bucket, i) => (
               <span key={bucket.key} className="min-w-0 flex-1 text-center text-xs text-muted-foreground">
-                {axisLabel(bucket, i, buckets.length)}
+                {axisLabel(bucket, i, buckets.length, kind)}
               </span>
             ))}
           </div>
