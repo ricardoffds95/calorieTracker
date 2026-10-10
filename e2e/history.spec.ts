@@ -62,6 +62,8 @@ test("the current month and year stop today: no future days in the chart or the 
   await login(page, "A");
   await openHistory(page, `p=month&d=${toDateKey(today)}`);
   await expect(page.getByTestId("kcal-bar")).toHaveCount(today.getDate());
+  await expect(page.getByTestId("bucket-list").getByRole("listitem")).toHaveCount(1); // only today has data
+  await page.getByRole("button", { name: "Mostrar todos os dias" }).click();
   await expect(page.getByTestId("bucket-list").getByRole("listitem")).toHaveCount(today.getDate());
   await page.getByRole("link", { name: "Ano" }).click();
   await expect(page.getByTestId("kcal-bar")).toHaveCount(today.getMonth() + 1); // January up to this month
@@ -77,25 +79,80 @@ test("averages are per logged day: exact numbers, days summed, empty days left o
   await expect(page.getByTestId("avg-kcal")).toHaveText("1925");
   await expect(page.getByTestId("logged-days")).toContainText("4 de 7 dias registados");
   await expect(page.getByTestId("logged-days")).toContainText("total 7699 kcal");
-  await expect(page.getByTestId("macro-protein")).toContainText("80.1"); // (100 + 90.5 + 80 + 50) / 4
-  await expect(page.getByTestId("macro-carbs")).toContainText("195");
-  await expect(page.getByTestId("macro-fat")).toContainText("57.6");
-  await expect(page.getByTestId("macro-protein")).toContainText("20% das kcal");
-  await expect(page.getByTestId("macro-carbs")).toContainText("48% das kcal");
-  await expect(page.getByTestId("macro-fat")).toContainText("32% das kcal");
-  await expect(page.getByText("Dia mais alto")).toBeVisible();
   // goals change over time, so nothing in the history is compared with them
   await expect(page.getByText(/meta/i)).toHaveCount(0);
   await expect(page.getByRole("progressbar")).toHaveCount(0);
 
+  // average, highest and lowest day of calories and of every macro
+  const stat = (metric: string, kind: "avg" | "max" | "min") => page.getByTestId(`stat-${metric}-${kind}`);
+  await expect(stat("calories", "avg")).toHaveText("1925 kcal");
+  await expect(stat("calories", "max")).toContainText("2400 kcal");
+  await expect(stat("calories", "max")).toContainText("sex, 16 jan");
+  await expect(stat("calories", "min")).toContainText("1500 kcal");
+  await expect(stat("calories", "min")).toContainText("ter, 13 jan");
+  await expect(stat("protein", "avg")).toHaveText("80.1 g"); // (100 + 90.5 + 80 + 50) / 4
+  await expect(stat("protein", "max")).toContainText("100 g");
+  await expect(stat("protein", "max")).toContainText("seg, 12 jan");
+  await expect(stat("protein", "min")).toContainText("50 g");
+  await expect(stat("protein", "min")).toContainText("sex, 16 jan");
+  await expect(stat("carbs", "avg")).toHaveText("195 g");
+  await expect(stat("carbs", "max")).toContainText("250 g");
+  await expect(stat("carbs", "min")).toContainText("150 g");
+  await expect(stat("fat", "avg")).toHaveText("57.6 g");
+  await expect(stat("fat", "max")).toContainText("80 g");
+  await expect(stat("fat", "min")).toContainText("40.4 g");
+  await expect(page.getByTestId("metric-protein")).toContainText("20% das kcal");
+  await expect(page.getByTestId("metric-carbs")).toContainText("48% das kcal");
+  await expect(page.getByTestId("metric-fat")).toContainText("32% das kcal");
+
+  // one chart per metric, a bar for each day of the week
   const bars = page.getByTestId("kcal-bar");
   await expect(bars).toHaveCount(7);
+  await expect(page.getByTestId("macro-bar")).toHaveCount(21); // protein, carbs and fat
   await expect(bars.nth(4)).toHaveAttribute("aria-label", /2400 kcal/); // Friday 16
   await expect(bars.nth(2)).toHaveAttribute("aria-label", /sem registos/); // Wednesday
+});
 
-  await bars.nth(0).click();
-  await expect(page.getByTestId("chart-readout")).toContainText("2000 kcal");
-  await expect(page.getByTestId("chart-readout")).toContainText("P 100 · H 200 · G 60");
+test("selecting a day in one chart selects it in all four, with every value in one line", async ({ page }) => {
+  await seedWeek();
+  await login(page, "A");
+  await openHistory(page, WEEK);
+  const readout = page.getByTestId("chart-readout");
+  const selectedBars = page.locator('[data-testid="kcal-bar"][data-selected="true"], [data-testid="macro-bar"][data-selected="true"]');
+
+  await page.getByTestId("kcal-bar").nth(0).click();
+  await expect(readout).toContainText("2000 kcal");
+  await expect(readout).toContainText("P 100 · H 200 · G 60");
+  await expect(selectedBars).toHaveCount(4); // one in each chart
+
+  await page.locator('[data-testid="macro-bar"][data-metric="fat"]').nth(4).click(); // Friday, in the fat chart
+  await expect(readout).toContainText("2400 kcal");
+  await expect(readout).toContainText("P 50 · H 250 · G 80");
+  await expect(selectedBars).toHaveCount(4);
+
+  await page.locator('[data-testid="macro-bar"][data-metric="fat"]').nth(4).click(); // again: unselect
+  await expect(selectedBars).toHaveCount(0);
+});
+
+test("the list shows only the days with data, and every day on request", async ({ page }) => {
+  await seedWeek();
+  await login(page, "A");
+  await openHistory(page, WEEK);
+  const items = page.getByTestId("bucket-list").getByRole("listitem");
+
+  await expect(items).toHaveCount(4); // Mon 12, Tue 13, Thu 15, Fri 16
+  await expect(page.getByTestId("bucket-list")).not.toContainText("—");
+  await page.getByRole("button", { name: "Mostrar todos os dias" }).click();
+  await expect(items).toHaveCount(7);
+  await expect(page.getByTestId("bucket-list").getByText("—")).toHaveCount(3);
+  await expect(page.getByRole("button", { name: "Só dias com registos" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("kcal-bar")).toHaveCount(7); // the charts always show the whole period
+  await page.getByRole("button", { name: "Só dias com registos" }).click();
+  await expect(items).toHaveCount(4);
+
+  await openHistory(page, "p=year&d=2026-01-01"); // months in the year view
+  await page.getByRole("button", { name: "Mostrar todos os meses" }).click();
+  await expect(items).toHaveCount(now().getFullYear() === 2026 ? now().getMonth() + 1 : 12); // a past year has 12 months
 });
 
 test("arrows, kind links, going to a date and 'Voltar a hoje'", async ({ page }) => {

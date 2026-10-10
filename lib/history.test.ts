@@ -8,6 +8,8 @@ import {
   elapsedDays,
   granularityFor,
   macroSplit,
+  niceMax,
+  valueOf,
   parsePeriodParams,
   periodFor,
   periodHref,
@@ -149,18 +151,50 @@ describe("summarize", () => {
     expect(s.total).toEqual({ calories: 5299, protein: 270.5, carbs: 530, fat: 150.4 });
     expect(s.average).toEqual({ calories: 1766, protein: 90.2, carbs: 176.7, fat: 50.1 }); // 5299/3, not /6 or /7
   });
-  it("finds the highest and lowest day", () => {
-    const s = summarize(days, week, "2026-10-10");
-    expect(s.highest?.date).toBe("2026-10-05");
-    expect(s.lowest?.date).toBe("2026-10-06");
+  it("gives average, highest and lowest day for calories and every macro", () => {
+    const { stats } = summarize(days, week, "2026-10-10");
+    expect(stats?.calories).toEqual({ average: 1766, max: { date: "2026-10-05", value: 2000 }, min: { date: "2026-10-06", value: 1500 } });
+    expect(stats?.protein).toEqual({ average: 90.2, max: { date: "2026-10-05", value: 100 }, min: { date: "2026-10-08", value: 80 } });
+    expect(stats?.carbs).toEqual({ average: 176.7, max: { date: "2026-10-05", value: 200 }, min: { date: "2026-10-06", value: 150 } });
+    expect(stats?.fat).toEqual({ average: 50.1, max: { date: "2026-10-05", value: 60 }, min: { date: "2026-10-06", value: 40.4 } });
+  });
+  it("takes the earliest day on a tie, and one logged day is both highest and lowest", () => {
+    const tie = summarize([day("2026-10-07", 1800), day("2026-10-06", 1800), day("2026-10-08", 1800)], week, "2026-10-10");
+    expect(tie.stats?.calories.max.date).toBe("2026-10-06");
+    expect(tie.stats?.calories.min.date).toBe("2026-10-06");
+    const one = summarize([day("2026-10-07", 1234, 50)], week, "2026-10-10");
+    expect(one.stats?.calories).toEqual({ average: 1234, max: { date: "2026-10-07", value: 1234 }, min: { date: "2026-10-07", value: 1234 } });
   });
   it("ignores days outside the period and days without entries", () => {
     const s = summarize([...days, day("2026-10-12", 9999), day("2026-10-07", 777, 0, 0, 0, 0)], week, "2026-10-10");
     expect(s.loggedDays).toBe(3);
     expect(s.total.calories).toBe(5299);
   });
-  it("has no average when nothing was logged", () => {
-    expect(summarize([], week, "2026-10-10")).toMatchObject({ loggedDays: 0, average: null, highest: null, lowest: null });
+  it("has no average or stats when nothing was logged", () => {
+    expect(summarize([], week, "2026-10-10")).toMatchObject({ loggedDays: 0, average: null, stats: null });
+  });
+});
+
+describe("niceMax / valueOf", () => {
+  it("rounds up to a clean axis top, for kcal and for grams", () => {
+    expect(niceMax(2049)).toBe(2500);
+    expect(niceMax(2520)).toBe(3000);
+    expect(niceMax(71)).toBe(80);
+    expect(niceMax(207)).toBe(250);
+    expect(niceMax(1)).toBe(1);
+    expect(niceMax(0.45)).toBe(0.5);
+    expect(niceMax(100)).toBe(100);
+    expect(niceMax(101)).toBe(120);
+  });
+  it("never goes below the value and has a floor for empty data", () => {
+    for (const v of [0.3, 7, 19.9, 55, 333, 999, 1500, 4700, 12345]) expect(niceMax(v)).toBeGreaterThanOrEqual(v);
+    expect(niceMax(0)).toBe(10);
+  });
+  it("reads a metric of a bucket, or null when it is empty", () => {
+    const [b] = bucketize([day("2026-10-06", 1500, 90)], periodFor("week", "2026-10-10")).filter((x) => x.average);
+    expect(valueOf(b!, "calories")).toBe(1500);
+    expect(valueOf(b!, "protein")).toBe(90);
+    expect(valueOf({ average: null }, "fat")).toBeNull();
   });
 });
 

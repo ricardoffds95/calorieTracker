@@ -18,7 +18,7 @@ export function DiaryTargetPicker({ value, onChange }: DiaryTargetPickerProps) {
     <div className="flex flex-col gap-3" role="group" aria-label="Onde adicionar">
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="target-date">Data</Label>
-        <Input id="target-date" type="date" className="h-11" value={value.entry_date} onChange={(e) => onChange({ ...value, entry_date: e.target.value })} />
+        <Input id="target-date" type="date" className="block h-11 w-full min-w-0 max-w-full appearance-none" value={value.entry_date} onChange={(e) => onChange({ ...value, entry_date: e.target.value })} />
       </div>
       <div role="group" aria-label="Refeição" className="grid grid-cols-4 gap-1">
         {MEAL_TYPES.map((meal) => (

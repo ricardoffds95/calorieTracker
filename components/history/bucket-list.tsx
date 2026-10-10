@@ -1,12 +1,31 @@
-import Link from "next/link";
-import { bucketHref, bucketLabel, type Bucket } from "@/lib/history";
+"use client";
 
-/** The table view of the chart: every bar with its values, and a link to open that day (or drill into that week/month). */
+import { useState } from "react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { bucketHref, bucketLabel, type Bucket, type Granularity } from "@/lib/history";
+
+const NOUN: Record<Granularity, string> = { day: "dias", week: "semanas", month: "meses" };
+
+/** The table view of the charts: every bar with its values and a link to open that day (or drill into that week/month). */
 export function BucketList({ buckets, now }: { buckets: readonly Bucket[]; now: Date }) {
+  const [showAll, setShowAll] = useState(false);
+  const noun = NOUN[buckets[0]?.granularity ?? "day"];
+  const withData = buckets.filter((bucket) => bucket.average !== null);
+  const shown = showAll ? buckets : withData;
+
   return (
     <section aria-label="Detalhe do período" className="flex flex-col">
+      <div className="flex items-center justify-between gap-3 pb-1">
+        <h2 className="text-base font-semibold">Detalhe</h2>
+        {withData.length < buckets.length && (
+          <Button type="button" variant="ghost" className="h-11 px-2 text-sm" aria-pressed={showAll} onClick={() => setShowAll((v) => !v)}>
+            {showAll ? `Só ${noun} com registos` : `Mostrar todos os ${noun}`}
+          </Button>
+        )}
+      </div>
       <ul data-testid="bucket-list">
-        {buckets.map((bucket) => (
+        {shown.map((bucket) => (
           <li key={bucket.key} className="border-t border-border">
             <Link href={bucketHref(bucket, now)} className="flex min-h-14 items-center justify-between gap-3 rounded-sm px-1 py-2">
               <span className="min-w-0">

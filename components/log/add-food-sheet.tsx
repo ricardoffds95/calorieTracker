@@ -16,7 +16,8 @@ interface AddFoodSheetProps {
   initialTarget: LogTarget;
   pending: boolean;
   onClose: () => void;
-  onAdd: (food: FoodSearchResult, quantity_g: number, target: LogTarget) => void;
+  /** `save`: also keep the food in "Guardados" (always true for a food that is already saved). */
+  onAdd: (food: FoodSearchResult, quantity_g: number, target: LogTarget, save: boolean) => void;
   /** Save the food in "Guardados" without logging it (only offered for foods that are not saved yet). */
   onSaveOnly?: (food: FoodSearchResult) => void;
 }
@@ -45,13 +46,18 @@ export function AddFoodSheet({ food, initialTarget, pending, onClose, onAdd, onS
           <DiaryTargetPicker value={target} onChange={setTarget} />
         </div>
         <SheetFooter>
-          <Button type="button" size="lg" className="h-11" disabled={!ready || pending} onClick={() => parsed.success && onAdd(food, parsed.data, target)}>
+          <Button type="button" size="lg" className="h-11" disabled={!ready || pending} onClick={() => parsed.success && onAdd(food, parsed.data, target, true)}>
             {pending ? "A adicionar…" : isNew ? "Guardar e adicionar ao diário" : "Adicionar ao diário"}
           </Button>
           {isNew && (
-            <Button type="button" variant="outline" size="lg" className="h-11" disabled={pending} onClick={() => onSaveOnly(food)}>
-              Só guardar nos alimentos
-            </Button>
+            <>
+              <Button type="button" variant="outline" size="lg" className="h-11" disabled={!ready || pending} onClick={() => parsed.success && onAdd(food, parsed.data, target, false)}>
+                Só adicionar ao diário
+              </Button>
+              <Button type="button" variant="outline" size="lg" className="h-11" disabled={pending} onClick={() => onSaveOnly(food)}>
+                Só guardar nos alimentos
+              </Button>
+            </>
           )}
         </SheetFooter>
       </SheetContent>

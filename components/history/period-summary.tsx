@@ -1,12 +1,8 @@
-import { dayLabel, type PeriodSummary } from "@/lib/history";
+import type { PeriodSummary } from "@/lib/history";
 
-
-function dayText(date: string, kcal: number) {
-  return `${dayLabel(date)} · ${kcal} kcal`;
-}
 
 export function PeriodSummaryCard({ summary }: { summary: PeriodSummary }) {
-  const { average, loggedDays, elapsedDays, total, highest, lowest } = summary;
+  const { average, loggedDays, elapsedDays, total } = summary;
   if (!average) {
     return (
       <section aria-label="Resumo do período" className="flex flex-col gap-1">
@@ -29,18 +25,6 @@ export function PeriodSummaryCard({ summary }: { summary: PeriodSummary }) {
         {loggedDays} de {elapsedDays} {elapsedDays === 1 ? "dia registado" : "dias registados"}
         <span className="text-muted-foreground"> · total {total.calories} kcal</span>
       </p>
-      {highest && lowest && highest.date !== lowest.date && (
-        <dl className="grid grid-cols-2 gap-3 text-sm">
-          <div>
-            <dt className="text-xs text-muted-foreground">Dia mais alto</dt>
-            <dd className="tabular-nums">{dayText(highest.date, highest.calories)}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-muted-foreground">Dia mais baixo</dt>
-            <dd className="tabular-nums">{dayText(lowest.date, lowest.calories)}</dd>
-          </div>
-        </dl>
-      )}
     </section>
   );
 }

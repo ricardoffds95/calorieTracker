@@ -222,6 +222,24 @@ test("a food from Open Food Facts can be only saved, or saved and logged", async
   expect((await fetchSavedFoods("A"))[0]).toMatchObject({ times_used: 1 });
 });
 
+test("a new food can be logged without saving it: it only goes to the diary", async ({ page }) => {
+  await mockOff(page);
+  await login(page, "A");
+  await openLog(page);
+
+  await searchBox(page).fill("arroz teste e2e");
+  await page.getByRole("button", { name: "Escolher Arroz Teste E2E" }).click();
+  for (const name of ["Guardar e adicionar ao diário", "Só adicionar ao diário", "Só guardar nos alimentos"]) {
+    await expect(page.getByRole("button", { name, exact: true })).toBeVisible(); // the three choices
+  }
+  await page.getByRole("button", { name: "Só adicionar ao diário", exact: true }).click();
+  await expect(page.getByText(/Arroz Teste E2E adicionado a almoço/)).toBeVisible();
+
+  const [row] = await fetchDiary("A", DAY);
+  expect(row).toMatchObject({ name: "Arroz Teste E2E", quantity_g: 75, calories: 98, saved_food_id: null });
+  expect(await fetchSavedFoods("A")).toHaveLength(0); // nothing was kept in "Guardados"
+});
+
 test("opening a food or a meal never opens the keyboard: nothing is focused or selected", async ({ page }) => {
   await seedSavedFood("A", { name: "Ovo E2E", calories_100g: 155, protein_100g: 13, carbs_100g: 1.1, fat_100g: 11 });
   await seedSavedMeal("A", { name: "Sopa E2E", items: [{ name: "Sopa", quantity_g: null, calories: 180, protein_g: 5, carbs_g: 20, fat_g: 6 }], total_calories: 180, total_protein: 5, total_carbs: 20, total_fat: 6 });

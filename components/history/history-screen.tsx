@@ -3,8 +3,7 @@
 import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { BucketList } from "@/components/history/bucket-list";
-import { KcalChart } from "@/components/history/kcal-chart";
-import { MacroAverages } from "@/components/history/macro-averages";
+import { PeriodMetrics } from "@/components/history/period-metrics";
 import { PeriodPicker } from "@/components/history/period-picker";
 import { PeriodSummaryCard } from "@/components/history/period-summary";
 import { Button } from "@/components/ui/button";
@@ -53,8 +52,7 @@ function HistoryPeriod({ userId }: { userId: string }) {
           <PeriodSummaryCard summary={summary} />
           {summary.average && (
             <>
-              <MacroAverages average={summary.average} />
-              <KcalChart key={`${period.kind}-${period.from}-${period.to}`} buckets={buckets} kind={period.kind} />
+              <PeriodMetrics key={`${period.kind}-${period.from}-${period.to}`} summary={summary} buckets={buckets} kind={period.kind} />
               <BucketList buckets={buckets} now={now} />
             </>
           )}

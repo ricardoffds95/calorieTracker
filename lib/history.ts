@@ -138,6 +138,36 @@ export function periodLabel(period: Period, now: Date): string {
   return sameMonth ? `${from.getDate()}–${day(period.to)}${suffix}` : `${day(period.from)} – ${day(period.to)}${suffix}`;
 }
 
+export type Metric = "calories" | "protein" | "carbs" | "fat";
+
+/** The four things the History shows, in order, with their unit. */
+export const METRICS: readonly { key: Metric; label: string; unit: string }[] = [
+  { key: "calories", label: "Calorias", unit: "kcal" },
+  { key: "protein", label: "Proteína", unit: "g" },
+  { key: "carbs", label: "Hidratos", unit: "g" },
+  { key: "fat", label: "Gordura", unit: "g" },
+];
+
+const DAY_FIELD: Record<Metric, "calories" | "protein_g" | "carbs_g" | "fat_g"> = {
+  calories: "calories",
+  protein: "protein_g",
+  carbs: "carbs_g",
+  fat: "fat_g",
+};
+
+/** A value on a given day (the highest or the lowest of the period). */
+export interface DayValue {
+  date: string;
+  value: number;
+}
+
+/** Average per logged day, and the highest and lowest day, of one metric. */
+export interface MetricStats {
+  average: number;
+  max: DayValue;
+  min: DayValue;
+}
+
 export interface PeriodSummary {
   /** Days of the period that already started. */
   elapsedDays: number;
@@ -145,8 +175,8 @@ export interface PeriodSummary {
   total: MacroTotals;
   /** Per logged day (days without entries do not drag the average down); null when nothing was logged. */
   average: MacroTotals | null;
-  highest: DayTotals | null;
-  lowest: DayTotals | null;
+  /** Average, highest and lowest day for each metric; null when nothing was logged. */
+  stats: Record<Metric, MetricStats> | null;
 }
 
 const ZERO: MacroTotals = { calories: 0, protein: 0, carbs: 0, fat: 0 };
@@ -165,18 +195,49 @@ function averageOf(days: readonly DayTotals[]): MacroTotals | null {
   return { calories: roundCalories(total.calories / n), protein: roundMacro(total.protein / n), carbs: roundMacro(total.carbs / n), fat: roundMacro(total.fat / n) };
 }
 
+/** Average per logged day, and the highest and lowest day (the earliest one on a tie) of every metric. */
+function statsOf(days: readonly DayTotals[], average: MacroTotals): Record<Metric, MetricStats> {
+  const ordered = [...days].sort((a, b) => a.date.localeCompare(b.date));
+  const stats = {} as Record<Metric, MetricStats>;
+  for (const { key } of METRICS) {
+    const field = DAY_FIELD[key];
+    let max = ordered[0]!;
+    let min = ordered[0]!;
+    for (const day of ordered) {
+      if (day[field] > max[field]) max = day;
+      if (day[field] < min[field]) min = day;
+    }
+    stats[key] = { average: average[key], max: { date: max.date, value: max[field] }, min: { date: min.date, value: min[field] } };
+  }
+  return stats;
+}
+
 export function summarize(days: readonly DayTotals[], period: Period, todayKey: string): PeriodSummary {
   const inPeriod = days.filter((d) => containsDay(period, d.date) && d.entries > 0);
   const total = sum(inPeriod);
-  const byCalories = [...inPeriod].sort((a, b) => a.calories - b.calories);
+  const average = averageOf(inPeriod);
   return {
     elapsedDays: elapsedDays(period, todayKey),
     loggedDays: inPeriod.length,
     total: { calories: roundCalories(total.calories), protein: roundMacro(total.protein), carbs: roundMacro(total.carbs), fat: roundMacro(total.fat) },
-    average: averageOf(inPeriod),
-    highest: byCalories.at(-1) ?? null,
-    lowest: byCalories[0] ?? null,
+    average,
+    stats: average ? statsOf(inPeriod, average) : null,
   };
+}
+
+/** The average of a metric inside a bucket, or null when nothing was logged there. */
+export function valueOf(bucket: Pick<Bucket, "average">, metric: Metric): number | null {
+  return bucket.average ? bucket.average[metric] : null;
+}
+
+const NICE = [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10];
+
+/** The smallest round number (1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8 × a power of ten) that is at least `value`: a clean top for an axis. */
+export function niceMax(value: number): number {
+  if (!(value > 0)) return 10;
+  const exponent = 10 ** Math.floor(Math.log10(value));
+  const mantissa = value / exponent;
+  return (NICE.find((n) => n >= mantissa - 1e-9) ?? 10) * exponent;
 }
 
 export interface MacroSplit {

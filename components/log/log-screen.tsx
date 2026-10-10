@@ -89,7 +89,9 @@ function LogDay({ userId }: { userId: string }) {
           pending={add.isPending || saveOnly.isPending}
           onClose={() => setPanel(null)}
           // Foods from search/scan are saved first (per 100 g) so next time they are instant.
-          onAdd={(food, quantity, target) => addRows(async () => [foodEntryRow(target, food, quantity, await ensureSavedFood(food))], food.name, target)}
+          onAdd={(food, quantity, target, save) =>
+            addRows(async () => [foodEntryRow(target, food, quantity, save ? await ensureSavedFood(food) : null)], food.name, target)
+          }
           onSaveOnly={(food) => saveOnly.mutate(food, { onSuccess: () => setPanel(null) })}
         />
       )}

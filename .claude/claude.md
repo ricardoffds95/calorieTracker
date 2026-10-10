@@ -59,7 +59,7 @@ Migração de uma app React Native (Expo) de contagem de calorias e macros para 
 - O servidor envia `User-Agent: CalorieTracker/1.0 (OFF_CONTACT_EMAIL)` (variável de ambiente, não é segredo), tem timeout de 8 s e **1 repetição** em 5xx/429/timeout. Falhando, responde 503 `off_unavailable`; a UI diz "O Open Food Facts não respondeu…" com "Tentar novamente" ("Sem ligação" **só** quando o pedido falha).
 - Limites oficiais do Open Food Facts, **por IP**: pesquisa 10/min, leitura de produto 15/min, mais limites globais que dão 503. Como o servidor partilha o IP da Vercel, manter a pausa de 700 ms. A API nova não documenta limite: se for limitada, trocar a fonte atrás de `lib/off-search.ts` sem mexer na UI.
 - Só se leem os campos `*_100g` do Open Food Facts (os sem sufixo podem ser por dose). Há produtos com dados errados lá (ex.: o mesmo leite com valores de 250 ml nos campos por 100 g): escolher o resultado certo ou corrigir o alimento em Guardados.
-- Sempre que um alimento vindo da pesquisa é adicionado ao diário, **guardá-lo automaticamente em `saved_foods`** (por 100g). Um alimento ainda não guardado também pode ser **só guardado** ("Só guardar nos alimentos", sem diário); não existe "só diário" sem guardar.
+- Sempre que um alimento vindo da pesquisa é adicionado ao diário, **guardá-lo automaticamente em `saved_foods`** (por 100g). Um alimento ainda não guardado tem **três escolhas**: "Guardar e adicionar ao diário" (a principal), "Só adicionar ao diário" (a entrada fica sem ligação a um guardado, para algo que se come uma vez) e "Só guardar nos alimentos" (sem diário).
 - Código de barras: leitura direta de produto no Open Food Facts, **do browser** (`/api/v2/product/<código>`, limite por utilizador).
 - **Tab Guardados** (`/guardados`, 5 tabs): biblioteca de alimentos e refeições. Tocar numa linha abre uma folha com **Adicionar ao diário · Editar · Apagar**. Editar um guardado pergunta: a partir de hoje / todo o histórico / não atualizar. Uma refeição pode ser criada sem a registar no diário.
 
@@ -81,7 +81,7 @@ Migração de uma app React Native (Expo) de contagem de calorias e macros para 
 - Os dados vêm de `diary_daily_totals(p_from, p_to)` (SQL, `security invoker`, uma linha por dia com entradas), não de ler as entradas: o PostgREST devolve no máximo 1000 linhas por pedido e um ano tem mais. **Sem tabelas de estatísticas**: o diário é a única fonte de verdade, por isso editar um guardado com "todo o histórico" atualiza também o Histórico (as mutações invalidam `["history", userId]`).
 - **A média é por dia registado** (dias sem entradas não puxam a média para baixo, são outliers) e o ecrã diz sempre "N de M dias registados" (M = dias do período que já começaram; mês e ano atuais contam só até hoje).
 - **Nada no Histórico é comparado com as metas** (decisão do utilizador): as metas mudam ao longo do ano e não há histórico de metas, por isso comparar um período antigo com a meta atual enganaria. Só voltar a comparar se um dia existir uma média das metas do período. As macros mostram gramas médias e a parte de cada uma nas calorias (`macroSplit`).
-- Gráfico de barras próprio (sem biblioteca): barras ≤ 24 px, uma por dia (≤ 31 dias), semana (≤ ~6 meses) ou mês, sempre em `primary`; cada barra é um botão com a lista por baixo como vista em tabela.
+- **Um bloco por métrica** (calorias, proteína, hidratos, gordura): **média, máximo e mínimo** (com o dia) sobre os dias registados e um gráfico de barras próprio (sem biblioteca): barras ≤ 24 px, uma por dia (≤ 31 dias), semana (≤ ~6 meses) ou mês; `primary` nas calorias e as cores `protein`/`carbs`/`fat` nas macros, cada gráfico com a sua escala (nunca dois eixos). Tocar num dia seleciona-o nos quatro gráficos. A lista por baixo (vista em tabela) mostra **só os dias com dados**, com um botão para mostrar todos.
 
 ## Segurança (regras duras)
 - **Nunca** pôr chaves no repositório ou no cliente. Só `NEXT_PUBLIC_SUPABASE_URL` e a chave anónima/publicável são públicas.
@@ -141,7 +141,7 @@ Migração de uma app React Native (Expo) de contagem de calorias e macros para 
 ## Fluxo de trabalho
 - Usar plan mode antes de cada funcionalidade e esperar a minha aprovação do plano.
 - No fim de cada funcionalidade: correr lint, typecheck e testes; depois fazer uma revisão crítica das alterações (bugs, segurança, RLS) antes de eu fazer commit.
-- Commits pequenos. Não fazer commit nem push sem eu pedir.
+- Commits pequenos. **Fazer commit e push sozinho no fim de cada alteração** (testes verdes, sem segredos no diff), sem pedir autorização (decisão do utilizador, 2026-10-10).
 - Se algo for ambíguo, perguntar em vez de assumir.
 
 ## Comandos
