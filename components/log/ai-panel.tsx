@@ -17,15 +17,15 @@ import { AI_MAX_TEXT_LENGTH } from "@/lib/schemas";
 
 interface AiPanelProps {
   userId: string;
-  target: LogTarget;
-  mealName: string;
+  initialTarget: LogTarget;
+  now: Date;
   onClose: () => void;
-  onAdded: (message: string) => void;
+  onAdded: (message: string, day: string) => void;
 }
 
 type Result = { name: string; items: FoodItem[] };
 
-export function AiPanel({ userId, target, mealName, onClose, onAdded }: AiPanelProps) {
+export function AiPanel({ userId, initialTarget, now, onClose, onAdded }: AiPanelProps) {
   const [text, setText] = useState("");
   const [photo, setPhoto] = useState<AiImage | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -103,8 +103,8 @@ export function AiPanel({ userId, target, mealName, onClose, onAdded }: AiPanelP
               <MealActions
                 key={JSON.stringify(result)}
                 userId={userId}
-                target={target}
-                mealName={mealName}
+                initialTarget={initialTarget}
+                now={now}
                 name={result.name}
                 items={result.items}
                 onAdded={onAdded}

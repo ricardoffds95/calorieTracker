@@ -60,7 +60,8 @@ test("editing from the tab can update the whole diary history", async ({ page })
   await login(page, "A");
   await openSaved(page);
 
-  await page.getByRole("button", { name: "Editar Pão E2E" }).click();
+  await page.getByRole("button", { name: "Abrir Pão E2E" }).click();
+  await page.getByRole("button", { name: "Editar", exact: true }).click();
   await page.getByLabel("Calorias").fill("200");
   await page.getByRole("button", { name: "Guardar" }).click();
   await expect(page.getByText("Está em 2 entradas do diário")).toBeVisible();
@@ -80,14 +81,69 @@ test("deleting a saved food keeps the diary entries, just unlinked", async ({ pa
   await login(page, "A");
   await openSaved(page);
 
-  await page.getByRole("button", { name: "Editar Apagar E2E" }).click();
+  await page.getByRole("button", { name: "Abrir Apagar E2E" }).click();
   await page.getByRole("button", { name: "Apagar" }).click();
+  await expect(page.getByText("As entradas do diário mantêm-se como estão.")).toBeVisible();
   await page.getByRole("button", { name: "Apagar" }).click(); // confirm
   await expect(page.getByText("Removido dos guardados")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Editar Apagar E2E" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Abrir Apagar E2E" })).toHaveCount(0);
 
   expect(await fetchSavedFoods("A")).toHaveLength(0);
   expect((await fetchDiary("A", "2026-01-20"))[0]).toMatchObject({ name: "Apagar E2E", calories: 100, saved_food_id: null });
+});
+
+test("tapping a saved item offers Adicionar ao diário, Editar and Apagar, without opening the keyboard", async ({ page }) => {
+  await seedSavedFood("A", { name: "Ovo E2E", calories_100g: 155, protein_100g: 13, carbs_100g: 1.1, fat_100g: 11 });
+  await login(page, "A");
+  await openSaved(page);
+
+  await page.getByRole("button", { name: "Abrir Ovo E2E" }).click();
+  for (const name of ["Adicionar ao diário", "Editar", "Apagar"]) {
+    await expect(page.getByRole("button", { name, exact: true })).toBeVisible();
+  }
+  await page.getByRole("button", { name: "Editar", exact: true }).click();
+  await expect(page.getByLabel("Nome", { exact: true })).toHaveValue("Ovo E2E");
+  expect(await page.evaluate(() => ["INPUT", "TEXTAREA"].includes(document.activeElement?.tagName ?? ""))).toBe(false);
+});
+
+test("a saved food is added to the diary from here, choosing grams, day and meal (snacks by default)", async ({ page }) => {
+  const food = await seedSavedFood("A", { name: "Ovo E2E", calories_100g: 155, protein_100g: 13, carbs_100g: 1.1, fat_100g: 11 });
+  await login(page, "A");
+  await openSaved(page);
+
+  await page.getByRole("button", { name: "Abrir Ovo E2E" }).click();
+  await page.getByRole("button", { name: "Adicionar ao diário" }).click();
+  const meal = (name: string) => page.getByRole("group", { name: "Refeição", exact: true }).getByRole("button", { name, exact: true });
+  await expect(meal("Lanches")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByLabel("Data")).toHaveValue(toDateKey(new Date()));
+  await page.getByRole("button", { name: "Mais 10 g" }).click(); // 100 → 110 g
+  await meal("Almoço").click();
+  await page.getByLabel("Data").fill("2026-01-21");
+  await page.getByRole("button", { name: "Adicionar ao diário" }).click();
+  await expect(page.getByText(/Ovo E2E adicionado a almoço/)).toBeVisible();
+
+  const [row] = await fetchDiary("A", "2026-01-21");
+  expect(row).toMatchObject({ meal: "lunch", kind: "food", quantity_g: 110, calories: 171, saved_food_id: food.id });
+  await expect(page.getByTestId("saved-foods")).toContainText("usado 1×");
+});
+
+test("a saved meal is added to the diary from here, in portions", async ({ page }) => {
+  const saved = await seedSavedMeal("A", { name: "Papas de aveia", items: ITEMS, total_calories: 343, total_protein: 16.2, total_carbs: 48, total_fat: 8.2 });
+  await login(page, "A");
+  await openSaved(page);
+
+  await page.getByRole("button", { name: "Refeições · 1" }).click();
+  await page.getByRole("button", { name: "Abrir Papas de aveia" }).click();
+  await page.getByRole("button", { name: "Adicionar ao diário" }).click();
+  await page.getByRole("button", { name: "Mais porções" }).click();
+  await page.getByRole("button", { name: "Mais porções" }).click();
+  await expect(page.getByRole("status", { name: "Porções" })).toHaveText("2 porções");
+  await page.getByRole("group", { name: "Refeição", exact: true }).getByRole("button", { name: "Pequeno-almoço", exact: true }).click();
+  await page.getByRole("button", { name: "Adicionar ao diário" }).click();
+  await expect(page.getByText(/Papas de aveia adicionado a pequeno-almoço/)).toBeVisible();
+
+  const [row] = await fetchDiary("A", toDateKey(new Date()));
+  expect(row).toMatchObject({ meal: "breakfast", kind: "meal", doses: 2, calories: 686, saved_meal_id: saved.id });
 });
 
 test("creates a food by hand (per 100 g) and explains a duplicate name", async ({ page }) => {

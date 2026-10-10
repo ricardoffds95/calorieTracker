@@ -32,14 +32,21 @@ const ARROZ = {
   fat_100g: 0.3,
 };
 
-/** Our search route is mocked (no Open Food Facts quota, stable data); returns the queries it received. */
-async function mockOff(page: Page) {
-  const queries: string[] = [];
+interface Mocked {
+  queries: string[];
+  pages: number[];
+}
+
+/** Our search route is mocked (no Open Food Facts quota, stable data); records what it was asked. */
+async function mockOff(page: Page, answer: (q: string, pageNumber: number) => unknown = () => ({ results: [ARROZ] })): Promise<Mocked> {
+  const seen: Mocked = { queries: [], pages: [] };
   await page.route("**/api/food-search**", (route) => {
-    queries.push(new URL(route.request().url()).searchParams.get("q") ?? "");
-    return route.fulfill({ json: { results: [ARROZ] } });
+    const params = new URL(route.request().url()).searchParams;
+    seen.queries.push(params.get("q") ?? "");
+    seen.pages.push(Number(params.get("page")));
+    return route.fulfill({ json: answer(params.get("q") ?? "", Number(params.get("page"))) });
   });
-  return queries;
+  return seen;
 }
 
 async function openLog(page: Page, date = DAY, meal = "lunch") {
@@ -48,27 +55,40 @@ async function openLog(page: Page, date = DAY, meal = "lunch") {
   await page.waitForLoadState("networkidle");
 }
 
+const searchBox = (page: Page) => page.getByRole("searchbox", { name: "Pesquisar alimento" });
+const offTab = (page: Page) => page.getByRole("button", { name: /^Open Food Facts · / });
+const savedTab = (page: Page) => page.getByRole("button", { name: /^Guardados · / });
+const mealButton = (page: Page, name: string) => page.getByRole("group", { name: "Refeição", exact: true }).getByRole("button", { name, exact: true });
+
+/** Types exact grams through "Escrever gramas" (the only place where the keyboard is meant to open). */
+async function typeGrams(page: Page, grams: string) {
+  await page.getByRole("button", { name: "Escrever gramas" }).click();
+  await page.getByLabel("Gramas", { exact: true }).fill(grams);
+}
+
 test("search → add 150 g: diary row, auto-saved food with times_used and the Today totals", async ({ page }) => {
   await mockOff(page);
   await login(page, "A");
   await openLog(page);
-  await expect(page.getByRole("button", { name: "Almoço", exact: true })).toHaveAttribute("aria-pressed", "true");
 
-  await page.getByRole("searchbox", { name: "Pesquisar alimento" }).fill("arroz teste e2e");
+  await searchBox(page).fill("arroz teste e2e"); // searches by itself after the pause
   await page.getByRole("button", { name: "Escolher Arroz Teste E2E" }).click();
-  await expect(page.getByLabel("Quantidade (g)")).toHaveValue("75"); // one serving
-  await page.getByLabel("Quantidade (g)").fill("150");
+  await expect(page.getByTestId("grams-value")).toHaveText("75 g"); // one serving
+  await expect(mealButton(page, "Almoço")).toHaveAttribute("aria-pressed", "true"); // from the "+" of the meal in Today
+  await typeGrams(page, "150");
+  await expect(page.getByTestId("grams-value")).toHaveText("150 g");
   await expect(page.getByTestId("nutrient-summary")).toContainText("195");
-  await page.getByRole("button", { name: "Adicionar a almoço" }).click();
-  await expect(page.getByText("Arroz Teste E2E adicionado a almoço")).toBeVisible();
+  await page.getByRole("button", { name: "Guardar e adicionar ao diário" }).click();
+  await expect(page.getByText(/Arroz Teste E2E adicionado a almoço/)).toBeVisible();
 
   const [row] = await fetchDiary("A", DAY);
   expect(row).toMatchObject({ meal: "lunch", kind: "food", quantity_g: 150, calories: 195, protein_g: 4.1, carbs_g: 42.3, fat_g: 0.5 });
   const [saved] = await fetchSavedFoods("A");
   expect(saved).toMatchObject({ id: row!.saved_food_id, name: "Arroz Teste E2E", off_code: "5601234567890", calories_100g: 130, times_used: 1 });
 
-  // Next time it comes from the saved foods, without a duplicate from Open Food Facts.
-  await page.getByRole("searchbox", { name: "Pesquisar alimento" }).fill("arroz teste");
+  // Next time it is also found in the saved foods.
+  await searchBox(page).fill("arroz teste");
+  await expect(savedTab(page)).toHaveText("Guardados · 1");
   await expect(page.getByTestId("search-results").getByRole("button", { name: /Escolher Arroz Teste E2E/ })).toHaveCount(1);
   await expect(page.getByTestId("search-results").getByLabel("Guardado")).toBeVisible();
 
@@ -76,75 +96,114 @@ test("search → add 150 g: diary row, auto-saved food with times_used and the T
   await expect(page.getByTestId("meal-lunch-kcal")).toHaveText("195 kcal");
 });
 
-test("pausing while typing never searches below 3 letters, and typing on makes a single request", async ({ page }) => {
-  const queries = await mockOff(page);
+test("the search waits for a pause (700 ms) or the button; two letters are enough", async ({ page }) => {
+  const seen = await mockOff(page);
   await login(page, "A");
   await openLog(page);
-  const box = page.getByRole("searchbox", { name: "Pesquisar alimento" });
+  const box = searchBox(page);
 
-  await box.fill("ar");
-  await page.waitForTimeout(1_000); // longer than the debounce
-  expect(queries).toEqual([]);
-  await expect(page.getByText("Escreve pelo menos 3 letras")).toBeVisible();
+  await box.fill("a"); // one letter: nothing to search
+  await expect(page.getByRole("button", { name: "Pesquisar", exact: true })).toBeDisabled();
+  await page.waitForTimeout(1_000);
+  expect(seen.queries).toEqual([]);
 
-  await box.pressSequentially("roz teste", { delay: 60 }); // typed on without pausing
+  await box.pressSequentially("rroz teste", { delay: 60 }); // typed without pausing: one request in the end
   await expect(page.getByRole("button", { name: "Escolher Arroz Teste E2E" })).toBeVisible();
-  expect(queries).toEqual(["arroz teste"]);
+  expect(seen.queries).toEqual(["arroz teste"]);
+
+  await box.fill("qu"); // two letters, then the button: no need to wait for the pause
+  await page.getByRole("button", { name: "Pesquisar", exact: true }).click();
+  await expect.poll(() => seen.queries).toEqual(["arroz teste", "qu"]);
+  await page.waitForTimeout(1_000); // the pause that follows must not search "qu" again
+  expect(seen.queries).toEqual(["arroz teste", "qu"]);
 });
 
-test("matching saved foods are enough: Open Food Facts is only asked on request", async ({ page }) => {
+test("saved foods and Open Food Facts are always both searched, in separate tabs", async ({ page }) => {
   await seedSavedFood("A", { name: "Iogurte grego E2E", calories_100g: 97, protein_100g: 9, carbs_100g: 4, fat_100g: 5 });
-  const queries = await mockOff(page);
+  const seen = await mockOff(page);
   await login(page, "A");
   await openLog(page);
-  const box = page.getByRole("searchbox", { name: "Pesquisar alimento" });
 
-  await box.fill("iogurte");
-  await expect(page.getByRole("button", { name: "Escolher Iogurte grego E2E" })).toBeVisible();
-  await page.waitForTimeout(1_000); // longer than the debounce
-  expect(queries).toEqual([]);
+  await searchBox(page).fill("iogurte");
+  await expect(savedTab(page)).toHaveText("Guardados · 1");
+  await expect(offTab(page)).toHaveText("Open Food Facts · 1");
+  expect(seen.queries).toEqual(["iogurte"]); // asked even though a saved food matches
+  await expect(page.getByRole("button", { name: "Escolher Iogurte grego E2E" })).toBeVisible(); // opens on the saved foods
   await expect(page.getByRole("button", { name: "Escolher Arroz Teste E2E" })).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Pesquisar no Open Food Facts" }).click();
+  await offTab(page).click();
   await expect(page.getByRole("button", { name: "Escolher Arroz Teste E2E" })).toBeVisible();
-  expect(queries).toEqual(["iogurte"]);
-  await expect(page.getByRole("button", { name: "Escolher Iogurte grego E2E" })).toBeVisible(); // saved stays first
+  await expect(page.getByRole("button", { name: "Escolher Iogurte grego E2E" })).toHaveCount(0);
 
-  // nothing saved matches: it goes online by itself
-  await box.fill("queijo");
-  await expect.poll(() => queries).toEqual(["iogurte", "queijo"]); // previous results stay on screen meanwhile
+  // nothing saved matches: it opens on Open Food Facts
+  await searchBox(page).fill("queijo");
+  await expect(page.getByRole("button", { name: "Escolher Arroz Teste E2E" })).toBeVisible();
+  await expect(savedTab(page)).toHaveText("Guardados · 0");
 });
 
-test("cache first: a repeated search shows the cached results with no request, and the button refreshes them", async ({ page }) => {
-  const queries = await mockOff(page);
+test("every result is reachable: pages of 20 in Open Food Facts, with the total", async ({ page }) => {
+  const product = (n: number) => ({ ...ARROZ, id: `p${n}`, name: `Produto ${n}`, off_code: `p${n}` });
+  const seen = await mockOff(page, (_q, pageNumber) => ({
+    results: [product(pageNumber * 100 + 1), product(pageNumber * 100 + 2)],
+    page: pageNumber,
+    pageCount: 3,
+    total: 45,
+    totalExact: true,
+  }));
   await login(page, "A");
   await openLog(page);
-  const box = page.getByRole("searchbox", { name: "Pesquisar alimento" });
-  const result = page.getByRole("button", { name: "Escolher Arroz Teste E2E" });
 
-  await box.fill("iogurte"); // nothing saved, nothing cached: it goes online by itself
-  await expect(result).toBeVisible();
-  expect(queries).toEqual(["iogurte"]);
+  await searchBox(page).fill("produto");
+  await expect(offTab(page)).toHaveText("Open Food Facts · 45");
+  await offTab(page).click();
+  await expect(page.getByRole("button", { name: "Escolher Produto 101" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Página 1" })).toHaveAttribute("aria-current", "page");
 
-  await box.fill("");
-  await box.fill("iogurte"); // now cached
-  await expect(result).toBeVisible();
-  await expect(page.getByRole("button", { name: "Pesquisar no Open Food Facts" })).toBeVisible();
-  await page.waitForTimeout(1_000); // longer than the debounce
-  expect(queries).toEqual(["iogurte"]);
+  await page.getByRole("button", { name: "Página 3" }).click();
+  await expect(page.getByRole("button", { name: "Escolher Produto 301" })).toBeVisible();
+  expect(seen.pages).toEqual([1, 3]);
+  await page.getByRole("button", { name: "Página anterior" }).click();
+  await expect(page.getByRole("button", { name: "Escolher Produto 201" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Pesquisar no Open Food Facts" }).click();
-  await expect.poll(() => queries).toEqual(["iogurte", "iogurte"]);
-  await expect(page.getByRole("button", { name: "Pesquisar no Open Food Facts" })).toHaveCount(0);
+  await searchBox(page).fill("produtos"); // a new search starts on page 1 again
+  await expect(page.getByRole("button", { name: "Escolher Produto 101" })).toBeVisible();
+});
+
+test("nothing is cached: the same search asks Open Food Facts again", async ({ page }) => {
+  const seen = await mockOff(page);
+  await login(page, "A");
+  await openLog(page);
+
+  await searchBox(page).fill("iogurte");
+  await expect(page.getByRole("button", { name: "Escolher Arroz Teste E2E" })).toBeVisible();
+  await searchBox(page).fill("");
+  await page.waitForTimeout(900); // the empty text must settle (700 ms) before the same words count as a new search
+  await searchBox(page).fill("iogurte");
+  await expect.poll(() => seen.queries).toEqual(["iogurte", "iogurte"]);
+});
+
+test("scrolling the results closes the keyboard", async ({ page }) => {
+  const product = (n: number) => ({ ...ARROZ, id: `p${n}`, name: `Produto ${n}`, off_code: `p${n}` });
+  await mockOff(page, () => ({ results: Array.from({ length: 20 }, (_, i) => product(i + 1)), page: 1, pageCount: 1, total: 20, totalExact: true }));
+  await login(page, "A");
+  await openLog(page);
+
+  await searchBox(page).fill("produto");
+  await offTab(page).click();
+  await expect(page.getByRole("button", { name: "Escolher Produto 20" })).toBeAttached();
+  await searchBox(page).focus();
+  await expect(searchBox(page)).toBeFocused();
+  await page.mouse.move(100, 400);
+  await page.mouse.wheel(0, 600);
+  await expect(searchBox(page)).not.toBeFocused();
 });
 
 test("a food from Open Food Facts can be only saved, or saved and logged", async ({ page }) => {
   await mockOff(page);
   await login(page, "A");
   await openLog(page);
-  const box = page.getByRole("searchbox", { name: "Pesquisar alimento" });
 
-  await box.fill("arroz teste e2e");
+  await searchBox(page).fill("arroz teste e2e");
   await page.getByRole("button", { name: "Escolher Arroz Teste E2E" }).click();
   await page.getByRole("button", { name: "Só guardar nos alimentos" }).click();
   await expect(page.getByText("Guardado nos alimentos")).toBeVisible();
@@ -153,14 +212,92 @@ test("a food from Open Food Facts can be only saved, or saved and logged", async
   expect(await fetchDiary("A", DAY)).toHaveLength(0);
 
   // already saved: nothing left to save, it can only be logged
-  await box.fill("arroz teste e2e");
+  await expect(savedTab(page)).toHaveText("Guardados · 1");
   await page.getByRole("button", { name: "Escolher Arroz Teste E2E" }).click();
   await expect(page.getByRole("button", { name: "Só guardar nos alimentos" })).toHaveCount(0);
-  await page.getByRole("button", { name: "Adicionar a almoço" }).click();
-  await expect(page.getByText("Arroz Teste E2E adicionado a almoço")).toBeVisible();
+  await page.getByRole("button", { name: "Adicionar ao diário" }).click();
+  await expect(page.getByText(/Arroz Teste E2E adicionado a almoço/)).toBeVisible();
   const [row] = await fetchDiary("A", DAY);
   expect(row).toMatchObject({ saved_food_id: saved!.id, quantity_g: 100 }); // a saved food has no label serving
   expect((await fetchSavedFoods("A"))[0]).toMatchObject({ times_used: 1 });
+});
+
+test("opening a food or a meal never opens the keyboard: nothing is focused or selected", async ({ page }) => {
+  await seedSavedFood("A", { name: "Ovo E2E", calories_100g: 155, protein_100g: 13, carbs_100g: 1.1, fat_100g: 11 });
+  await seedSavedMeal("A", { name: "Sopa E2E", items: [{ name: "Sopa", quantity_g: null, calories: 180, protein_g: 5, carbs_g: 20, fat_g: 6 }], total_calories: 180, total_protein: 5, total_carbs: 20, total_fat: 6 });
+  await login(page, "A");
+  await openLog(page);
+  const focusedField = () => page.evaluate(() => ["INPUT", "TEXTAREA"].includes(document.activeElement?.tagName ?? ""));
+
+  await page.getByRole("button", { name: "Escolher Ovo E2E" }).click();
+  await expect(page.getByTestId("grams-value")).toHaveText("100 g");
+  expect(await focusedField()).toBe(false);
+  await page.keyboard.press("Escape");
+
+  await page.getByRole("button", { name: "Refeições" }).click();
+  await page.getByRole("button", { name: "Escolher Sopa E2E" }).click();
+  await expect(page.getByRole("status", { name: "Porções" })).toBeVisible();
+  expect(await focusedField()).toBe(false);
+  await page.keyboard.press("Escape");
+
+  await page.getByRole("button", { name: "Editar guardado Sopa E2E" }).click();
+  await expect(page.getByRole("heading", { name: /Editar refeição guardado/ })).toBeVisible();
+  expect(await focusedField()).toBe(false);
+  expect(await page.evaluate(() => window.getSelection()?.toString() ?? "")).toBe("");
+});
+
+test("grams: a bar and buttons move 10 g at a time, or the exact value is typed", async ({ page }) => {
+  await seedSavedFood("A", { name: "Ovo E2E", calories_100g: 200, protein_100g: 10, carbs_100g: 0, fat_100g: 10 });
+  await login(page, "A");
+  await openLog(page);
+  await page.getByRole("button", { name: "Escolher Ovo E2E" }).click();
+
+  const grams = page.getByTestId("grams-value");
+  await expect(grams).toHaveText("100 g");
+  await expect(page.getByLabel("Gramas", { exact: true })).toHaveCount(0); // nothing to type until asked
+  await page.getByRole("button", { name: "Mais 10 g" }).click();
+  await expect(grams).toHaveText("110 g");
+  await expect(page.getByTestId("nutrient-summary")).toContainText("220");
+  await page.getByRole("button", { name: "Menos 10 g" }).click();
+  await page.getByRole("button", { name: "Menos 10 g" }).click();
+  await expect(grams).toHaveText("90 g");
+
+  await page.getByRole("slider").focus();
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowRight");
+  await expect(grams).toHaveText("110 g"); // 10 g per step
+
+  await typeGrams(page, "275,5"); // decimal comma, beyond the bar's 500 g? no: exact value
+  await expect(grams).toHaveText("275.5 g");
+  await expect(page.getByTestId("nutrient-summary")).toContainText("551");
+  await page.getByLabel("Gramas", { exact: true }).fill("0");
+  await expect(page.getByRole("alert").filter({ hasText: "maior que 0" })).toBeVisible();
+  await page.getByLabel("Gramas", { exact: true }).fill("900");
+  await expect(grams).toHaveText("900 g"); // above the bar
+  await page.getByRole("button", { name: "Adicionar ao diário" }).click();
+  await expect(page.getByText(/Ovo E2E adicionado a/)).toBeVisible();
+  expect((await fetchDiary("A", DAY))[0]).toMatchObject({ quantity_g: 900, calories: 1800 });
+});
+
+test("the day and the meal are chosen where the food is added (snacks by default)", async ({ page }) => {
+  await seedSavedFood("A", { name: "Ovo E2E", calories_100g: 155, protein_100g: 13, carbs_100g: 1.1, fat_100g: 11 });
+  await login(page, "A");
+  await page.goto("/registar"); // no meal and day in the URL
+  await expect(page.getByRole("heading", { name: "Registar" })).toBeVisible();
+  await page.waitForLoadState("networkidle");
+  await expect(page.getByRole("group", { name: "Refeição" })).toHaveCount(0); // the menu at the top is gone
+
+  await page.getByRole("button", { name: "Escolher Ovo E2E" }).click();
+  await expect(mealButton(page, "Lanches")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByLabel("Data")).toHaveValue(toDateKey(new Date()));
+  await mealButton(page, "Jantar").click();
+  await page.getByLabel("Data").fill("2026-01-22");
+  await page.getByRole("button", { name: "Adicionar ao diário" }).click();
+  await expect(page.getByText(/Ovo E2E adicionado a jantar \(.*22 jan\)/)).toBeVisible();
+
+  expect(await fetchDiary("A", "2026-01-22")).toHaveLength(1);
+  expect((await fetchDiary("A", "2026-01-22"))[0]).toMatchObject({ meal: "dinner", name: "Ovo E2E" });
+  expect(await fetchDiary("A", toDateKey(new Date()))).toHaveLength(0);
 });
 
 test("when Open Food Facts is down: clear message, saved foods stay, and 'Tentar novamente' recovers", async ({ page }) => {
@@ -172,12 +309,12 @@ test("when Open Food Facts is down: clear message, saved foods stay, and 'Tentar
   await login(page, "A");
   await openLog(page);
 
-  await page.getByRole("searchbox", { name: "Pesquisar alimento" }).fill("arroz");
-  await page.getByRole("button", { name: "Pesquisar no Open Food Facts" }).click(); // the saved "Arroz" already matches
+  await searchBox(page).fill("arroz");
+  await expect(page.getByRole("button", { name: "Escolher Arroz guardado E2E" })).toBeVisible(); // the saved foods are there anyway
+  await offTab(page).click();
   const problem = page.getByRole("alert").filter({ hasText: "O Open Food Facts não respondeu" }); // Next.js adds its own empty alert
   await expect(problem).toBeVisible();
   await expect(page.getByText("Sem ligação")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Escolher Arroz guardado E2E" })).toBeVisible();
 
   down = false;
   await page.getByRole("button", { name: "Tentar novamente" }).click();
@@ -188,14 +325,21 @@ test("when Open Food Facts is down: clear message, saved foods stay, and 'Tentar
 test.describe("live Open Food Facts", () => {
   test.skip(!process.env.E2E_LIVE_OFF, "Set E2E_LIVE_OFF=1 to search the real Open Food Facts through our route");
 
-  test("'peito de frango' returns real, usable foods", async ({ page }) => {
+  test("'peito de frango' returns real, usable foods, page by page", async ({ page }) => {
     await login(page, "A");
-    const response = await page.request.get("/api/food-search?q=peito%20de%20frango");
-    expect(response.status()).toBe(200);
-    const { results } = (await response.json()) as { results: { name: string; calories_100g: number }[] };
-    expect(results.length).toBeGreaterThan(3);
-    expect(results.every((r) => r.name && r.calories_100g > 0)).toBe(true);
-    expect((await page.request.get("/api/food-search?q=ar")).status()).toBe(400);
+    const first = await page.request.get("/api/food-search?q=peito%20de%20frango");
+    expect(first.status()).toBe(200);
+    const body = (await first.json()) as { results: { name: string; calories_100g: number }[]; page: number; pageCount: number; total: number };
+    expect(body.results.length).toBeGreaterThan(3);
+    expect(body.results.every((r) => r.name && r.calories_100g > 0)).toBe(true);
+    expect(body).toMatchObject({ page: 1 });
+    expect(body.pageCount).toBeGreaterThan(1);
+    expect(body.total).toBeGreaterThan(20);
+    const second = (await (await page.request.get("/api/food-search?q=peito%20de%20frango&page=2")).json()) as { results: { id: string }[]; page: number };
+    expect(second.page).toBe(2);
+    expect(second.results[0]?.id).not.toBe((body.results[0] as unknown as { id: string }).id);
+    expect((await page.request.get("/api/food-search?q=a")).status()).toBe(400);
+    expect((await page.request.get("/api/food-search?q=ar")).status()).toBe(200); // two letters are fine
   });
 });
 
@@ -213,8 +357,8 @@ test("a saved meal with 2 portions stores doses and doubled items", async ({ pag
   await page.getByRole("button", { name: "Mais porções" }).click();
   await page.getByRole("button", { name: "Mais porções" }).click();
   await expect(page.getByRole("status", { name: "Porções" })).toHaveText("2 porções");
-  await page.getByRole("button", { name: "Adicionar a jantar" }).click();
-  await expect(page.getByText("Almoço E2E adicionado a jantar")).toBeVisible();
+  await page.getByRole("button", { name: "Adicionar ao diário" }).click();
+  await expect(page.getByText(/Almoço E2E adicionado a jantar/)).toBeVisible();
 
   const [row] = await fetchDiary("A", DAY);
   expect(row).toMatchObject({ kind: "meal", meal: "dinner", doses: 2, calories: 822, protein_g: 99.8 });
@@ -304,7 +448,7 @@ async function mockAi(page: Page) {
 }
 
 async function analyzeText(page: Page) {
-  await page.getByRole("button", { name: "Registar com IA" }).click();
+  await page.getByRole("button", { name: "Com IA" }).click();
   await page.getByLabel("O que comeste?").fill("frango com arroz");
   await page.getByRole("button", { name: "Analisar" }).click();
   await expect(page.getByRole("heading", { name: "Frango com arroz" })).toBeVisible();
@@ -315,7 +459,7 @@ test("AI from a photo → one meal → 'Guardar e adicionar' with 2 portions", a
   await login(page, "A");
   await openLog(page);
 
-  await page.getByRole("button", { name: "Registar com IA" }).click();
+  await page.getByRole("button", { name: "Com IA" }).click();
   const png = await page.screenshot({ clip: { x: 0, y: 0, width: 40, height: 30 } }); // a real image to decode
   await page.locator('input[type="file"]:not([capture])').setInputFiles({ name: "prato.png", mimeType: "image/png", buffer: png });
   await expect(page.getByRole("img", { name: "Foto selecionada" })).toBeVisible();
@@ -432,7 +576,7 @@ test("a failed insert shows 'Sem ligação' and nothing is saved", async ({ page
   await page.route("**/rest/v1/diary_entries**", (route) => (route.request().method() === "POST" ? route.abort("internetdisconnected") : route.continue()));
 
   await page.getByRole("button", { name: "Escolher Ovo E2E" }).click();
-  await page.getByRole("button", { name: "Adicionar a almoço" }).click();
+  await page.getByRole("button", { name: "Adicionar ao diário" }).click();
   await expect(page.getByText(/Sem ligação/)).toBeVisible();
   await expect(page.getByText("Ovo E2E adicionado a almoço")).toHaveCount(0);
   expect(await fetchDiary("A", DAY)).toHaveLength(0);

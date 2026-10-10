@@ -1,20 +1,22 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { DiaryTargetPicker } from "@/components/log/diary-target-picker";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { foodEditSchema, type FoodEditValues } from "@/lib/diary-edit";
-import { savedFoodSchema, type SavedFoodValues } from "@/lib/log";
+import { isValidTarget, savedFoodSchema, type LogTarget, type SavedFoodValues } from "@/lib/log";
 import { parseDecimalInput } from "@/lib/numbers";
 
 interface ManualEntryDialogProps {
-  mealName: string;
+  /** Day and meal the picker starts on. */
+  initialTarget: LogTarget;
   pending: boolean;
   onClose: () => void;
   /** `saveAs`: the same food per 100 g, when "Guardar nos meus alimentos" is checked. */
-  onAdd: (item: FoodEditValues, saveAs: SavedFoodValues | null) => void;
+  onAdd: (item: FoodEditValues, saveAs: SavedFoodValues | null, target: LogTarget) => void;
 }
 
 const asNumber = (text: string) => parseDecimalInput(text) ?? Number.NaN;
@@ -28,9 +30,10 @@ const FIELDS = [
 ] as const;
 type Field = (typeof FIELDS)[number][0];
 
-export function ManualEntryDialog({ mealName, pending, onClose, onAdd }: ManualEntryDialogProps) {
+export function ManualEntryDialog({ initialTarget, pending, onClose, onAdd }: ManualEntryDialogProps) {
   const [text, setText] = useState<Record<Field, string>>({ name: "", quantity_g: "100", calories: "", protein_g: "0", carbs_g: "0", fat_g: "0" });
   const [save, setSave] = useState(true);
+  const [target, setTarget] = useState(initialTarget);
   const [touched, setTouched] = useState(false);
 
   const parsed = foodEditSchema.safeParse({
@@ -58,8 +61,8 @@ export function ManualEntryDialog({ mealName, pending, onClose, onAdd }: ManualE
   function onSubmit(event: FormEvent) {
     event.preventDefault();
     setTouched(true);
-    if (!parsed.success || saveError) return;
-    onAdd(parsed.data, save && per100?.success ? per100.data : null);
+    if (!parsed.success || saveError || !isValidTarget(target)) return;
+    onAdd(parsed.data, save && per100?.success ? per100.data : null, target);
   }
 
   return (
@@ -97,12 +100,15 @@ export function ManualEntryDialog({ mealName, pending, onClose, onAdd }: ManualE
               {saveError}
             </p>
           )}
+          <div className="col-span-2">
+            <DiaryTargetPicker value={target} onChange={setTarget} />
+          </div>
           <DialogFooter className="col-span-2 gap-2">
             <Button type="button" variant="outline" size="lg" onClick={onClose}>
               Cancelar
             </Button>
             <Button type="submit" size="lg" disabled={pending}>
-              {pending ? "A adicionar…" : `Adicionar a ${mealName.toLowerCase()}`}
+              {pending ? "A adicionar…" : "Adicionar ao diário"}
             </Button>
           </DialogFooter>
         </form>

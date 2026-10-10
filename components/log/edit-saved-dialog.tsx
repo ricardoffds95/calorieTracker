@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import type { SavedFood } from "@/lib/food-search";
 import { savedFoodSchema, savedMealSchema, type PropagationScope } from "@/lib/log";
 import { parseDecimalInput } from "@/lib/numbers";
-import { countLinkedEntries, useDeleteSaved, useUpdateSavedFood, useUpdateSavedMeal, type SavedMeal } from "@/lib/queries/saved";
+import { countLinkedEntries, useUpdateSavedFood, useUpdateSavedMeal, type SavedMeal } from "@/lib/queries/saved";
 
 export type SavedTarget = { kind: "food"; item: SavedFood } | { kind: "meal"; item: SavedMeal };
 
@@ -41,13 +41,12 @@ export function EditSavedDialog({ userId, target, todayKey, onClose }: EditSaved
   const [rows, setRows] = useState<EditableItem[]>(() => (isFood || isPortion ? [] : toEditable(mealItems)));
   const [totals, setTotals] = useState<PortionTotals | null>(() => (isPortion ? totalsFromItem(mealItems[0]!) : null));
   const [linked, setLinked] = useState<{ all: number; fromToday: number } | null>(null);
-  const [step, setStep] = useState<"edit" | "propagate" | "delete">("edit");
+  const [step, setStep] = useState<"edit" | "propagate">("edit");
   const [error, setError] = useState<string | null>(null);
 
   const updateFood = useUpdateSavedFood(userId);
   const updateMeal = useUpdateSavedMeal(userId);
-  const remove = useDeleteSaved(userId);
-  const pending = updateFood.isPending || updateMeal.isPending || remove.isPending;
+  const pending = updateFood.isPending || updateMeal.isPending;
 
   const food = isFood
     ? savedFoodSchema.safeParse({ name, ...Object.fromEntries(PER100.map(([k]) => [k, parseDecimalInput(per100[k] ?? "") ?? Number.NaN])) })
@@ -113,8 +112,8 @@ export function EditSavedDialog({ userId, target, todayKey, onClose }: EditSaved
               </p>
             )}
             <DialogFooter className="gap-2">
-              <Button type="button" variant="ghost" size="lg" className="text-destructive" onClick={() => setStep("delete")}>
-                Apagar
+              <Button type="button" variant="outline" size="lg" onClick={onClose}>
+                Cancelar
               </Button>
               <Button type="button" size="lg" disabled={!valid || pending} onClick={onSave}>
                 Guardar
@@ -124,28 +123,6 @@ export function EditSavedDialog({ userId, target, todayKey, onClose }: EditSaved
         )}
 
         {step === "propagate" && linked && <PropagationChoice linked={linked} pending={pending} onChoose={save} onBack={() => setStep("edit")} />}
-
-        {step === "delete" && (
-          <div className="flex flex-col gap-4">
-            <p className="text-sm">
-              Apagar <strong>{target.item.name}</strong> dos guardados? As entradas do diário mantêm-se como estão.
-            </p>
-            <DialogFooter className="gap-2">
-              <Button type="button" variant="outline" size="lg" onClick={() => setStep("edit")}>
-                Cancelar
-              </Button>
-              <Button
-                type="button"
-                variant="destructive"
-                size="lg"
-                disabled={pending}
-                onClick={() => remove.mutate({ kind: target.kind, id: target.item.id }, { onSuccess: onClose })}
-              >
-                Apagar
-              </Button>
-            </DialogFooter>
-          </div>
-        )}
       </DialogContent>
     </Dialog>
   );

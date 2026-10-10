@@ -1,9 +1,11 @@
 import { z } from "zod";
 import type { TablesInsert } from "@/lib/supabase/database.types";
+import { parseDateKey, formatDayLabel } from "./dates";
 import { itemsToJson } from "./diary-edit";
 import { MEAL_TYPES, type MealType } from "./macros";
 import { roundCalories, roundMacro, scaleFromPer100g, scaleMealItems, sumItems, type FoodItem, type Per100g } from "./nutrition";
 import { foodItemsSchema } from "./schemas";
+import { mealLabel } from "./today";
 
 export type NewDiaryEntry = TablesInsert<"diary_entries">;
 
@@ -13,18 +15,22 @@ export interface LogTarget {
   meal: MealType;
 }
 
-/** Meal suggested when the Log screen is opened from the tab bar (local time). */
-export function defaultMeal(now: Date): MealType {
-  const hour = now.getHours();
-  if (hour < 11) return "breakfast";
-  if (hour < 15) return "lunch";
-  if (hour < 19) return "snacks";
-  return "dinner";
+/** Meal chosen when nothing says otherwise. */
+export const DEFAULT_MEAL: MealType = "snacks";
+
+/** The `?meal=` parameter when valid (the "+" of a meal in Today), otherwise snacks. */
+export function mealFromParam(param: string | null | undefined): MealType {
+  return (MEAL_TYPES as readonly string[]).includes(param ?? "") ? (param as MealType) : DEFAULT_MEAL;
 }
 
-/** The `?meal=` parameter when valid, otherwise the meal for the current time. */
-export function mealFromParam(param: string | null | undefined, now: Date): MealType {
-  return (MEAL_TYPES as readonly string[]).includes(param ?? "") ? (param as MealType) : defaultMeal(now);
+/** "lanches, hoje, 10 out": where an entry was added. */
+export function describeTarget(target: LogTarget, now: Date): string {
+  return `${mealLabel(target.meal).toLowerCase()} (${formatDayLabel(target.entry_date, now).toLowerCase()})`;
+}
+
+/** A target is usable when its date is a real calendar day. */
+export function isValidTarget(target: LogTarget): boolean {
+  return parseDateKey(target.entry_date) !== null;
 }
 
 export const MAX_QUANTITY_G = 5000;

@@ -1,32 +1,33 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { ScanBarcode, Search, Sparkles } from "lucide-react";
 import { FoodResultRow } from "@/components/log/food-result-row";
+import { Pagination } from "@/components/log/pagination";
 import { useDebouncedValue } from "@/components/log/use-debounced-value";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { createIdbSearchCache } from "@/lib/food-search-cache";
 import {
   FOOD_SEARCH_MESSAGES,
   FoodSearchError,
   MIN_QUERY_LENGTH,
-  OFF_MIN_QUERY_LENGTH,
-  mergeResults,
   normalizeQuery,
-  peekOffCache,
+  paginate,
   searchOpenFoodFacts,
   searchSavedFoods,
-  shouldSearchOnline,
   type FoodSearchResult,
   type SavedFood,
 } from "@/lib/food-search";
+import { cn } from "@/lib/utils";
 
-// Open Food Facts allows few searches per minute: only ask once the user has really stopped typing.
-const SEARCH_DEBOUNCE_MS = 600;
-const searchCache = typeof window === "undefined" ? undefined : createIdbSearchCache();
+// Open Food Facts allows few searches per minute: ask once the user stopped typing, or on "Pesquisar".
+const SEARCH_DEBOUNCE_MS = 700;
+/** Scrolling this far with the field focused closes the keyboard (otherwise it covers the results). */
+const SCROLL_BLUR_PX = 24;
+
+type Source = "saved" | "off";
 
 interface FoodSearchProps {
   saved: readonly SavedFood[];
@@ -34,58 +35,68 @@ interface FoodSearchProps {
   onScan: () => void;
   onAi: () => void;
   /** Rendered below the field while nothing is being searched (saved lists). */
-  children?: React.ReactNode;
+  children?: ReactNode;
 }
 
 export function FoodSearch({ saved, onPick, onScan, onAi, children }: FoodSearchProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
-  // The user asked for Open Food Facts even though saved foods already match.
-  const [forced, setForced] = useState(false);
-  const debounced = normalizeQuery(useDebouncedValue(query, SEARCH_DEBOUNCE_MS));
-  const typed = normalizeQuery(query);
-  const searching = typed.length >= MIN_QUERY_LENGTH;
-  const online = typed.length >= OFF_MIN_QUERY_LENGTH;
+  const [submitted, setSubmitted] = useState<string | null>(null); // set by the button / Enter, cleared by typing
+  const [focused, setFocused] = useState(false);
+  // Page and tab are remembered per search text: a new search starts again at page 1.
+  const [view, setView] = useState<{ term: string; source?: Source; savedPage: number; offPage: number }>({ term: "", savedPage: 1, offPage: 1 });
 
-  const savedMatches = useMemo(() => searchSavedFoods(saved, query), [saved, query]);
-  // Cache first: results of past searches cost no request, so they are shown right away with the saved foods.
-  const cached = useQuery({
-    queryKey: ["off-cache", typed],
-    queryFn: async () => (await peekOffCache(typed, { cache: searchCache })) ?? [],
-    enabled: online,
-    placeholderData: keepPreviousData, // no flicker while the cache reads the new text
-    // Re-read whenever this text is typed again: an online search may have written the cache since.
+  const debounced = normalizeQuery(useDebouncedValue(query, SEARCH_DEBOUNCE_MS));
+  const term = submitted ?? debounced;
+  const searching = term.length >= MIN_QUERY_LENGTH;
+  const current = view.term === term ? view : { term, savedPage: 1, offPage: 1 };
+
+  const savedAll = useMemo(() => searchSavedFoods(saved, term), [saved, term]);
+  const savedPage = paginate(savedAll, current.savedPage);
+  const off = useQuery({
+    queryKey: ["off-search", term, current.offPage],
+    queryFn: ({ signal }) => searchOpenFoodFacts(term, { page: current.offPage, signal }),
+    enabled: searching,
+    placeholderData: keepPreviousData,
+    // Nothing is cached: every search asks Open Food Facts again.
     staleTime: 0,
     gcTime: 0,
+    retry: false,
     refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
     meta: { persist: false },
   });
-  const cacheRead = cached.isSuccess && !cached.isPlaceholderData;
-  const cachedResults = online ? (cached.data ?? []) : [];
-  // Open Food Facts is only asked on request, or when neither the saved foods nor the cache have anything.
-  const useOff =
-    online && shouldSearchOnline({ forced, cacheRead, savedCount: savedMatches.length, cachedCount: cachedResults.length });
-  const off = useQuery({
-    queryKey: ["off-search", debounced, forced],
-    queryFn: ({ signal }) => searchOpenFoodFacts(debounced, { signal, cache: searchCache, refresh: forced }),
-    enabled: useOff && debounced.length >= OFF_MIN_QUERY_LENGTH,
-    placeholderData: keepPreviousData,
-    staleTime: Infinity,
-    gcTime: 1000 * 60 * 5,
-    retry: false,
-    meta: { persist: false }, // has its own 30-day IndexedDB cache
-  });
 
-  const results = mergeResults(savedMatches, useOff ? (off.data?.results ?? []) : cachedResults);
-  const waiting = (online && !cacheRead && savedMatches.length === 0) || (useOff && (debounced !== typed || off.isFetching));
-  const error = !useOff ? null : off.error instanceof FoodSearchError ? off.error.message : off.error ? FOOD_SEARCH_MESSAGES.http : null;
+  const source: Source = current.source ?? (savedAll.length > 0 ? "saved" : "off");
+  const update = (patch: Partial<typeof view>) => setView({ ...current, ...patch });
+
+  // Scrolling the results closes the keyboard, so neither it nor the browser bar covers them.
+  useEffect(() => {
+    if (!focused) return;
+    const start = window.scrollY;
+    const onScroll = () => {
+      if (Math.abs(window.scrollY - start) > SCROLL_BLUR_PX) inputRef.current?.blur();
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [focused]);
+
+  function onSubmit(event: FormEvent) {
+    event.preventDefault();
+    setSubmitted(normalizeQuery(query));
+    inputRef.current?.blur(); // closes the keyboard so the results are visible
+  }
+
+  const offError = off.error instanceof FoodSearchError ? off.error.message : off.error ? FOOD_SEARCH_MESSAGES.http : null;
+  const offTotal = off.data ? `${off.data.total}${off.data.totalExact ? "" : "+"}` : off.isFetching ? "…" : "0";
+  const offLoading = off.isFetching && !off.data;
 
   return (
     <section aria-label="Pesquisar alimento" className="flex flex-col gap-3">
-      <div className="flex gap-2">
+      <form role="search" onSubmit={onSubmit} className="flex gap-2">
         <div className="relative flex-1">
           <Search aria-hidden className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
+            ref={inputRef}
             type="search"
             aria-label="Pesquisar alimento"
             placeholder="Pesquisar alimento"
@@ -93,55 +104,95 @@ export function FoodSearch({ saved, onPick, onScan, onAi, children }: FoodSearch
             autoComplete="off"
             className="h-11 pl-9"
             value={query}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
             onChange={(e) => {
               setQuery(e.target.value);
-              setForced(false);
+              setSubmitted(null);
             }}
           />
         </div>
-        <Button type="button" variant="outline" size="icon" className="size-11" aria-label="Ler código de barras" onClick={onScan}>
-          <ScanBarcode aria-hidden />
+        <Button type="submit" className="h-11" disabled={normalizeQuery(query).length < MIN_QUERY_LENGTH}>
+          Pesquisar
         </Button>
-        <Button type="button" variant="outline" size="icon" className="size-11" aria-label="Registar com IA" onClick={onAi}>
+      </form>
+      <div className="grid grid-cols-2 gap-2">
+        <Button type="button" variant="outline" className="h-11" onClick={onScan}>
+          <ScanBarcode aria-hidden />
+          Código de barras
+        </Button>
+        <Button type="button" variant="outline" className="h-11" onClick={onAi}>
           <Sparkles aria-hidden />
+          Com IA
         </Button>
       </div>
 
       {searching ? (
-        <div className="flex flex-col gap-1" data-testid="search-results">
-          {results.length > 0 && (
-            <ul className="flex flex-col">
-              {results.map((food) => (
-                <FoodResultRow key={`${food.source}-${food.id}`} food={food} onPick={onPick} />
-              ))}
-            </ul>
-          )}
-          {waiting && (
-            <div aria-label="A pesquisar" className="flex flex-col gap-2">
-              <Skeleton className="h-11 w-full" />
-              <Skeleton className="h-11 w-full" />
-            </div>
-          )}
-          {error && (
-            <div className="flex items-center justify-between gap-3">
-              <p role="alert" className="text-sm text-destructive">
-                {error}
-              </p>
-              <Button type="button" variant="outline" className="h-11 shrink-0" disabled={off.isFetching} onClick={() => void off.refetch()}>
-                Tentar novamente
+        <div className="flex flex-col gap-2" data-testid="search-results">
+          <div role="group" aria-label="Fonte dos resultados" className="grid grid-cols-2 gap-1 rounded-md bg-muted p-1">
+            {(
+              [
+                ["saved", `Guardados · ${savedAll.length}`],
+                ["off", `Open Food Facts · ${offTotal}`],
+              ] as const
+            ).map(([key, label]) => (
+              <Button
+                key={key}
+                type="button"
+                variant="ghost"
+                aria-pressed={source === key}
+                className="h-10 px-1 text-xs text-muted-foreground aria-pressed:bg-card aria-pressed:text-foreground dark:aria-pressed:bg-background"
+                onClick={() => update({ source: key })}
+              >
+                {label}
               </Button>
+            ))}
+          </div>
+
+          {source === "saved" ? (
+            <>
+              {savedPage.items.length > 0 ? (
+                <ul className="flex flex-col">
+                  {savedPage.items.map((food) => (
+                    <FoodResultRow key={food.id} food={food} onPick={onPick} />
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-muted-foreground">Nenhum dos teus guardados tem esse nome.</p>
+              )}
+              <Pagination page={current.savedPage} pageCount={savedPage.pageCount} onChange={(page) => update({ savedPage: page })} />
+            </>
+          ) : (
+            <div className={cn("flex flex-col gap-1 transition-opacity", off.isPlaceholderData && "opacity-60")}>
+              {offLoading && (
+                <div aria-label="A pesquisar" className="flex flex-col gap-2">
+                  <Skeleton className="h-11 w-full" />
+                  <Skeleton className="h-11 w-full" />
+                  <Skeleton className="h-11 w-full" />
+                </div>
+              )}
+              {offError && !off.data && (
+                <div className="flex items-center justify-between gap-3">
+                  <p role="alert" className="text-sm text-destructive">
+                    {offError}
+                  </p>
+                  <Button type="button" variant="outline" className="h-11 shrink-0" disabled={off.isFetching} onClick={() => void off.refetch()}>
+                    Tentar novamente
+                  </Button>
+                </div>
+              )}
+              {off.data && off.data.results.length > 0 && (
+                <ul className="flex flex-col">
+                  {off.data.results.map((food) => (
+                    <FoodResultRow key={food.id} food={food} onPick={onPick} />
+                  ))}
+                </ul>
+              )}
+              {off.data && off.data.results.length === 0 && (
+                <p className="text-sm text-muted-foreground">Sem resultados. Experimenta outro nome ou insere manualmente.</p>
+              )}
+              {off.data && <Pagination page={current.offPage} pageCount={off.data.pageCount} disabled={off.isFetching} onChange={(page) => update({ offPage: page })} />}
             </div>
-          )}
-          {!online && (
-            <p className="text-sm text-muted-foreground">Escreve pelo menos {OFF_MIN_QUERY_LENGTH} letras para pesquisar também no Open Food Facts.</p>
-          )}
-          {online && !useOff && cacheRead && (
-            <Button type="button" variant="outline" className="h-11" onClick={() => setForced(true)}>
-              Pesquisar no Open Food Facts
-            </Button>
-          )}
-          {useOff && !waiting && !error && results.length === 0 && (
-            <p className="text-sm text-muted-foreground">Sem resultados. Experimenta outro nome ou insere manualmente.</p>
           )}
         </div>
       ) : (

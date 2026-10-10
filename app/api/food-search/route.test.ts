@@ -12,8 +12,14 @@ vi.mock("@/lib/off-search", async (importOriginal) => ({
 import { OffUnavailableError, searchOffServer } from "@/lib/off-search";
 import { GET } from "./route";
 
-const get = (q?: string) => GET(new Request(`http://localhost/api/food-search${q === undefined ? "" : `?q=${encodeURIComponent(q)}`}`));
+const get = (q?: string, page?: string) => {
+  const params = new URLSearchParams();
+  if (q !== undefined) params.set("q", q);
+  if (page !== undefined) params.set("page", page);
+  return GET(new Request(`http://localhost/api/food-search?${params}`));
+};
 const results = [{ id: "1", source: "off", name: "Arroz", calories_100g: 130, protein_100g: 2.7, carbs_100g: 28, fat_100g: 0.3 }];
+const page = { results, page: 1, pageCount: 21, total: 401, totalExact: true };
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -28,7 +34,7 @@ describe("GET /api/food-search", () => {
     expect(searchOffServer).not.toHaveBeenCalled();
   });
 
-  it.each([["missing", undefined], ["empty", "  "], ["too short", "ar"], ["too long", "a".repeat(101)]])(
+  it.each([["missing", undefined], ["empty", "  "], ["too short", "a"], ["too long", "a".repeat(101)]])(
     "rejects a %s query (400) without calling Open Food Facts",
     async (_label, q) => {
       const response = await get(q);
@@ -38,12 +44,28 @@ describe("GET /api/food-search", () => {
     },
   );
 
-  it("returns the results for a normalized query", async () => {
-    vi.mocked(searchOffServer).mockResolvedValue(results as never);
+  it("accepts two letters (no 3-letter minimum any more)", async () => {
+    vi.mocked(searchOffServer).mockResolvedValue(page as never);
+    expect((await get("ar")).status).toBe(200);
+  });
+
+  it("returns the page for a normalized query, defaulting to page 1", async () => {
+    vi.mocked(searchOffServer).mockResolvedValue(page as never);
     const response = await get("  Arroz  ");
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ results });
+    expect(await response.json()).toEqual(page);
     expect(vi.mocked(searchOffServer).mock.calls[0]![0]).toBe("arroz");
+    expect(vi.mocked(searchOffServer).mock.calls[0]![1]).toMatchObject({ page: 1 });
+  });
+
+  it("passes the requested page on and rejects pages outside 1..25 or not numbers", async () => {
+    vi.mocked(searchOffServer).mockResolvedValue(page as never);
+    expect((await get("arroz", "3")).status).toBe(200);
+    expect(vi.mocked(searchOffServer).mock.calls[0]![1]).toMatchObject({ page: 3 });
+    for (const bad of ["0", "26", "-1", "abc", "1.5"]) {
+      expect((await get("arroz", bad)).status, bad).toBe(400);
+    }
+    expect(searchOffServer).toHaveBeenCalledTimes(1);
   });
 
   it("answers 503 'off_unavailable' without leaking the reason", async () => {

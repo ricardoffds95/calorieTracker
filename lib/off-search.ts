@@ -1,5 +1,5 @@
 import "server-only";
-import { isUsable, mapProduct, normalizeQuery, type FoodSearchResult, type OffProduct } from "./food-search";
+import { MAX_PAGES, PAGE_SIZE, isUsable, mapProduct, normalizeQuery, type OffProduct, type SearchPage } from "./food-search";
 
 /** Open Food Facts could not answer (down, overloaded, rate limited, timeout) after the retry. */
 export class OffUnavailableError extends Error {
@@ -24,12 +24,21 @@ export function offUserAgent(contactEmail?: string): string {
 }
 
 interface SearchOptions {
+  /** 1-based page of 20 results. */
+  page?: number;
   fetch?: typeof fetch;
   contactEmail?: string;
   sleep?: (ms: number) => Promise<void>;
 }
 
-type Attempt = { ok: true; hits: OffProduct[] } | { ok: false; error: OffUnavailableError; retry: boolean };
+interface OffResponse {
+  hits?: OffProduct[];
+  count?: number;
+  is_count_exact?: boolean;
+  page_count?: number;
+}
+
+type Attempt = { ok: true; data: OffResponse } | { ok: false; error: OffUnavailableError; retry: boolean };
 
 async function attempt(url: string, headers: HeadersInit, fetchFn: typeof fetch): Promise<Attempt> {
   let response: Response;
@@ -43,20 +52,20 @@ async function attempt(url: string, headers: HeadersInit, fetchFn: typeof fetch)
   // 5xx is retried; any other non-2xx is our own mistake and retrying would not help.
   if (!response.ok) return { ok: false, error: new OffUnavailableError("server"), retry: response.status >= 500 };
   try {
-    const data = (await response.json()) as { hits?: OffProduct[] };
-    return { ok: true, hits: Array.isArray(data.hits) ? data.hits : [] };
+    const data = (await response.json()) as OffResponse;
+    return { ok: true, data };
   } catch {
     return { ok: false, error: new OffUnavailableError("server"), retry: true };
   }
 }
 
 /**
- * Searches Open Food Facts for `query` (already validated by the caller) and returns usable foods per 100 g.
+ * Searches Open Food Facts for `query` (already validated by the caller) and returns one page of usable foods per 100 g.
  * Retries once on timeouts, 429 and 5xx; throws OffUnavailableError when it still cannot answer.
  */
-export async function searchOffServer(query: string, options: SearchOptions = {}): Promise<FoodSearchResult[]> {
-  const { fetch: fetchFn = fetch, contactEmail, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)) } = options;
-  const url = `${SEARCH_URL}?${new URLSearchParams({ q: normalizeQuery(query), page_size: "20", langs: "pt", fields: FIELDS })}`;
+export async function searchOffServer(query: string, options: SearchOptions = {}): Promise<SearchPage> {
+  const { page = 1, fetch: fetchFn = fetch, contactEmail, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)) } = options;
+  const url = `${SEARCH_URL}?${new URLSearchParams({ q: normalizeQuery(query), page_size: String(PAGE_SIZE), page: String(page), langs: "pt", fields: FIELDS })}`;
   const headers = { "User-Agent": offUserAgent(contactEmail), Accept: "application/json" };
 
   let last: OffUnavailableError | undefined;
@@ -64,10 +73,17 @@ export async function searchOffServer(query: string, options: SearchOptions = {}
     if (i > 0) await sleep(RETRY_DELAY_MS);
     const result = await attempt(url, headers, fetchFn);
     if (result.ok) {
-      return result.hits
-        .filter((product) => product.nutriments)
-        .map(mapProduct)
-        .filter(isUsable);
+      const { hits, count, is_count_exact, page_count } = result.data;
+      return {
+        results: (Array.isArray(hits) ? hits : [])
+          .filter((product) => product.nutriments)
+          .map(mapProduct)
+          .filter(isUsable),
+        page,
+        pageCount: Math.min(Math.max(page_count ?? 1, 1), MAX_PAGES),
+        total: count ?? 0,
+        totalExact: is_count_exact ?? true,
+      };
     }
     last = result.error;
     if (!result.retry) break;

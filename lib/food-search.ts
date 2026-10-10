@@ -35,21 +35,23 @@ export class FoodSearchError extends Error {
   }
 }
 
-/** Local (browser) cache of OFF searches. Never shared between users. */
-export interface SearchCacheEntry {
-  results: FoodSearchResult[];
-  timestamp: number;
-}
-export interface SearchCache {
-  get(key: string): Promise<SearchCacheEntry | undefined>;
-  set(key: string, entry: SearchCacheEntry): Promise<void>;
-}
-
-export const SEARCH_CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
-/** Saved foods are filtered locally from this many letters. */
+/** A search needs at least this many letters (a single letter returns noise and wastes requests). */
 export const MIN_QUERY_LENGTH = 2;
-/** Open Food Facts is only asked from this many letters (shorter queries return noise and waste requests). */
-export const OFF_MIN_QUERY_LENGTH = 3;
+/** Results per page, in both tabs (saved foods and Open Food Facts). */
+export const PAGE_SIZE = 20;
+/** Deeper pages are slow on the Open Food Facts side and nobody reads them: 25 pages = 500 results. */
+export const MAX_PAGES = 25;
+
+/** One page of search results. */
+export interface SearchPage {
+  results: FoodSearchResult[];
+  page: number;
+  pageCount: number;
+  /** Matches found, as reported by Open Food Facts (may include products that are not usable). */
+  total: number;
+  /** False when `total` is a lower bound (e.g. "10000+"). */
+  totalExact: boolean;
+}
 
 const OFF_FIELDS =
   "code,product_name,product_name_pt,product_name_en,product_name_es,product_name_fr,brands,nutriments,serving_size";
@@ -143,31 +145,7 @@ async function getJson(url: string, { fetch: fetchFn = fetch, signal }: FetchOpt
 }
 
 export interface SearchOffOptions extends FetchOptions {
-  cache?: SearchCache;
-  now?: () => number;
-  ttlMs?: number;
-  /** Skip reading the local cache (the user asked for fresh results); the answer is still written to it. */
-  refresh?: boolean;
-}
-
-/** Cached results of a past Open Food Facts search (no network), or undefined when there are none or they expired. */
-export async function peekOffCache(
-  query: string,
-  { cache, now = Date.now, ttlMs = SEARCH_CACHE_TTL_MS }: Pick<SearchOffOptions, "cache" | "now" | "ttlMs"> = {},
-): Promise<FoodSearchResult[] | undefined> {
-  const normalized = normalizeQuery(query);
-  if (normalized.length < OFF_MIN_QUERY_LENGTH) return undefined;
-  const cached = await cache?.get(normalized);
-  return cached && now() - cached.timestamp < ttlMs ? cached.results : undefined;
-}
-
-/**
- * Open Food Facts is only asked when the user requested it, or when neither the saved foods nor the
- * local cache have anything for this text (and the cache has already been read).
- */
-export function shouldSearchOnline(state: { forced: boolean; cacheRead: boolean; savedCount: number; cachedCount: number }): boolean {
-  if (state.forced) return true;
-  return state.cacheRead && state.savedCount === 0 && state.cachedCount === 0;
+  page?: number;
 }
 
 const SEARCH_ENDPOINT = "/api/food-search";
@@ -182,39 +160,35 @@ export const FOOD_SEARCH_MESSAGES: Record<"network" | "timeout" | "unavailable" 
   http: "Erro ao pesquisar alimento. Tenta novamente.",
 };
 
-/** Searches Open Food Facts through our server (`/api/food-search`), which retries and shares a cache. */
-export async function searchOpenFoodFacts(
-  query: string,
-  options: SearchOffOptions = {},
-): Promise<{ results: FoodSearchResult[]; fromCache: boolean }> {
+/** Searches Open Food Facts through our server (`/api/food-search`), which retries on failures. Nothing is cached. */
+export async function searchOpenFoodFacts(query: string, options: SearchOffOptions = {}): Promise<SearchPage> {
   const normalized = normalizeQuery(query);
-  if (normalized.length < OFF_MIN_QUERY_LENGTH) return { results: [], fromCache: false };
-
-  const { cache, now = Date.now, ttlMs = SEARCH_CACHE_TTL_MS, fetch: fetchFn = fetch, signal, refresh = false } = options;
-  if (!refresh) {
-    const cached = await peekOffCache(normalized, { cache, now, ttlMs });
-    if (cached) return { results: cached, fromCache: true };
-  }
+  const { page = 1, fetch: fetchFn = fetch, signal } = options;
+  if (normalized.length < MIN_QUERY_LENGTH) return { results: [], page: 1, pageCount: 0, total: 0, totalExact: true };
 
   const timeout = AbortSignal.timeout(SEARCH_TIMEOUT_MS);
   let response: Response;
   try {
-    response = await fetchFn(`${SEARCH_ENDPOINT}?${new URLSearchParams({ q: normalized })}`, {
+    response = await fetchFn(`${SEARCH_ENDPOINT}?${new URLSearchParams({ q: normalized, page: String(page) })}`, {
       signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
     });
   } catch (error) {
-    if (signal?.aborted) throw error; // caller cancelled (e.g. new keystroke): not an error to show
+    if (signal?.aborted) throw error; // caller cancelled (e.g. new search): not an error to show
     throw new FoodSearchError(FOOD_SEARCH_MESSAGES[timeout.aborted ? "timeout" : "network"], timeout.aborted ? "timeout" : "network");
   }
   if (response.status === 401) throw new FoodSearchError(FOOD_SEARCH_MESSAGES.unauthorized, "unauthorized");
   if (response.status === 503) throw new FoodSearchError(FOOD_SEARCH_MESSAGES.unavailable, "unavailable");
   if (!response.ok) throw new FoodSearchError(FOOD_SEARCH_MESSAGES.http, "http");
 
-  const data = (await response.json().catch(() => null)) as { results?: FoodSearchResult[] } | null;
+  const data = (await response.json().catch(() => null)) as Partial<SearchPage> | null;
   if (!data || !Array.isArray(data.results)) throw new FoodSearchError(FOOD_SEARCH_MESSAGES.http, "http");
-
-  await cache?.set(normalized, { results: data.results, timestamp: now() });
-  return { results: data.results, fromCache: false };
+  return {
+    results: data.results,
+    page: data.page ?? page,
+    pageCount: data.pageCount ?? 1,
+    total: data.total ?? data.results.length,
+    totalExact: data.totalExact ?? true,
+  };
 }
 
 /** A product barcode (EAN/UPC): 8 to 14 digits. */
@@ -283,10 +257,23 @@ export function filterSavedMeals<T extends { name: string; times_used: number }>
   return matchSaved(meals, query);
 }
 
-/** Saved foods first; OFF results that duplicate a saved food (same barcode or name) are dropped. */
-export function mergeResults(saved: readonly FoodSearchResult[], off: readonly FoodSearchResult[]): FoodSearchResult[] {
-  const codes = new Set(saved.flatMap((s) => (s.off_code ? [s.off_code] : [])));
-  const names = new Set(saved.map((s) => fold(s.name.trim())));
-  const rest = off.filter((o) => !(o.off_code && codes.has(o.off_code)) && !names.has(fold(o.name.trim())));
-  return [...saved, ...rest];
+/** The items of page `page` (1-based) and the number of pages. */
+export function paginate<T>(items: readonly T[], page: number, size = PAGE_SIZE): { items: T[]; pageCount: number } {
+  const pageCount = Math.max(1, Math.ceil(items.length / size));
+  const current = Math.min(Math.max(1, Math.floor(page)), pageCount);
+  return { items: items.slice((current - 1) * size, current * size), pageCount };
+}
+
+/** Which page numbers to show: the first, the last and the neighbours of the current one, with "…" for the gaps. */
+export function pageWindow(current: number, total: number): (number | "…")[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const wanted = new Set([1, total, current - 1, current, current + 1].filter((n) => n >= 1 && n <= total));
+  const pages = [...wanted].sort((a, b) => a - b);
+  const result: (number | "…")[] = [];
+  pages.forEach((n, i) => {
+    const previous = pages[i - 1];
+    if (previous !== undefined && n - previous > 1) result.push(n - previous === 2 ? n - 1 : "…");
+    result.push(n);
+  });
+  return result;
 }

@@ -23,8 +23,8 @@ describe("searchOffServer", () => {
     const fetchMock = vi.fn<typeof fetch>(async () =>
       json({ hits: [hit("1", "Peito de frango", 110), { code: "2", product_name: "Sem nutrientes" }, hit("3", "Zero", 0), hit("4", "", 100)] }),
     );
-    const results = await searchOffServer("  Peito DE frango ", { fetch: fetchMock, contactEmail: "eu@exemplo.pt", sleep: noSleep });
-    expect(results.map((r) => [r.name, r.brand, r.calories_100g])).toEqual([["Peito de frango", "Marca", 110]]);
+    const found = await searchOffServer("  Peito DE frango ", { fetch: fetchMock, contactEmail: "eu@exemplo.pt", sleep: noSleep });
+    expect(found.results.map((r) => [r.name, r.brand, r.calories_100g])).toEqual([["Peito de frango", "Marca", 110]]);
     const [url, init] = fetchMock.mock.calls[0]!;
     const parsed = new URL(String(url));
     expect(parsed.origin + parsed.pathname).toBe("https://search.openfoodfacts.org/search");
@@ -36,8 +36,8 @@ describe("searchOffServer", () => {
   it("retries once after a 503 and returns the second answer", async () => {
     const sleep = vi.fn(noSleep);
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(json({}, 503)).mockResolvedValueOnce(json({ hits: [hit("1", "Arroz", 130)] }));
-    const results = await searchOffServer("arroz", { fetch: fetchMock, sleep });
-    expect(results).toHaveLength(1);
+    const found = await searchOffServer("arroz", { fetch: fetchMock, sleep });
+    expect(found.results).toHaveLength(1);
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(sleep).toHaveBeenCalledTimes(1);
   });
@@ -68,6 +68,21 @@ describe("searchOffServer", () => {
   });
 
   it("returns an empty list when nothing matches", async () => {
-    expect(await searchOffServer("zzzz", { fetch: async () => json({ hits: [] }), sleep: noSleep })).toEqual([]);
+    expect(await searchOffServer("zzzz", { fetch: async () => json({ hits: [] }), sleep: noSleep })).toEqual({
+      results: [],
+      page: 1,
+      pageCount: 1,
+      total: 0,
+      totalExact: true,
+    });
+  });
+
+  it("asks for the requested page of 20 and reports the totals (capped at 25 pages)", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => json({ hits: [hit("1", "Arroz", 130)], count: 2844, is_count_exact: false, page_count: 143 }));
+    const found = await searchOffServer("arroz", { page: 4, fetch: fetchMock, sleep: noSleep });
+    const params = new URL(String(fetchMock.mock.calls[0]![0])).searchParams;
+    expect(params.get("page")).toBe("4");
+    expect(params.get("page_size")).toBe("20");
+    expect(found).toMatchObject({ page: 4, pageCount: 25, total: 2844, totalExact: false });
   });
 });

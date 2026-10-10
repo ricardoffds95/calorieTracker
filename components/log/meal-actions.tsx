@@ -2,24 +2,25 @@
 
 import { useState } from "react";
 import { Check } from "lucide-react";
+import { DiaryTargetPicker } from "@/components/log/diary-target-picker";
 import { NutrientSummary } from "@/components/log/nutrient-summary";
 import { PortionStepper } from "@/components/log/portion-stepper";
 import { Button } from "@/components/ui/button";
-import { mealEntryRow, type LogTarget } from "@/lib/log";
+import { describeTarget, isValidTarget, mealEntryRow, type LogTarget } from "@/lib/log";
 import { sumItems, type FoodItem } from "@/lib/nutrition";
 import { useAddEntries } from "@/lib/queries/diary";
 import { DUPLICATE_NAME, useCreateSavedMeal, type SavedMeal } from "@/lib/queries/saved";
 
 interface MealActionsProps {
   userId: string;
-  /** Where to log it. Without a target (Guardados tab) the meal can only be saved. */
-  target?: LogTarget;
-  /** Label of the diary meal (e.g. "Almoço"). */
-  mealName?: string;
+  /** Day and meal the picker starts on. Without it (Guardados tab) the meal can only be saved, not logged. */
+  initialTarget?: LogTarget;
+  /** The current time, to word the confirmation ("hoje", "ontem"). */
+  now?: Date;
   name: string;
   items: FoodItem[];
   /** Called after something was added to the diary, with the toast text. */
-  onAdded?: (message: string) => void;
+  onAdded?: (message: string, day: string) => void;
   /** Called after the meal was saved (with or without logging it). */
   onSaved?: (meal: SavedMeal) => void;
   /** Shown as "Editar" when given (AI result). */
@@ -29,15 +30,15 @@ interface MealActionsProps {
 const DUPLICATE_MESSAGE = "Já tens uma refeição guardada com este nome. Muda o nome para a guardar.";
 
 /** Save the meal, save and add it to the diary (in portions), edit it, or only add it. */
-export function MealActions({ userId, target, mealName = "", name, items, onAdded, onSaved, onEdit }: MealActionsProps) {
+export function MealActions({ userId, initialTarget, now = new Date(), name, items, onAdded, onSaved, onEdit }: MealActionsProps) {
   const [portions, setPortions] = useState(1);
+  const [target, setTarget] = useState(initialTarget);
   const [saved, setSaved] = useState<SavedMeal | null>(null);
   const [error, setError] = useState<string | null>(null);
   const createMeal = useCreateSavedMeal(userId);
   const add = useAddEntries(userId);
   const pending = createMeal.isPending || add.isPending;
   const totals = sumItems(items);
-  const where = mealName.toLowerCase();
 
   /** The saved meal (saving it now if needed), or null when it could not be saved. */
   async function ensureSaved(): Promise<SavedMeal | null> {
@@ -58,7 +59,7 @@ export function MealActions({ userId, target, mealName = "", name, items, onAdde
     if (!target) return;
     try {
       await add.mutateAsync({ rows: [mealEntryRow(target, meal, portions)] });
-      onAdded?.(`${meal.name} adicionado a ${where}`);
+      onAdded?.(`${meal.name} adicionado a ${describeTarget(target, now)}`, target.entry_date);
     } catch {
       // the mutation already shows "Sem ligação…"
     }
@@ -70,7 +71,12 @@ export function MealActions({ userId, target, mealName = "", name, items, onAdde
         value={{ calories: totals.total_calories, protein_g: totals.total_protein, carbs_g: totals.total_carbs, fat_g: totals.total_fat }}
       />
       <p className="-mt-2 text-xs text-muted-foreground">Valores de 1 porção</p>
-      {target && <PortionStepper value={portions} onChange={setPortions} />}
+      {target && (
+        <>
+          <PortionStepper value={portions} onChange={setPortions} />
+          <DiaryTargetPicker value={target} onChange={setTarget} />
+        </>
+      )}
       {error && (
         <p role="alert" className="text-sm text-destructive">
           {error}
@@ -81,13 +87,13 @@ export function MealActions({ userId, target, mealName = "", name, items, onAdde
           type="button"
           size="lg"
           className="h-11"
-          disabled={pending}
+          disabled={pending || !isValidTarget(target)}
           onClick={async () => {
             const meal = await ensureSaved();
             if (meal) await addToDiary(meal);
           }}
         >
-          {saved ? `Adicionar a ${where}` : "Guardar e adicionar ao diário"}
+          {saved ? "Adicionar ao diário" : "Guardar e adicionar ao diário"}
         </Button>
       )}
       <div className={target ? "grid grid-cols-2 gap-2" : "flex flex-col"}>
@@ -114,7 +120,7 @@ export function MealActions({ userId, target, mealName = "", name, items, onAdde
         )}
       </div>
       {target && !saved && (
-        <Button type="button" variant="link" className="h-11 text-muted-foreground" disabled={pending} onClick={() => addToDiary({ id: null, name, items })}>
+        <Button type="button" variant="link" className="h-11 text-muted-foreground" disabled={pending || !isValidTarget(target)} onClick={() => addToDiary({ id: null, name, items })}>
           Só adicionar ao diário (sem guardar)
         </Button>
       )}

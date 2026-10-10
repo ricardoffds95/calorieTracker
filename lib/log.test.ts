@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-  defaultMeal,
+  DEFAULT_MEAL,
+  describeTarget,
+  isValidTarget,
   foodEntryRow,
   itemRows,
   mealEntryRow,
@@ -19,19 +21,24 @@ const items = [
   { name: "Arroz", quantity_g: 125, calories: 163, protein_g: 3.4, carbs_g: 35.3, fat_g: 0.4 },
 ];
 
-describe("defaultMeal / mealFromParam", () => {
-  it("follows the time of day", () => {
-    expect(defaultMeal(at(7))).toBe("breakfast");
-    expect(defaultMeal(at(10, 59))).toBe("breakfast");
-    expect(defaultMeal(at(11))).toBe("lunch");
-    expect(defaultMeal(at(16))).toBe("snacks");
-    expect(defaultMeal(at(19))).toBe("dinner");
-    expect(defaultMeal(at(0, 30))).toBe("breakfast");
+describe("mealFromParam / describeTarget / isValidTarget", () => {
+  it("defaults to snacks, whatever the time", () => {
+    expect(DEFAULT_MEAL).toBe("snacks");
+    expect(mealFromParam(null)).toBe("snacks");
+    expect(mealFromParam("brunch")).toBe("snacks");
   });
-  it("uses a valid ?meal= and ignores anything else", () => {
-    expect(mealFromParam("dinner", at(8))).toBe("dinner");
-    expect(mealFromParam("brunch", at(8))).toBe("breakfast");
-    expect(mealFromParam(null, at(20))).toBe("dinner");
+  it("uses a valid ?meal= (the + of a meal in Today)", () => {
+    expect(mealFromParam("dinner")).toBe("dinner");
+    expect(mealFromParam("breakfast")).toBe("breakfast");
+  });
+  it("says where an entry went", () => {
+    expect(describeTarget({ entry_date: "2026-10-10", meal: "snacks" }, at(15))).toBe("lanches (hoje, 10 out)");
+    expect(describeTarget({ entry_date: "2026-10-09", meal: "dinner" }, at(15))).toBe("jantar (ontem, 9 out)");
+  });
+  it("only accepts a real calendar day", () => {
+    expect(isValidTarget({ entry_date: "2026-10-10", meal: "lunch" })).toBe(true);
+    expect(isValidTarget({ entry_date: "", meal: "lunch" })).toBe(false);
+    expect(isValidTarget({ entry_date: "2026-02-30", meal: "lunch" })).toBe(false);
   });
 });
 

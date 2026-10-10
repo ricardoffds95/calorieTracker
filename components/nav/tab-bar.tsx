@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Bookmark, ChartColumn, CirclePlus, House, User, type LucideIcon } from "lucide-react";
+import { useKeyboardOpen } from "@/lib/use-keyboard-open";
 import { cn } from "@/lib/utils";
 
 const TABS: { href: string; label: string; icon: LucideIcon }[] = [
@@ -19,11 +20,16 @@ function isActive(pathname: string, href: string) {
 
 export function TabBar() {
   const pathname = usePathname();
+  const keyboardOpen = useKeyboardOpen();
 
   return (
     <nav
       aria-label="Navegação principal"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/90 pb-[env(safe-area-inset-bottom)] backdrop-blur"
+      // Hidden (not removed) while the keyboard is open: on iOS it would float in the middle of the screen.
+      className={cn(
+        "fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/90 pb-[env(safe-area-inset-bottom)] backdrop-blur",
+        keyboardOpen && "hidden",
+      )}
     >
       <ul className="mx-auto flex h-(--tab-bar-height) max-w-md items-stretch">
         {TABS.map(({ href, label, icon: Icon }) => {

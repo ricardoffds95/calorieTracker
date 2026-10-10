@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
@@ -16,21 +16,16 @@ import { NewMealDialog } from "@/components/log/new-meal-dialog";
 import { SavedList } from "@/components/log/saved-list";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useMounted } from "@/components/use-mounted";
 import { dateKeyOrToday, toDateKey } from "@/lib/dates";
 import { savedToResult, type FoodSearchResult } from "@/lib/food-search";
-import { foodEntryRow, itemRows, mealEntryRow, mealFromParam, type NewDiaryEntry } from "@/lib/log";
-import type { MealType } from "@/lib/macros";
+import { describeTarget, foodEntryRow, itemRows, mealEntryRow, mealFromParam, type LogTarget, type NewDiaryEntry } from "@/lib/log";
 import { useAddEntries } from "@/lib/queries/diary";
 import { ensureSavedFood, useSaveFoodOnly, useSavedFoods, useSavedMeals, type SavedMeal } from "@/lib/queries/saved";
-import { mealLabel } from "@/lib/today";
-
-// The day and default meal depend on the browser's clock, so nothing date-based renders on the server.
-const subscribeNothing = () => () => {};
-const useMounted = () => useSyncExternalStore(subscribeNothing, () => true, () => false);
 
 export function LogScreen({ userId }: { userId: string }) {
-  const mounted = useMounted();
-  if (!mounted) return <Skeleton className="h-96 w-full" aria-label="A carregar" />;
+  // "Today" depends on the browser's clock, so nothing date-based renders on the server.
+  if (!useMounted()) return <Skeleton className="h-96 w-full" aria-label="A carregar" />;
   return <LogDay userId={userId} />;
 }
 
@@ -41,9 +36,8 @@ function LogDay({ userId }: { userId: string }) {
   const router = useRouter();
   const params = useSearchParams();
   const dateKey = dateKeyOrToday(params.get("d"), now);
-  const meal = mealFromParam(params.get("meal"), now);
-  const target = { entry_date: dateKey, meal };
-  const name = mealLabel(meal);
+  // The "+" of a meal in Today pre-selects its day and meal; otherwise today, snacks. The meal is chosen when adding.
+  const initialTarget: LogTarget = { entry_date: dateKey, meal: mealFromParam(params.get("meal")) };
 
   const [panel, setPanel] = useState<Panel>(null);
   const [editing, setEditing] = useState<SavedTarget | null>(null);
@@ -52,20 +46,18 @@ function LogDay({ userId }: { userId: string }) {
   const add = useAddEntries(userId);
   const saveOnly = useSaveFoodOnly(userId);
 
-  const setMeal = (m: MealType) => router.replace(`/registar?meal=${m}&d=${dateKey}`, { scroll: false });
-
-  function showAdded(message: string) {
+  function showAdded(message: string, day = dateKey) {
     setPanel(null);
-    toast.success(message, { action: { label: "Ver dia", onClick: () => router.push(dayHref(dateKey, now)) } });
+    toast.success(message, { action: { label: "Ver dia", onClick: () => router.push(dayHref(day, now)) } });
   }
 
-  function addRows(rows: NewDiaryEntry[] | (() => Promise<NewDiaryEntry[]>), what: string) {
-    add.mutate({ rows }, { onSuccess: () => showAdded(`${what} adicionado a ${name.toLowerCase()}`) });
+  function addRows(rows: NewDiaryEntry[] | (() => Promise<NewDiaryEntry[]>), what: string, target: LogTarget) {
+    add.mutate({ rows }, { onSuccess: () => showAdded(`${what} adicionado a ${describeTarget(target, now)}`, target.entry_date) });
   }
 
   return (
     <div className="flex flex-col gap-5">
-      <LogHeader dateKey={dateKey} now={now} meal={meal} onMealChange={setMeal} />
+      <LogHeader dateKey={dateKey} now={now} />
 
       <FoodSearch
         saved={foods.data ?? []}
@@ -93,39 +85,42 @@ function LogDay({ userId }: { userId: string }) {
         <AddFoodSheet
           key={panel.food.id}
           food={panel.food}
-          mealName={name}
+          initialTarget={initialTarget}
           pending={add.isPending || saveOnly.isPending}
           onClose={() => setPanel(null)}
           // Foods from search/scan are saved first (per 100 g) so next time they are instant.
-          onAdd={(food, quantity) => addRows(async () => [foodEntryRow(target, food, quantity, await ensureSavedFood(food))], food.name)}
+          onAdd={(food, quantity, target) => addRows(async () => [foodEntryRow(target, food, quantity, await ensureSavedFood(food))], food.name, target)}
           onSaveOnly={(food) => saveOnly.mutate(food, { onSuccess: () => setPanel(null) })}
         />
       )}
       {panel?.kind === "meal" && (
         <AddMealSheet
           meal={panel.meal}
-          target={target}
-          mealName={name}
+          initialTarget={initialTarget}
           pending={add.isPending}
           onClose={() => setPanel(null)}
-          onAdd={(m, doses) => addRows([mealEntryRow(target, m, doses)], m.name)}
+          onAdd={(m, doses, target) => addRows([mealEntryRow(target, m, doses)], m.name, target)}
         />
       )}
-      {panel?.kind === "ai" && <AiPanel userId={userId} target={target} mealName={name} onClose={() => setPanel(null)} onAdded={showAdded} />}
+      {panel?.kind === "ai" && <AiPanel userId={userId} initialTarget={initialTarget} now={now} onClose={() => setPanel(null)} onAdded={showAdded} />}
       {panel?.kind === "newMeal" && (
-        <NewMealDialog userId={userId} target={target} mealName={name} foods={foods.data ?? []} onClose={() => setPanel(null)} onAdded={showAdded} />
+        <NewMealDialog userId={userId} initialTarget={initialTarget} now={now} foods={foods.data ?? []} onClose={() => setPanel(null)} onAdded={showAdded} />
       )}
       {panel?.kind === "manual" && (
         <ManualEntryDialog
-          mealName={name}
+          initialTarget={initialTarget}
           pending={add.isPending}
           onClose={() => setPanel(null)}
-          onAdd={(item, saveAs) =>
-            addRows(async () => {
-              const [row] = itemRows(target, [item]);
-              const savedId = saveAs ? await ensureSavedFood({ ...saveAs, id: "", source: "off" }) : null;
-              return [{ ...row!, saved_food_id: savedId }];
-            }, item.name)
+          onAdd={(item, saveAs, target) =>
+            addRows(
+              async () => {
+                const [row] = itemRows(target, [item]);
+                const savedId = saveAs ? await ensureSavedFood({ ...saveAs, id: "", source: "off" }) : null;
+                return [{ ...row!, saved_food_id: savedId }];
+              },
+              item.name,
+              target,
+            )
           }
         />
       )}

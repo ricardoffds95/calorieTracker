@@ -2,16 +2,22 @@
 
 import { useState } from "react";
 import { Plus, Search } from "lucide-react";
+import { AddFoodSheet } from "@/components/log/add-food-sheet";
+import { AddMealSheet } from "@/components/log/add-meal-sheet";
 import { EditSavedDialog, type SavedTarget } from "@/components/log/edit-saved-dialog";
 import { NewMealDialog } from "@/components/log/new-meal-dialog";
 import { NewFoodDialog } from "@/components/saved/new-food-dialog";
+import { SavedActionsSheet } from "@/components/saved/saved-actions-sheet";
 import { SavedRow } from "@/components/saved/saved-row";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toDateKey } from "@/lib/dates";
-import { filterSavedFoods, filterSavedMeals } from "@/lib/food-search";
+import { filterSavedFoods, filterSavedMeals, savedToResult } from "@/lib/food-search";
+import { DEFAULT_MEAL, describeTarget, foodEntryRow, mealEntryRow, type LogTarget } from "@/lib/log";
+import { useAddEntries } from "@/lib/queries/diary";
 import { useSavedFoods, useSavedMeals } from "@/lib/queries/saved";
+import { toast } from "sonner";
 
 const PAGE = 20;
 type Tab = "foods" | "meals";
@@ -20,9 +26,19 @@ export function SavedScreen({ userId }: { userId: string }) {
   const [tab, setTab] = useState<Tab>("foods");
   const [query, setQuery] = useState("");
   const [limit, setLimit] = useState(PAGE);
+  const [actions, setActions] = useState<SavedTarget | null>(null); // the sheet with Editar / Adicionar / Apagar
   const [editing, setEditing] = useState<SavedTarget | null>(null);
+  const [adding, setAdding] = useState<SavedTarget | null>(null);
   const [creating, setCreating] = useState<Tab | null>(null);
-  const [today] = useState(() => toDateKey(new Date()));
+  const [now] = useState(() => new Date());
+  const today = toDateKey(now);
+  const initialTarget: LogTarget = { entry_date: today, meal: DEFAULT_MEAL };
+  const add = useAddEntries(userId);
+
+  function added(what: string, target: LogTarget) {
+    setAdding(null);
+    toast.success(`${what} adicionado a ${describeTarget(target, now)}`);
+  }
 
   const foods = useSavedFoods(userId);
   const meals = useSavedMeals(userId);
@@ -103,7 +119,7 @@ export function SavedScreen({ userId }: { userId: string }) {
                   energy={`${food.calories_100g} kcal/100 g`}
                   macros={`P ${food.protein_100g} · H ${food.carbs_100g} · G ${food.fat_100g}`}
                   timesUsed={food.times_used}
-                  onEdit={() => setEditing({ kind: "food", item: food })}
+                  onEdit={() => setActions({ kind: "food", item: food })}
                 />
               ))
             : mealRows.slice(0, limit).map((meal) => (
@@ -114,7 +130,7 @@ export function SavedScreen({ userId }: { userId: string }) {
                   energy={`${meal.total_calories} kcal`}
                   macros={`P ${meal.total_protein} · H ${meal.total_carbs} · G ${meal.total_fat}`}
                   timesUsed={meal.times_used}
-                  onEdit={() => setEditing({ kind: "meal", item: meal })}
+                  onEdit={() => setActions({ kind: "meal", item: meal })}
                 />
               ))}
         </ul>
@@ -127,6 +143,42 @@ export function SavedScreen({ userId }: { userId: string }) {
 
       {creating === "foods" && <NewFoodDialog userId={userId} onClose={() => setCreating(null)} />}
       {creating === "meals" && <NewMealDialog userId={userId} foods={foods.data ?? []} onClose={() => setCreating(null)} />}
+      {actions && (
+        <SavedActionsSheet
+          key={actions.item.id}
+          userId={userId}
+          target={actions}
+          onClose={() => setActions(null)}
+          onEdit={() => {
+            setEditing(actions);
+            setActions(null);
+          }}
+          onAddToDiary={() => {
+            setAdding(actions);
+            setActions(null);
+          }}
+        />
+      )}
+      {adding?.kind === "food" && (
+        <AddFoodSheet
+          food={savedToResult(adding.item)}
+          initialTarget={initialTarget}
+          pending={add.isPending}
+          onClose={() => setAdding(null)}
+          onAdd={(food, quantity, target) =>
+            add.mutate({ rows: [foodEntryRow(target, food, quantity, adding.item.id)] }, { onSuccess: () => added(food.name, target) })
+          }
+        />
+      )}
+      {adding?.kind === "meal" && (
+        <AddMealSheet
+          meal={adding.item}
+          initialTarget={initialTarget}
+          pending={add.isPending}
+          onClose={() => setAdding(null)}
+          onAdd={(meal, doses, target) => add.mutate({ rows: [mealEntryRow(target, meal, doses)] }, { onSuccess: () => added(meal.name, target) })}
+        />
+      )}
       {editing && <EditSavedDialog key={editing.item.id} userId={userId} target={editing} todayKey={today} onClose={() => setEditing(null)} />}
     </div>
   );

@@ -4,24 +4,16 @@ import {
   filterSavedFoods,
   filterSavedMeals,
   mapProduct,
-  mergeResults,
-  peekOffCache,
+  paginate,
+  pageWindow,
   searchByBarcode,
   searchOpenFoodFacts,
   searchSavedFoods,
-  shouldSearchOnline,
   type SavedFood,
-  type SearchCache,
-  type SearchCacheEntry,
 } from "./food-search";
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
-}
-
-function memoryCache(): SearchCache & { store: Map<string, SearchCacheEntry> } {
-  const store = new Map<string, SearchCacheEntry>();
-  return { store, get: async (k) => store.get(k), set: async (k, v) => void store.set(k, v) };
 }
 
 const oats = {
@@ -87,48 +79,37 @@ describe("mapProduct", () => {
 
 describe("searchOpenFoodFacts (through our server)", () => {
   const results = [mapProduct(oats)];
+  const page = { results, page: 1, pageCount: 21, total: 401, totalExact: true };
 
-  it("asks /api/food-search with the normalized query and returns the results", async () => {
-    const fetchMock = vi.fn<typeof fetch>(async () => jsonResponse({ results }));
-    const found = await searchOpenFoodFacts("  Aveia  ", { fetch: fetchMock });
-    expect(found).toEqual({ results, fromCache: false });
+  it("asks /api/food-search with the normalized query and the page, and returns the page", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => jsonResponse(page));
+    const found = await searchOpenFoodFacts("  Aveia  ", { page: 3, fetch: fetchMock });
+    expect(found).toEqual({ ...page });
     const url = new URL(String(fetchMock.mock.calls[0]![0]), "http://localhost");
     expect(url.pathname).toBe("/api/food-search");
     expect(url.searchParams.get("q")).toBe("aveia");
+    expect(url.searchParams.get("page")).toBe("3");
   });
 
-  it("does not call the network for queries shorter than 3 characters", async () => {
-    const fetchMock = vi.fn();
-    expect(await searchOpenFoodFacts(" ar ", { fetch: fetchMock })).toEqual({ results: [], fromCache: false });
+  it("starts on page 1 and fills in what an older answer does not have", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => jsonResponse({ results }));
+    expect(await searchOpenFoodFacts("aveia", { fetch: fetchMock })).toEqual({ results, page: 1, pageCount: 1, total: 1, totalExact: true });
+    expect(new URL(String(fetchMock.mock.calls[0]![0]), "http://localhost").searchParams.get("page")).toBe("1");
+  });
+
+  it("does not call the network for queries shorter than 2 characters, but does for 2", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => jsonResponse(page));
+    expect((await searchOpenFoodFacts(" a ", { fetch: fetchMock })).results).toEqual([]);
     expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it("serves the second identical search from the cache", async () => {
-    const fetchMock = vi.fn(async () => jsonResponse({ results }));
-    const cache = memoryCache();
-    await searchOpenFoodFacts("aveia", { fetch: fetchMock, cache });
-    const second = await searchOpenFoodFacts("AVEIA ", { fetch: fetchMock, cache });
-    expect(second.fromCache).toBe(true);
-    expect(second.results).toHaveLength(1);
+    await searchOpenFoodFacts("ar", { fetch: fetchMock });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it("refetches once the cache entry is older than the TTL", async () => {
-    const fetchMock = vi.fn(async () => jsonResponse({ results }));
-    const cache = memoryCache();
-    let now = 1_000;
-    await searchOpenFoodFacts("aveia", { fetch: fetchMock, cache, now: () => now, ttlMs: 500 });
-    now = 1_400;
-    expect((await searchOpenFoodFacts("aveia", { fetch: fetchMock, cache, now: () => now, ttlMs: 500 })).fromCache).toBe(true);
-    now = 1_600;
-    expect((await searchOpenFoodFacts("aveia", { fetch: fetchMock, cache, now: () => now, ttlMs: 500 })).fromCache).toBe(false);
+  it("never caches: the same search asks again every time", async () => {
+    const fetchMock = vi.fn(async () => jsonResponse(page));
+    await searchOpenFoodFacts("aveia", { fetch: fetchMock });
+    await searchOpenFoodFacts("aveia", { fetch: fetchMock });
     expect(fetchMock).toHaveBeenCalledTimes(2);
-  });
-
-  it("does not cache failures", async () => {
-    const cache = memoryCache();
-    await expect(searchOpenFoodFacts("aveia", { fetch: async () => jsonResponse({}, 500), cache })).rejects.toThrow();
-    expect(cache.store.size).toBe(0);
   });
 
   it.each([
@@ -152,7 +133,7 @@ describe("searchOpenFoodFacts (through our server)", () => {
     await expect(searchOpenFoodFacts("aveia", { fetch: async () => jsonResponse({ nope: true }) })).rejects.toMatchObject({ kind: "http" });
   });
 
-  it("rethrows the abort when the caller cancels (new keystroke)", async () => {
+  it("rethrows the abort when the caller cancels (new search)", async () => {
     const controller = new AbortController();
     controller.abort();
     const fetchMock = vi.fn<typeof fetch>(async (_input, init) => {
@@ -235,65 +216,6 @@ describe("searchSavedFoods", () => {
   });
 });
 
-describe("mergeResults", () => {
-  it("puts saved foods first and drops OFF duplicates by barcode or name", () => {
-    const savedResults = searchSavedFoods([saved({ id: "1", name: "Aveia", off_code: "111" })], "aveia");
-    const off = [
-      { ...mapProduct({ code: "111", product_name: "Aveia X", nutriments: { "energy-kcal_100g": 1 } }) },
-      { ...mapProduct({ code: "222", product_name: "AVEIA", nutriments: { "energy-kcal_100g": 1 } }) },
-      { ...mapProduct({ code: "333", product_name: "Arroz", nutriments: { "energy-kcal_100g": 1 } }) },
-    ];
-    expect(mergeResults(savedResults, off).map((r) => r.id)).toEqual(["1", "333"]);
-  });
-});
-
-describe("peekOffCache", () => {
-  const entry = { results: [mapProduct(oats)], timestamp: 1_000 };
-  const cacheWith = (key: string) => {
-    const cache = memoryCache();
-    cache.store.set(key, entry);
-    return cache;
-  };
-
-  it("returns cached results without touching the network", async () => {
-    expect(await peekOffCache(" AVEIA ", { cache: cacheWith("aveia"), now: () => 1_500, ttlMs: 1_000 })).toEqual(entry.results);
-  });
-  it("returns undefined when nothing is cached, it expired, or the text is too short", async () => {
-    expect(await peekOffCache("arroz", { cache: cacheWith("aveia") })).toBeUndefined();
-    expect(await peekOffCache("aveia", { cache: cacheWith("aveia"), now: () => 5_000, ttlMs: 1_000 })).toBeUndefined();
-    expect(await peekOffCache("av", { cache: cacheWith("av") })).toBeUndefined();
-    expect(await peekOffCache("aveia")).toBeUndefined();
-  });
-});
-
-describe("searchOpenFoodFacts with refresh", () => {
-  it("ignores the cache when reading but writes the fresh answer to it", async () => {
-    const cache = memoryCache();
-    cache.store.set("aveia", { results: [], timestamp: Date.now() });
-    const fetchMock = vi.fn(async () => jsonResponse({ results: [mapProduct(oats)] }));
-    const result = await searchOpenFoodFacts("aveia", { fetch: fetchMock, cache, refresh: true });
-    expect(result).toMatchObject({ fromCache: false });
-    expect(result.results).toHaveLength(1);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(cache.store.get("aveia")?.results).toHaveLength(1);
-  });
-});
-
-describe("shouldSearchOnline", () => {
-  const base = { forced: false, cacheRead: true, savedCount: 0, cachedCount: 0 };
-  it("goes online by itself only when saved foods and the cache are both empty", () => {
-    expect(shouldSearchOnline(base)).toBe(true);
-    expect(shouldSearchOnline({ ...base, savedCount: 1 })).toBe(false);
-    expect(shouldSearchOnline({ ...base, cachedCount: 3 })).toBe(false);
-  });
-  it("waits for the cache to be read before deciding", () => {
-    expect(shouldSearchOnline({ ...base, cacheRead: false })).toBe(false);
-  });
-  it("always searches when the user asked for it", () => {
-    expect(shouldSearchOnline({ forced: true, cacheRead: false, savedCount: 5, cachedCount: 5 })).toBe(true);
-  });
-});
-
 describe("filterSavedFoods / filterSavedMeals", () => {
   const foods = [
     saved({ id: "a", name: "Iogurte grego", brand: "Marca", times_used: 2 }),
@@ -312,5 +234,35 @@ describe("filterSavedFoods / filterSavedMeals", () => {
       { name: "Bifana", times_used: 4 },
     ];
     expect(filterSavedMeals(meals, "ARROZ").map((m) => m.name)).toEqual(["Frango com arroz"]);
+  });
+});
+
+describe("paginate", () => {
+  const items = Array.from({ length: 45 }, (_, i) => i + 1);
+  it("cuts pages of 20 and counts them", () => {
+    expect(paginate(items, 1)).toEqual({ items: items.slice(0, 20), pageCount: 3 });
+    expect(paginate(items, 3).items).toEqual([41, 42, 43, 44, 45]);
+    expect(paginate(items, 2, 10).items).toHaveLength(10);
+  });
+  it("clamps an out-of-range page and handles no results", () => {
+    expect(paginate(items, 99).items[0]).toBe(41);
+    expect(paginate(items, 0).items[0]).toBe(1);
+    expect(paginate([], 1)).toEqual({ items: [], pageCount: 1 });
+  });
+});
+
+describe("pageWindow", () => {
+  it("lists every page when there are few", () => {
+    expect(pageWindow(1, 1)).toEqual([1]);
+    expect(pageWindow(3, 7)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+  });
+  it("keeps the first, the last and the neighbours of the current page", () => {
+    expect(pageWindow(1, 21)).toEqual([1, 2, "…", 21]);
+    expect(pageWindow(10, 21)).toEqual([1, "…", 9, 10, 11, "…", 21]);
+    expect(pageWindow(21, 21)).toEqual([1, "…", 20, 21]);
+  });
+  it("does not use '…' for a gap of a single page", () => {
+    expect(pageWindow(3, 21)).toEqual([1, 2, 3, 4, "…", 21]);
+    expect(pageWindow(19, 21)).toEqual([1, "…", 18, 19, 20, 21]);
   });
 });

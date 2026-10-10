@@ -16,18 +16,18 @@ import type { SavedMeal } from "@/lib/queries/saved";
 
 interface NewMealDialogProps {
   userId: string;
-  /** Without a target (Guardados tab) the meal is only saved, not logged. */
-  target?: LogTarget;
-  mealName?: string;
+  /** Without it (Guardados tab) the meal is only saved, not logged. */
+  initialTarget?: LogTarget;
+  now?: Date;
   foods: readonly SavedFood[];
   onClose: () => void;
-  onAdded?: (message: string) => void;
+  onAdded?: (message: string, day: string) => void;
   onSaved?: (meal: SavedMeal) => void;
 }
 
 const DEFAULT_GRAMS = 100;
 
-export function NewMealDialog({ userId, target, mealName, foods, onClose, onAdded, onSaved }: NewMealDialogProps) {
+export function NewMealDialog({ userId, initialTarget, now, foods, onClose, onAdded, onSaved }: NewMealDialogProps) {
   const [mode, setMode] = useState<"foods" | "portion">("foods");
   const [name, setName] = useState("");
   const [query, setQuery] = useState("");
@@ -114,8 +114,8 @@ export function NewMealDialog({ userId, target, mealName, foods, onClose, onAdde
             <MealActions
               key={JSON.stringify([trimmed, items])}
               userId={userId}
-              target={target}
-              mealName={mealName}
+              initialTarget={initialTarget}
+              now={now}
               name={trimmed}
               items={items}
               onAdded={onAdded}
