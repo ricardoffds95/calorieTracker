@@ -1,4 +1,5 @@
 import { X } from "lucide-react";
+import { ARROW_SLOT, KCAL, ROW_GRID } from "@/components/today/row-layout";
 import { Button } from "@/components/ui/button";
 import type { DiaryEntry } from "@/lib/diary";
 
@@ -10,20 +11,24 @@ interface EntryRowProps {
 
 export function EntryRow({ entry, onEdit, onDelete }: EntryRowProps) {
   return (
-    <li className="flex items-center gap-1" data-testid="entry-row">
+    <li className={ROW_GRID} data-testid="entry-row">
       <button
         type="button"
         aria-label={`Editar ${entry.name}`}
         onClick={() => onEdit(entry)}
-        className="flex min-h-11 min-w-0 flex-1 items-center justify-between gap-3 rounded-sm px-1 text-left"
+        className="grid min-h-11 min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-sm px-1 text-left"
       >
-        <span className="min-w-0 truncate">
-          {entry.name}
-          {entry.quantity_g !== null && <span className="text-sm text-muted-foreground"> · {entry.quantity_g} g</span>}
+        <span className="flex min-w-0 items-center gap-2">
+          <span aria-hidden className={ARROW_SLOT} />
+          <span className="min-w-0 py-1">
+            <span className="line-clamp-2 break-words">{entry.name}</span>
+            {entry.quantity_g !== null && <span className="block text-xs text-muted-foreground">{entry.quantity_g} g</span>}
+          </span>
         </span>
-        <span className="shrink-0 text-sm tabular-nums">{entry.calories} kcal</span>
+        <span data-testid="row-kcal" className={KCAL}>{entry.calories} kcal</span>
       </button>
-      <Button type="button" variant="ghost" size="icon" className="size-11 shrink-0 text-muted-foreground" aria-label={`Remover ${entry.name}`} onClick={() => onDelete(entry)}>
+      <span aria-hidden />
+      <Button type="button" variant="ghost" size="icon" className="size-11 text-muted-foreground" aria-label={`Remover ${entry.name}`} onClick={() => onDelete(entry)}>
         <X aria-hidden />
       </Button>
     </li>

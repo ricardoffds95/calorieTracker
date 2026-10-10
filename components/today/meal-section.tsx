@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { EntryRow } from "@/components/today/entry-row";
+import { KCAL, ROW_GRID } from "@/components/today/row-layout";
 import { MealEntryRow } from "@/components/today/meal-entry-row";
 import { buttonVariants } from "@/components/ui/button";
 import type { DiaryEntry } from "@/lib/diary";
@@ -22,13 +23,14 @@ export function MealSection({ meal, entries, calories, dateKey, onEdit, onDelete
   const label = mealLabel(meal);
   return (
     <section aria-labelledby={`meal-${meal}`} data-testid={`meal-${meal}`} className="border-t border-border pt-2">
-      <div className="flex items-center justify-between">
-        <h2 id={`meal-${meal}`} className="flex flex-1 items-baseline justify-between pr-2 text-base font-semibold">
-          {label}
-          <span data-testid={`meal-${meal}-kcal`} className="text-sm font-normal text-muted-foreground tabular-nums">
+      <div className={ROW_GRID}>
+        <h2 id={`meal-${meal}`} className="flex min-w-0 items-center justify-between gap-2 px-1 text-base font-semibold">
+          <span className="min-w-0 truncate">{label}</span>
+          <span data-testid={`meal-${meal}-kcal`} className={cn(KCAL, "font-normal text-muted-foreground")}>
             {entries.length === 0 ? "—" : `${calories} kcal`}
           </span>
         </h2>
+        <span aria-hidden />
         <Link
           href={`/registar?meal=${meal}&d=${dateKey}`}
           aria-label={`Adicionar a ${label}`}

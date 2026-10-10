@@ -249,3 +249,33 @@ test("another user never sees these entries", async ({ page }) => {
   await expect(page.getByText("Aveia")).toHaveCount(0);
   await expect(page.getByText("Ainda sem registos neste dia.")).toBeVisible();
 });
+
+test("the rows of the day line up: the calories of headings, foods, meals and items end at the same place, long names wrap", async ({ page }) => {
+  const day = toDateKey(new Date());
+  const items = [
+    { name: "Peito de frango grelhado com especiarias e molho", quantity_g: 150, calories: 248, protein_g: 46, carbs_g: 0, fat_g: 5 },
+    { name: "Arroz", quantity_g: 150, calories: 195, protein_g: 4, carbs_g: 42, fat_g: 1 },
+  ];
+  await seedDiary("A", [
+    { entry_date: day, meal: "lunch", kind: "meal", name: "Menu McCrispy Chicken Deluxe com batatas grandes e bebida", calories: 1037, protein_g: 40, carbs_g: 100, fat_g: 50, doses: 1, items },
+    { entry_date: day, meal: "lunch", kind: "meal", name: "Tosta", calories: 516, protein_g: 20, carbs_g: 50, fat_g: 20, doses: 1.5, items },
+    { entry_date: day, meal: "snacks", kind: "food", name: "Iogurte magro sem lactose com pedaços de frutos silvestres e cereais", quantity_g: 200, calories: 110, protein_g: 8, carbs_g: 12, fat_g: 1 },
+    { entry_date: day, meal: "snacks", kind: "food", name: "Ovo", quantity_g: 60, calories: 93, protein_g: 8, carbs_g: 1, fat_g: 7 },
+  ]);
+  await login(page, "A");
+  await page.getByRole("button", { name: /Menu McCrispy.*itens/ }).click();
+
+  const rightEdges = async (locator: ReturnType<Page["getByTestId"]>) => {
+    const boxes = await locator.evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().right)));
+    return boxes;
+  };
+  const edges = [...(await rightEdges(page.getByTestId("row-kcal"))), ...(await rightEdges(page.getByTestId("meal-lunch-kcal"))), ...(await rightEdges(page.getByTestId("meal-snacks-kcal")))];
+  expect(edges.length).toBeGreaterThanOrEqual(8); // 2 + 2 items + 2 snacks + 2 headings
+  expect(new Set(edges).size).toBe(1); // one single right edge
+
+  // a long name wraps on two lines at most and never pushes the calories out
+  const name = page.getByRole("button", { name: /^Editar Iogurte magro/ });
+  const box = (await name.boundingBox())!;
+  expect(box.height).toBeLessThan(90);
+  expect(box.x + box.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+});
