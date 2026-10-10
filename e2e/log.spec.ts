@@ -718,6 +718,22 @@ test("new meal: tick several saved foods in one list (with a filter) and join th
   expect((meal!.items as { name: string }[]).map((i) => i.name)).toEqual(["Aveia E2E", "Banana E2E"]);
 });
 
+test("new meal: the list of saved foods always has the filter, even with few foods", async ({ page }) => {
+  await seedSavedFood("A", { name: "Aveia E2E", calories_100g: 380, protein_100g: 13, carbs_100g: 60, fat_100g: 7 });
+  await seedSavedFood("A", { name: "Leite E2E", calories_100g: 46, protein_100g: 3, carbs_100g: 5, fat_100g: 2 });
+  await login(page, "A");
+  await openLog(page);
+
+  await page.getByRole("button", { name: "Refeições", exact: true }).click();
+  await page.getByRole("button", { name: "Nova refeição" }).click();
+  await page.getByRole("button", { name: /^Escolher dos meus alimentos/ }).click();
+  await page.getByRole("searchbox", { name: "Filtrar alimentos" }).fill("lei");
+  await expect(page.getByRole("checkbox")).toHaveCount(1);
+  await expect(page.getByRole("checkbox", { name: "Leite E2E" })).toBeVisible();
+  await page.getByRole("searchbox", { name: "Filtrar alimentos" }).fill("zzz");
+  await expect(page.getByText("Nenhum alimento com esse nome.")).toBeVisible();
+});
+
 test("new meal by joining saved foods: totals are the sum of the foods", async ({ page }) => {
   await seedSavedFood("A", { name: "Aveia E2E", calories_100g: 380, protein_100g: 13.2, carbs_100g: 60, fat_100g: 7 });
   await seedSavedFood("A", { name: "Leite E2E", calories_100g: 46, protein_100g: 3.3, carbs_100g: 4.8, fat_100g: 1.6 });

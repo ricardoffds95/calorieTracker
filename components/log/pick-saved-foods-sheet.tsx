@@ -36,7 +36,7 @@ export function PickSavedFoodsSheet({ foods, onJoin, onClose }: PickSavedFoodsSh
           <SheetDescription>Marca os que fazem parte da refeição. Entram com 100 g, que ajustas depois.</SheetDescription>
         </SheetHeader>
         <div className="flex flex-col gap-3 px-4">
-          {foods.length > 5 && (
+          {foods.length > 0 && (
             <div className="relative">
               <Search aria-hidden className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
