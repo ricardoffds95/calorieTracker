@@ -20,6 +20,17 @@ export async function login(page: Page, user: TestUser) {
   await expect(page.getByRole("navigation", { name: "Navegação principal" })).toBeVisible();
 }
 
+/** Signs in and waits to be away from /login, wherever the app sends the user (e.g. the questionnaire has no tab bar). */
+export async function signIn(page: Page, user: TestUser) {
+  const { email, password } = credentials(user);
+  await page.goto("/login");
+  await page.waitForLoadState("networkidle");
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password").fill(password);
+  await page.getByRole("button", { name: "Entrar" }).click();
+  await page.waitForURL((url) => !url.pathname.startsWith("/login"));
+}
+
 export async function openProfile(page: Page) {
   await page.getByRole("link", { name: "Perfil" }).click();
   await expect(page).toHaveURL(/\/perfil/);

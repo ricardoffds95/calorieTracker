@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { AiInvalidResponseError, AiUnavailableError, analyzeFoodImage, parseFoodText } from "./ai";
+import { AiInvalidResponseError, AiUnavailableError, analyzeFoodImage, describeAnswers, generateNutritionPlan, parseFoodText } from "./ai";
+import { referencePlan, type PlanAnswers } from "./nutrition-plan";
 
 const items = [{ name: "frango grelhado", quantity_g: 200, calories: 330, protein_g: 62, carbs_g: 0, fat_g: 7.2 }];
 const meal = { name: "Frango grelhado", kind: "food" as const, items };
@@ -141,5 +142,45 @@ describe("analyzeFoodImage", () => {
     expect(result).toEqual(meal);
     const body = JSON.parse(fetchMock.mock.calls[0]![1]?.body as string);
     expect(body.contents[0].parts[1]).toEqual({ inlineData: { mimeType: "image/png", data: "QUJD" } });
+  });
+});
+
+describe("generateNutritionPlan", () => {
+  const answers: PlanAnswers = { sex: "male", age: 30, height_cm: 180, weight_kg: 80, body_fat_pct: 18, goal: "bulk", sessions_per_week: 4, exercise_types: ["strength", "running"] };
+  const ask = (body: unknown) => generateNutritionPlan(answers, { ...base, fetch: async () => geminiResponse([{ text: typeof body === "string" ? body : JSON.stringify(body) }]) });
+
+  it("describes the questionnaire in words for the model", () => {
+    const text = describeAnswers(answers);
+    expect(text).toContain("Sexo: masculino");
+    expect(text).toContain("Massa gorda: 18 % (massa magra 82 %)");
+    expect(text).toContain("Objetivo: ganhar massa muscular");
+    expect(text).toContain("Tipo de exercício: Musculação, Corrida");
+    expect(describeAnswers({ ...answers, body_fat_pct: null, exercise_types: [] })).toContain("Massa gorda: não indicada");
+  });
+
+  it("returns the model's plan when it is sensible", async () => {
+    const ref = referencePlan(answers);
+    const result = await ask({ calories: ref.calories + 50, protein_g: 150, carbs_g: 380, fat_g: 90, summary: "Excedente pequeno." });
+    expect(result.source).toBe("ai");
+    expect(result.summary).toBe("Excedente pequeno.");
+    expect(result.plan.calories).toBe(ref.calories + 50);
+  });
+
+  it("uses the standard plan (and its own summary) when the model is far off", async () => {
+    const result = await ask({ calories: 900, protein_g: 150, carbs_g: 100, fat_g: 40, summary: "Come pouco." });
+    expect(result.source).toBe("standard");
+    expect(result.plan).toEqual(referencePlan(answers));
+    expect(result.summary).not.toContain("Come pouco");
+  });
+
+  it("rejects an answer that is not the expected JSON", async () => {
+    await expect(ask("não sei")).rejects.toBeInstanceOf(AiInvalidResponseError);
+    await expect(ask({ calories: "muitas" })).rejects.toBeInstanceOf(AiInvalidResponseError);
+  });
+
+  it("accepts the JSON inside markdown fences", async () => {
+    const ref = referencePlan(answers);
+    const result = await ask("```json\n" + JSON.stringify({ calories: ref.calories, protein_g: 150, carbs_g: 380, fat_g: 90, summary: "Ok." }) + "\n```");
+    expect(result.source).toBe("ai");
   });
 });

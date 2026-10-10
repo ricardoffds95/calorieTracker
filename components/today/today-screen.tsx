@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Plus } from "lucide-react";
 import { DayNav } from "@/components/today/day-nav";
 import { EditEntryDialog } from "@/components/today/edit-entry-dialog";
@@ -34,6 +34,12 @@ function TodayDay({ userId }: { userId: string }) {
   const [editing, setEditing] = useState<DiaryEntry | null>(null);
 
   const profile = useProfile(userId);
+  const router = useRouter();
+  // First login: the questionnaire. `=== null` on purpose: a profile cached before the column existed has it undefined.
+  const needsOnboarding = profile.data?.onboarding_done_at === null;
+  useEffect(() => {
+    if (needsOnboarding) router.replace("/onboarding");
+  }, [needsOnboarding, router]);
   const diary = useDiaryDay(userId, dateKey);
   const updateEntry = useUpdateEntry(userId, dateKey);
   const deleteEntry = useDeleteEntry(userId, dateKey);

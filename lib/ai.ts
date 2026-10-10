@@ -1,4 +1,5 @@
 import "server-only";
+import { EXERCISE_TYPES, aiPlanSchema, reconcilePlan, referencePlan, referenceSummary, type NutritionPlan, type PlanAnswers } from "./nutrition-plan";
 import { aiMealSchema, aiResultSchema, type AiMeal } from "./schemas";
 
 /** The AI service cannot be used right now (not configured, quota exhausted, down, timeout). */
@@ -63,7 +64,8 @@ function withKind(answer: { name: string; kind?: "food" | "meal"; items: AiMeal[
   return { ...answer, kind: single && (answer.kind ?? "food") === "food" ? "food" : "meal" };
 }
 
-async function callGemini(parts: GeminiPart[], options: GeminiOptions): Promise<AiMeal> {
+/** Sends the parts to Gemini and returns the text of its answer (JSON, by the request's response type). */
+async function geminiText(parts: GeminiPart[], options: GeminiOptions): Promise<string> {
   const apiKey = options.apiKey ?? process.env.GEMINI_API_KEY;
   const model = options.model ?? process.env.GEMINI_MODEL;
   if (!apiKey || !model) throw new AiUnavailableError("not_configured");
@@ -102,7 +104,11 @@ async function callGemini(parts: GeminiPart[], options: GeminiOptions): Promise<
     .filter((p) => !p.thought)
     .map((p) => p.text ?? "")
     .join("");
-  return parseModelText(text);
+  return text;
+}
+
+async function callGemini(parts: GeminiPart[], options: GeminiOptions): Promise<AiMeal> {
+  return parseModelText(await geminiText(parts, options));
 }
 
 export function parseFoodText(text: string, options: GeminiOptions = {}): Promise<AiMeal> {
@@ -115,4 +121,52 @@ export function analyzeFoodImage(
   options: GeminiOptions = {},
 ): Promise<AiMeal> {
   return callGemini([{ text: SYSTEM_PROMPT }, { inlineData: { mimeType, data: base64 } }], options);
+}
+
+const PLAN_PROMPT = `És um nutricionista desportivo. Com os dados abaixo calcula as necessidades diárias e devolve APENAS um objeto JSON sem markdown nem texto extra:
+{"calories":2400,"protein_g":160,"carbs_g":260,"fat_g":75,"summary":"duas ou três frases em português europeu, simples, a explicar porque estes valores"}
+Regras: usa calorias de manutenção pelo gasto estimado (taxa metabólica basal x atividade). Para "perder" aplica um défice moderado (cerca de 15-20 %), para "ganhar" um excedente pequeno (cerca de 5-10 %), para "manter" a manutenção. Nunca menos de 1200 kcal. Proteína entre 1,6 e 2,2 g por kg de peso (mais no défice e com treino de força). Gordura cerca de 25 % das calorias. Os hidratos completam o resto, de forma que 4 x proteína + 4 x hidratos + 9 x gordura seja igual às calorias. Todos os números inteiros. É uma estimativa, não aconselhamento médico: não faças diagnósticos.`;
+
+const GOAL_TEXT: Record<PlanAnswers["goal"], string> = { cut: "perder gordura", maintain: "manter o peso", bulk: "ganhar massa muscular" };
+
+/** The questionnaire as the text the model reads (the labels are Portuguese on purpose). */
+export function describeAnswers(a: PlanAnswers): string {
+  const types = a.exercise_types.map((key) => EXERCISE_TYPES.find((t) => t.key === key)?.label ?? key);
+  return [
+    `Sexo: ${a.sex === "male" ? "masculino" : "feminino"}`,
+    `Idade: ${a.age} anos`,
+    `Altura: ${a.height_cm} cm`,
+    `Peso: ${a.weight_kg} kg`,
+    a.body_fat_pct !== null ? `Massa gorda: ${a.body_fat_pct} % (massa magra ${Math.round((100 - a.body_fat_pct) * 10) / 10} %)` : "Massa gorda: não indicada",
+    `Objetivo: ${GOAL_TEXT[a.goal]}`,
+    `Treinos por semana: ${a.sessions_per_week}`,
+    `Tipo de exercício: ${types.length > 0 ? types.join(", ") : "nenhum indicado"}`,
+  ].join("\n");
+}
+
+export interface GeneratedPlan {
+  plan: NutritionPlan;
+  summary: string;
+  /** "ai": the model's plan (checked); "standard": the reference calculation, because the model's answer could not be trusted. */
+  source: "ai" | "standard";
+}
+
+/**
+ * The daily calories and macros for the questionnaire, from Gemini and checked against the reference calculation.
+ * Throws AiUnavailableError / AiInvalidResponseError when the model cannot answer (the caller falls back to the reference).
+ */
+export async function generateNutritionPlan(answers: PlanAnswers, options: GeminiOptions = {}): Promise<GeneratedPlan> {
+  const text = await geminiText([{ text: `${PLAN_PROMPT}\n\n${describeAnswers(answers)}` }], options);
+  let json: unknown;
+  try {
+    json = JSON.parse(text.replace(/```(?:json)?/gi, "").trim());
+  } catch {
+    throw new AiInvalidResponseError();
+  }
+  const parsed = aiPlanSchema.safeParse(json);
+  if (!parsed.success) throw new AiInvalidResponseError();
+
+  const reference = referencePlan(answers);
+  const { plan, trusted } = reconcilePlan(parsed.data, reference);
+  return trusted ? { plan, summary: parsed.data.summary, source: "ai" } : { plan, summary: referenceSummary(answers), source: "standard" };
 }

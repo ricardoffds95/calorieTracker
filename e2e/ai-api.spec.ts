@@ -50,3 +50,29 @@ test.describe("AI call (live Gemini)", () => {
     expect(items.reduce((sum, i) => sum + i.protein_g, 0)).toBeGreaterThan(40);
   });
 });
+
+const PLAN_ENDPOINT = "/api/ai/plan";
+const ANSWERS = { sex: "male", age: 30, height_cm: 180, weight_kg: 80, body_fat_pct: null, goal: "maintain", sessions_per_week: 3, exercise_types: ["strength"] };
+
+test("the plan endpoint: 401 without a session, 400 for invalid answers", async ({ page, request }) => {
+  const anonymous = await request.post(PLAN_ENDPOINT, { data: ANSWERS, maxRedirects: 0 });
+  expect(anonymous.status()).toBe(401);
+
+  await login(page, "A");
+  const invalid = await page.request.post(PLAN_ENDPOINT, { data: { ...ANSWERS, age: 5 } });
+  expect(invalid.status()).toBe(400);
+  expect(await invalid.json()).toMatchObject({ error: "invalid_request", message: "A idade mínima é 14 anos." });
+});
+
+test("the plan endpoint always answers with a usable plan, even without the AI", async ({ page }) => {
+  await login(page, "A");
+  const response = await page.request.post(PLAN_ENDPOINT, { data: ANSWERS });
+  expect(response.status()).toBe(200);
+  const plan = (await response.json()) as { calories: number; protein_g: number; carbs_g: number; fat_g: number; summary: string; source: string };
+  expect(plan.calories).toBeGreaterThan(2300); // a trained 80 kg man: about 2760 kcal to maintain
+  expect(plan.calories).toBeLessThan(3300);
+  expect(plan.protein_g * 4 + plan.carbs_g * 4 + plan.fat_g * 9).toBeGreaterThan(plan.calories * 0.9);
+  expect(plan.protein_g * 4 + plan.carbs_g * 4 + plan.fat_g * 9).toBeLessThan(plan.calories * 1.1);
+  expect(plan.summary.length).toBeGreaterThan(10);
+  expect(hasGeminiKey ? ["ai", "standard"] : ["standard"]).toContain(plan.source);
+});

@@ -137,3 +137,38 @@ export async function dailyTotalsAs(user: TestUser, from: string, to: string) {
   const supabase = await clientFor(user);
   return supabase.rpc("diary_daily_totals", { p_from: from, p_to: to });
 }
+
+/** The profile row of a test user (RLS: only their own). */
+export async function fetchProfile(user: TestUser) {
+  const supabase = await clientFor(user);
+  const { data, error } = await supabase.from("profiles").select("*").single();
+  if (error) throw error;
+  return data;
+}
+
+/** Puts a test user back to a clean profile: default goals, no questionnaire answers, onboarding done or not. */
+export async function resetProfileRow(user: TestUser, { onboardingDone }: { onboardingDone: boolean }) {
+  const supabase = await clientFor(user);
+  const { data: auth, error: authError } = await supabase.auth.getUser();
+  if (authError) throw authError;
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      mode: "maintain",
+      goal_calories: 2000,
+      goal_protein: 150,
+      goal_carbs: 200,
+      goal_fat: 67,
+      sex: null,
+      age: null,
+      height_cm: null,
+      weight_kg: null,
+      body_fat_pct: null,
+      activity_sessions_per_week: null,
+      exercise_types: [],
+      plan_summary: null,
+      onboarding_done_at: onboardingDone ? new Date().toISOString() : null,
+    })
+    .eq("user_id", auth.user.id);
+  if (error) throw error;
+}

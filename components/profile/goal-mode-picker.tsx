@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 
 const ICONS: Record<GoalMode, LucideIcon> = { cut: TrendingDown, maintain: Minus, bulk: TrendingUp };
 
-export function GoalModePicker({ value, onChange }: { value: GoalMode; onChange: (mode: GoalMode) => void }) {
+export function GoalModePicker({ value, onChange }: { value: GoalMode | null; onChange: (mode: GoalMode) => void }) {
   return (
     <fieldset className="flex flex-col gap-2">
       <legend className="mb-2 text-sm font-medium">Objetivo</legend>

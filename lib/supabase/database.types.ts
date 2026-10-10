@@ -91,6 +91,15 @@ export type Database = {
       }
       profiles: {
         Row: {
+          activity_sessions_per_week: number | null
+          age: number | null
+          body_fat_pct: number | null
+          exercise_types: string[]
+          height_cm: number | null
+          onboarding_done_at: string | null
+          plan_summary: string | null
+          sex: string | null
+          weight_kg: number | null
           created_at: string
           goal_calories: number
           goal_carbs: number
@@ -102,6 +111,15 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          activity_sessions_per_week?: number | null
+          age?: number | null
+          body_fat_pct?: number | null
+          exercise_types?: string[]
+          height_cm?: number | null
+          onboarding_done_at?: string | null
+          plan_summary?: string | null
+          sex?: string | null
+          weight_kg?: number | null
           created_at?: string
           goal_calories?: number
           goal_carbs?: number
@@ -113,6 +131,15 @@ export type Database = {
           user_id?: string
         }
         Update: {
+          activity_sessions_per_week?: number | null
+          age?: number | null
+          body_fat_pct?: number | null
+          exercise_types?: string[]
+          height_cm?: number | null
+          onboarding_done_at?: string | null
+          plan_summary?: string | null
+          sex?: string | null
+          weight_kg?: number | null
           created_at?: string
           goal_calories?: number
           goal_carbs?: number

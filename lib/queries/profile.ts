@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { toastSaveError } from "@/lib/queries/errors";
 import type { ProfileUpdate } from "@/lib/profile";
 import { createClient } from "@/lib/supabase/client";
-import type { Tables } from "@/lib/supabase/database.types";
+import type { Tables, TablesUpdate } from "@/lib/supabase/database.types";
 
 export type Profile = Tables<"profiles">;
 
@@ -49,6 +49,31 @@ export function useUpdateProfile(userId: string) {
     onSuccess: (saved) => {
       queryClient.setQueryData(key, saved);
       toast.success("Objetivos guardados");
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: key }),
+  });
+}
+
+/**
+ * Finishes (or skips) the onboarding questionnaire: stores what was answered, the goals and the AI's explanation,
+ * and stamps `onboarding_done_at`. Same write-through as the goals form: the cache only keeps what the DB accepted.
+ */
+export function useSaveOnboarding(userId: string) {
+  const queryClient = useQueryClient();
+  const key = profileKey(userId);
+
+  return useMutation({
+    mutationFn: async (update: TablesUpdate<"profiles"> & { toast?: string }): Promise<Profile> => {
+      const { toast: _message, ...row } = update;
+      void _message;
+      const { data, error } = await createClient().from("profiles").update({ ...row, onboarding_done_at: new Date().toISOString() }).eq("user_id", userId).select().single();
+      if (error) throw error;
+      return data;
+    },
+    onError: (error: { message?: string }) => toastSaveError(error),
+    onSuccess: (saved, update) => {
+      queryClient.setQueryData(key, saved);
+      if (update.toast) toast.success(update.toast);
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: key }),
   });
