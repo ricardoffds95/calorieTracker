@@ -40,3 +40,21 @@ test("login shows the protected page and logout returns to /login", async ({ pag
   await page.goto("/");
   await expect(page).toHaveURL(/\/login/);
 });
+
+test("the confirmation link without a session lands on the login saying the email is confirmed", async ({ page }) => {
+  await page.goto("/auth/confirm"); // public: no redirect loop, no code
+  await expect(page).toHaveURL(/\/login\?confirmado=1/);
+  await expect(page.getByRole("status")).toContainText("Email confirmado");
+  await expect(page.getByLabel("Email")).toBeVisible();
+});
+
+test("an expired or used confirmation link is explained", async ({ page }) => {
+  await page.goto("/auth/confirm?error=access_denied&error_description=Email+link+is+invalid+or+has+expired");
+  await expect(page).toHaveURL(/\/login\?link=invalido/);
+  await expect(page.getByRole("status")).toContainText("já não é válido");
+});
+
+test("a wrong code on the confirmation link does not log anyone in", async ({ page }) => {
+  await page.goto("/auth/confirm?code=not-a-real-code");
+  await expect(page).toHaveURL(/\/login\?confirmado=1/);
+});

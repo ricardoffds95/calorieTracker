@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "./database.types";
 
-const PUBLIC_PATHS = ["/login", "/register"];
+const PUBLIC_PATHS = ["/login", "/register", "/auth/"];
 
 /** Refreshes the Supabase session cookies and redirects anonymous users to /login. */
 export async function updateSession(request: NextRequest) {

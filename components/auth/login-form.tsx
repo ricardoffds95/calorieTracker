@@ -14,13 +14,13 @@ function goHome() {
   window.location.assign("/");
 }
 
-export function LoginForm() {
+export function LoginForm({ initialInfo = null }: { initialInfo?: string | null }) {
   const [mode, setMode] = useState<AuthMode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fieldErrors, setFieldErrors] = useState<CredentialErrors>({});
   const [error, setError] = useState<string | null>(null);
-  const [info, setInfo] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(initialInfo);
   const [loading, setLoading] = useState(false);
 
   function switchMode() {
@@ -50,7 +50,7 @@ export function LoginForm() {
         if (signInError) setError(authErrorMessage(signInError, mode));
         else return goHome();
       } else {
-        const { data, error: signUpError } = await supabase.auth.signUp(input);
+        const { data, error: signUpError } = await supabase.auth.signUp({ ...input, options: { emailRedirectTo: `${window.location.origin}/auth/confirm` } });
         if (signUpError) setError(authErrorMessage(signUpError, mode));
         else if (data.session) return goHome();
         else {
