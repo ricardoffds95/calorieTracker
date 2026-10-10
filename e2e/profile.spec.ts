@@ -3,6 +3,7 @@ import { clearCache, login, logout, openProfile } from "./helpers";
 
 const calories = (page: Page) => page.getByLabel("Calorias diárias", { exact: true });
 const pct = (page: Page, macro: "Proteína" | "Hidratos" | "Gordura") => page.getByLabel(`${macro} %`, { exact: true });
+const grams = (page: Page, macro: "Proteína" | "Hidratos" | "Gordura") => page.getByLabel(`${macro} (g)`, { exact: true });
 const save = (page: Page) => page.getByRole("button", { name: /Guardar objetivos|A guardar/ });
 const summary = (page: Page) => page.getByTestId("profile-summary");
 const preview = (page: Page) => page.getByTestId("goals-preview");
@@ -17,6 +18,8 @@ async function openProfileForm(page: Page, user: "A" | "B" = "A") {
 async function resetProfile(page: Page) {
   await page.goto("/perfil");
   await expect(save(page)).toBeVisible();
+  // through another mode and back, so the percentages and grams return to the maintain preset
+  await page.getByRole("radio", { name: /Perder peso/ }).check({ force: true });
   await page.getByRole("radio", { name: /Manter peso/ }).check({ force: true });
   await calories(page).fill("2000");
   if (await save(page).isEnabled()) {
@@ -33,9 +36,9 @@ test("shows the default goals", async ({ page }) => {
   await expect(pct(page, "Hidratos")).toHaveValue("40");
   await expect(pct(page, "Gordura")).toHaveValue("30");
   await expect(page.getByTestId("macro-total")).toHaveText("Total: 100%");
-  await expect(preview(page)).toContainText("150");
-  await expect(preview(page)).toContainText("200");
-  await expect(preview(page)).toContainText("67");
+  await expect(grams(page, "Proteína")).toHaveValue("150");
+  await expect(grams(page, "Hidratos")).toHaveValue("200");
+  await expect(grams(page, "Gordura")).toHaveValue("67");
   await expect(save(page)).toBeDisabled(); // nothing changed yet
 });
 
@@ -48,10 +51,10 @@ test("changing goal and calories updates the preview, saves, and survives reload
     await expect(pct(page, "Gordura")).toHaveValue("30");
 
     await calories(page).fill("2400");
-    await expect(preview(page)).toContainText("2400");
-    await expect(preview(page)).toContainText("240");
-    await expect(preview(page)).toContainText("180");
-    await expect(preview(page)).toContainText("80");
+    await expect(preview(page)).toContainText("Total: 2400 kcal");
+    await expect(grams(page, "Proteína")).toHaveValue("240");
+    await expect(grams(page, "Hidratos")).toHaveValue("180");
+    await expect(grams(page, "Gordura")).toHaveValue("80");
 
     await save(page).click();
     await expect(page.getByText("Objetivos guardados")).toBeVisible();
@@ -69,6 +72,42 @@ test("changing goal and calories updates the preview, saves, and survives reload
     await page.reload();
     await expect(calories(page)).toHaveValue("2400");
     await expect(pct(page, "Proteína")).toHaveValue("40");
+  } finally {
+    await resetProfile(page);
+  }
+});
+
+test("the grams are editable too: calories and percentages follow, and the exact grams are saved", async ({ page }) => {
+  await openProfileForm(page);
+  try {
+    await grams(page, "Proteína").fill("180");
+    // 180 g × 4 + 200 g × 4 + 67 g × 9 = 2123 kcal
+    await expect(calories(page)).toHaveValue("2123");
+    await expect(page.getByTestId("macro-total")).toHaveText("Total: 100%");
+    await expect(pct(page, "Proteína")).toHaveValue("34");
+    await expect(preview(page)).toContainText("Total: 2123 kcal");
+
+    await page.getByRole("button", { name: "Aumentar Gordura (g)" }).click(); // +5 g
+    await expect(grams(page, "Gordura")).toHaveValue("72");
+    await expect(calories(page)).toHaveValue("2168");
+
+    await save(page).click();
+    await expect(page.getByText("Objetivos guardados")).toBeVisible();
+    await expect(summary(page)).toContainText("2168 kcal");
+    await page.reload();
+    await expect(grams(page, "Proteína")).toHaveValue("180");
+    await expect(grams(page, "Hidratos")).toHaveValue("200");
+    await expect(grams(page, "Gordura")).toHaveValue("72");
+    await expect(calories(page)).toHaveValue("2168");
+
+    // calories still drive the grams (keeping the percentages)
+    await calories(page).fill("2000");
+    await expect(grams(page, "Proteína")).toHaveValue(String(Math.round((2000 * Number(await pct(page, "Proteína").inputValue())) / 100 / 4)));
+
+    // a grams field that is not a whole number says so and blocks saving
+    await grams(page, "Hidratos").fill("12.5");
+    await expect(page.getByRole("alert").filter({ hasText: "Usa um número inteiro de gramas." })).toBeVisible();
+    await expect(save(page)).toBeDisabled();
   } finally {
     await resetProfile(page);
   }

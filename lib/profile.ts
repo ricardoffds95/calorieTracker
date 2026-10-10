@@ -5,6 +5,8 @@ export const MIN_CALORIES = 500;
 export const MAX_CALORIES = 10_000;
 export const CALORIE_STEP = 50;
 export const PERCENT_STEP = 5;
+export const GRAMS_STEP = 5;
+export const MAX_GRAMS = 2000;
 export const DEFAULT_NAME = "Utilizador";
 
 export const GOAL_MODE_OPTIONS: readonly { mode: GoalMode; label: string; description: string }[] = [
@@ -50,6 +52,13 @@ export function percentagesFromGoals(goals: Pick<MacroGoals, "protein" | "carbs"
   return { protein: floors[0]!, carbs: floors[1]!, fat: floors[2]! };
 }
 
+/** Grams of each macro for a calorie target and percentages (the same rounding as the stored goals). */
+export function gramsFromPercentages(calories: number, pct: MacroPercentages): MacroPercentages {
+  const goals = calculateMacrosFromCalories(calories, pct.protein / 100, pct.carbs / 100, pct.fat / 100);
+  return { protein: goals.protein, carbs: goals.carbs, fat: goals.fat };
+}
+
+const grams = z.number({ error: "Usa um número inteiro de gramas." }).int("Usa números inteiros.").min(0, "Mínimo 0 g.").max(MAX_GRAMS, `Máximo ${MAX_GRAMS} g.`);
 const percent = z.number({ error: "Valor inválido." }).int("Usa números inteiros.").min(0, "Mínimo 0%.").max(100, "Máximo 100%.");
 
 export const profileFormSchema = z
@@ -68,6 +77,9 @@ export const profileFormSchema = z
     proteinPct: percent,
     carbsPct: percent,
     fatPct: percent,
+    proteinG: grams,
+    carbsG: grams,
+    fatG: grams,
   })
   .refine((v) => v.proteinPct + v.carbsPct + v.fatPct === 100, {
     path: ["total"],
@@ -86,16 +98,15 @@ export interface ProfileUpdate {
   goal_fat: number;
 }
 
-/** Row values to store, with grams computed from the percentages. */
+/** Row values to store: the calories and the grams as the user set them (the percentages are only another way to edit them). */
 export function toProfileUpdate(data: ProfileFormData): ProfileUpdate {
-  const goals = calculateMacrosFromCalories(data.calories, data.proteinPct / 100, data.carbsPct / 100, data.fatPct / 100);
   return {
     name: data.name,
     mode: data.mode,
-    goal_calories: goals.calories,
-    goal_protein: goals.protein,
-    goal_carbs: goals.carbs,
-    goal_fat: goals.fat,
+    goal_calories: data.calories,
+    goal_protein: data.proteinG,
+    goal_carbs: data.carbsG,
+    goal_fat: data.fatG,
   };
 }
 

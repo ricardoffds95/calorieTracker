@@ -2,13 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   parseIntegerInput,
   percentagesFromGoals,
+  gramsFromPercentages,
   presetPercentages,
   profileFormSchema,
   stepValue,
   toProfileUpdate,
 } from "./profile";
 
-const valid = { name: "Ana", mode: "maintain", calories: 2000, proteinPct: 30, carbsPct: 40, fatPct: 30 } as const;
+const valid = { name: "Ana", mode: "maintain", calories: 2000, proteinPct: 30, carbsPct: 40, fatPct: 30, proteinG: 150, carbsG: 200, fatG: 67 } as const;
 
 describe("presetPercentages", () => {
   it("returns integers that sum to 100 for every mode", () => {
@@ -74,9 +75,25 @@ describe("profileFormSchema", () => {
   });
 });
 
+describe("gramsFromPercentages", () => {
+  it("splits the calories by the percentages", () => {
+    expect(gramsFromPercentages(2400, { protein: 40, carbs: 30, fat: 30 })).toEqual({ protein: 240, carbs: 180, fat: 80 });
+    expect(gramsFromPercentages(2000, { protein: 30, carbs: 40, fat: 30 })).toEqual({ protein: 150, carbs: 200, fat: 67 });
+  });
+});
+
+describe("profile form grams", () => {
+  it("rejects negative, fractional and absurd grams", () => {
+    expect(profileFormSchema.safeParse({ ...valid, proteinG: -1 }).success).toBe(false);
+    expect(profileFormSchema.safeParse({ ...valid, carbsG: 12.5 }).success).toBe(false);
+    expect(profileFormSchema.safeParse({ ...valid, fatG: 2001 }).success).toBe(false);
+    expect(profileFormSchema.safeParse({ ...valid, fatG: 0 }).success).toBe(true);
+  });
+});
+
 describe("toProfileUpdate", () => {
-  it("computes grams from calories and percentages", () => {
-    expect(toProfileUpdate(profileFormSchema.parse({ ...valid, mode: "cut", calories: 2400, proteinPct: 40, carbsPct: 30, fatPct: 30 }))).toEqual({
+  it("stores the calories and the grams exactly as set", () => {
+    expect(toProfileUpdate(profileFormSchema.parse({ ...valid, mode: "cut", calories: 2400, proteinG: 240, carbsG: 180, fatG: 80 }))).toEqual({
       name: "Ana",
       mode: "cut",
       goal_calories: 2400,
@@ -85,13 +102,9 @@ describe("toProfileUpdate", () => {
       goal_fat: 80,
     });
   });
-  it("round-trips through percentagesFromGoals", () => {
-    const update = toProfileUpdate(profileFormSchema.parse({ ...valid, calories: 1873, proteinPct: 35, carbsPct: 45, fatPct: 20 }));
-    expect(percentagesFromGoals({ protein: update.goal_protein, carbs: update.goal_carbs, fat: update.goal_fat })).toEqual({
-      protein: 35,
-      carbs: 45,
-      fat: 20,
-    });
+  it("keeps grams that are not whole percentages (150 g of protein in 1800 kcal is 33.3%)", () => {
+    const update = toProfileUpdate(profileFormSchema.parse({ ...valid, calories: 1800, proteinPct: 33, carbsPct: 34, fatPct: 33, proteinG: 150, carbsG: 150, fatG: 67 }));
+    expect([update.goal_protein, update.goal_carbs, update.goal_fat]).toEqual([150, 150, 67]);
   });
 });
 
