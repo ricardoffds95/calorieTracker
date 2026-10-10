@@ -4,6 +4,7 @@ import { login } from "./helpers";
 const TABS = [
   { name: "Hoje", url: /\/$/, heading: /^Hoje/ },
   { name: "Registar", url: /\/registar$/, heading: "Registar" },
+  { name: "Guardados", url: /\/guardados$/, heading: "Guardados" },
   { name: "Histórico", url: /\/historico$/, heading: "Histórico" },
   { name: "Perfil", url: /\/perfil$/, heading: "Perfil" },
 ];

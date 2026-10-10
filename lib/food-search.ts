@@ -145,6 +145,28 @@ export interface SearchOffOptions extends FetchOptions {
   cache?: SearchCache;
   now?: () => number;
   ttlMs?: number;
+  /** Skip reading the local cache (the user asked for fresh results); the answer is still written to it. */
+  refresh?: boolean;
+}
+
+/** Cached results of a past Open Food Facts search (no network), or undefined when there are none or they expired. */
+export async function peekOffCache(
+  query: string,
+  { cache, now = Date.now, ttlMs = SEARCH_CACHE_TTL_MS }: Pick<SearchOffOptions, "cache" | "now" | "ttlMs"> = {},
+): Promise<FoodSearchResult[] | undefined> {
+  const normalized = normalizeQuery(query);
+  if (normalized.length < OFF_MIN_QUERY_LENGTH) return undefined;
+  const cached = await cache?.get(normalized);
+  return cached && now() - cached.timestamp < ttlMs ? cached.results : undefined;
+}
+
+/**
+ * Open Food Facts is only asked when the user requested it, or when neither the saved foods nor the
+ * local cache have anything for this text (and the cache has already been read).
+ */
+export function shouldSearchOnline(state: { forced: boolean; cacheRead: boolean; savedCount: number; cachedCount: number }): boolean {
+  if (state.forced) return true;
+  return state.cacheRead && state.savedCount === 0 && state.cachedCount === 0;
 }
 
 const SEARCH_ENDPOINT = "/api/food-search";
@@ -167,9 +189,11 @@ export async function searchOpenFoodFacts(
   const normalized = normalizeQuery(query);
   if (normalized.length < OFF_MIN_QUERY_LENGTH) return { results: [], fromCache: false };
 
-  const { cache, now = Date.now, ttlMs = SEARCH_CACHE_TTL_MS, fetch: fetchFn = fetch, signal } = options;
-  const cached = await cache?.get(normalized);
-  if (cached && now() - cached.timestamp < ttlMs) return { results: cached.results, fromCache: true };
+  const { cache, now = Date.now, ttlMs = SEARCH_CACHE_TTL_MS, fetch: fetchFn = fetch, signal, refresh = false } = options;
+  if (!refresh) {
+    const cached = await peekOffCache(normalized, { cache, now, ttlMs });
+    if (cached) return { results: cached, fromCache: true };
+  }
 
   const timeout = AbortSignal.timeout(SEARCH_TIMEOUT_MS);
   let response: Response;
@@ -230,18 +254,32 @@ export function savedToResult(food: SavedFood): FoodSearchResult {
   };
 }
 
-/** Instant, local search over the user's saved foods: prefix matches first, then most used. */
-export function searchSavedFoods(saved: readonly SavedFood[], query: string): FoodSearchResult[] {
+/** Accent- and case-insensitive match on name (and brand): prefix matches first, then most used, then A-Z. */
+function matchSaved<T extends { name: string; brand?: string | null; times_used: number }>(items: readonly T[], query: string): T[] {
   const needle = fold(normalizeQuery(query));
   if (needle.length === 0) return [];
-  return saved
+  return items
     .filter((f) => fold(`${f.name} ${f.brand ?? ""}`).includes(needle))
     .sort((a, b) => {
       const aPrefix = fold(a.name).startsWith(needle) ? 0 : 1;
       const bPrefix = fold(b.name).startsWith(needle) ? 0 : 1;
       return aPrefix - bPrefix || b.times_used - a.times_used || a.name.localeCompare(b.name, "pt");
-    })
-    .map(savedToResult);
+    });
+}
+
+/** Instant, local search over the user's saved foods. */
+export function searchSavedFoods(saved: readonly SavedFood[], query: string): FoodSearchResult[] {
+  return matchSaved(saved, query).map(savedToResult);
+}
+
+/** The same for the saved foods list of the Guardados tab (full rows, not search results). */
+export function filterSavedFoods(saved: readonly SavedFood[], query: string): SavedFood[] {
+  return matchSaved(saved, query);
+}
+
+/** Saved meals whose name matches the query. */
+export function filterSavedMeals<T extends { name: string; times_used: number }>(meals: readonly T[], query: string): T[] {
+  return matchSaved(meals, query);
 }
 
 /** Saved foods first; OFF results that duplicate a saved food (same barcode or name) are dropped. */

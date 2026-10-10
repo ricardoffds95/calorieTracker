@@ -17,9 +17,12 @@ interface AddFoodSheetProps {
   pending: boolean;
   onClose: () => void;
   onAdd: (food: FoodSearchResult, quantity_g: number) => void;
+  /** Save the food in "Guardados" without logging it (only offered for foods that are not saved yet). */
+  onSaveOnly: (food: FoodSearchResult) => void;
 }
 
-export function AddFoodSheet({ food, mealName, pending, onClose, onAdd }: AddFoodSheetProps) {
+export function AddFoodSheet({ food, mealName, pending, onClose, onAdd, onSaveOnly }: AddFoodSheetProps) {
+  const isNew = food.source !== "saved";
   const presets = servingPresets(food.serving_size);
   const [quantity, setQuantity] = useState(formatNumberInput(presets[1]?.grams ?? 100));
   const parsed = quantitySchema.safeParse(parseDecimalInput(quantity) ?? Number.NaN);
@@ -70,8 +73,13 @@ export function AddFoodSheet({ food, mealName, pending, onClose, onAdd }: AddFoo
           </div>
           <SheetFooter>
             <Button type="submit" size="lg" className="h-11" disabled={!parsed.success || pending}>
-              {pending ? "A adicionar…" : `Adicionar a ${mealName.toLowerCase()}`}
+              {pending ? "A adicionar…" : `${isNew ? "Guardar e adicionar" : "Adicionar"} a ${mealName.toLowerCase()}`}
             </Button>
+            {isNew && (
+              <Button type="button" variant="outline" size="lg" className="h-11" disabled={pending} onClick={() => onSaveOnly(food)}>
+                Só guardar nos alimentos
+              </Button>
+            )}
           </SheetFooter>
         </form>
       </SheetContent>

@@ -1,11 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   FoodSearchError,
+  filterSavedFoods,
+  filterSavedMeals,
   mapProduct,
   mergeResults,
+  peekOffCache,
   searchByBarcode,
   searchOpenFoodFacts,
   searchSavedFoods,
+  shouldSearchOnline,
   type SavedFood,
   type SearchCache,
   type SearchCacheEntry,
@@ -228,5 +232,73 @@ describe("mergeResults", () => {
       { ...mapProduct({ code: "333", product_name: "Arroz", nutriments: { "energy-kcal_100g": 1 } }) },
     ];
     expect(mergeResults(savedResults, off).map((r) => r.id)).toEqual(["1", "333"]);
+  });
+});
+
+describe("peekOffCache", () => {
+  const entry = { results: [mapProduct(oats)], timestamp: 1_000 };
+  const cacheWith = (key: string) => {
+    const cache = memoryCache();
+    cache.store.set(key, entry);
+    return cache;
+  };
+
+  it("returns cached results without touching the network", async () => {
+    expect(await peekOffCache(" AVEIA ", { cache: cacheWith("aveia"), now: () => 1_500, ttlMs: 1_000 })).toEqual(entry.results);
+  });
+  it("returns undefined when nothing is cached, it expired, or the text is too short", async () => {
+    expect(await peekOffCache("arroz", { cache: cacheWith("aveia") })).toBeUndefined();
+    expect(await peekOffCache("aveia", { cache: cacheWith("aveia"), now: () => 5_000, ttlMs: 1_000 })).toBeUndefined();
+    expect(await peekOffCache("av", { cache: cacheWith("av") })).toBeUndefined();
+    expect(await peekOffCache("aveia")).toBeUndefined();
+  });
+});
+
+describe("searchOpenFoodFacts with refresh", () => {
+  it("ignores the cache when reading but writes the fresh answer to it", async () => {
+    const cache = memoryCache();
+    cache.store.set("aveia", { results: [], timestamp: Date.now() });
+    const fetchMock = vi.fn(async () => jsonResponse({ results: [mapProduct(oats)] }));
+    const result = await searchOpenFoodFacts("aveia", { fetch: fetchMock, cache, refresh: true });
+    expect(result).toMatchObject({ fromCache: false });
+    expect(result.results).toHaveLength(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(cache.store.get("aveia")?.results).toHaveLength(1);
+  });
+});
+
+describe("shouldSearchOnline", () => {
+  const base = { forced: false, cacheRead: true, savedCount: 0, cachedCount: 0 };
+  it("goes online by itself only when saved foods and the cache are both empty", () => {
+    expect(shouldSearchOnline(base)).toBe(true);
+    expect(shouldSearchOnline({ ...base, savedCount: 1 })).toBe(false);
+    expect(shouldSearchOnline({ ...base, cachedCount: 3 })).toBe(false);
+  });
+  it("waits for the cache to be read before deciding", () => {
+    expect(shouldSearchOnline({ ...base, cacheRead: false })).toBe(false);
+  });
+  it("always searches when the user asked for it", () => {
+    expect(shouldSearchOnline({ forced: true, cacheRead: false, savedCount: 5, cachedCount: 5 })).toBe(true);
+  });
+});
+
+describe("filterSavedFoods / filterSavedMeals", () => {
+  const foods = [
+    saved({ id: "a", name: "Iogurte grego", brand: "Marca", times_used: 2 }),
+    saved({ id: "b", name: "Pão de iogurte", times_used: 9 }),
+    saved({ id: "c", name: "Café", times_used: 1 }),
+  ];
+  it("matches without accents or case, prefix first and then most used", () => {
+    expect(filterSavedFoods(foods, "IOGURTE").map((f) => f.id)).toEqual(["a", "b"]); // prefix before usage
+    expect(filterSavedFoods(foods, "cafe").map((f) => f.id)).toEqual(["c"]);
+    expect(filterSavedFoods(foods, "marca").map((f) => f.id)).toEqual(["a"]);
+    expect(filterSavedFoods(foods, "  ")).toEqual([]);
+  });
+  it("filters meals by name", () => {
+    const meals = [
+      { name: "Frango com arroz", times_used: 1 },
+      { name: "Bifana", times_used: 4 },
+    ];
+    expect(filterSavedMeals(meals, "ARROZ").map((m) => m.name)).toEqual(["Frango com arroz"]);
   });
 });

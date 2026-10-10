@@ -21,7 +21,7 @@ import { savedToResult, type FoodSearchResult } from "@/lib/food-search";
 import { foodEntryRow, itemRows, mealEntryRow, mealFromParam, type NewDiaryEntry } from "@/lib/log";
 import type { MealType } from "@/lib/macros";
 import { useAddEntries } from "@/lib/queries/diary";
-import { ensureSavedFood, useSavedFoods, useSavedMeals, type SavedMeal } from "@/lib/queries/saved";
+import { ensureSavedFood, useSaveFoodOnly, useSavedFoods, useSavedMeals, type SavedMeal } from "@/lib/queries/saved";
 import { mealLabel } from "@/lib/today";
 
 // The day and default meal depend on the browser's clock, so nothing date-based renders on the server.
@@ -50,6 +50,7 @@ function LogDay({ userId }: { userId: string }) {
   const foods = useSavedFoods(userId);
   const meals = useSavedMeals(userId);
   const add = useAddEntries(userId);
+  const saveOnly = useSaveFoodOnly(userId);
 
   const setMeal = (m: MealType) => router.replace(`/registar?meal=${m}&d=${dateKey}`, { scroll: false });
 
@@ -93,10 +94,11 @@ function LogDay({ userId }: { userId: string }) {
           key={panel.food.id}
           food={panel.food}
           mealName={name}
-          pending={add.isPending}
+          pending={add.isPending || saveOnly.isPending}
           onClose={() => setPanel(null)}
           // Foods from search/scan are saved first (per 100 g) so next time they are instant.
           onAdd={(food, quantity) => addRows(async () => [foodEntryRow(target, food, quantity, await ensureSavedFood(food))], food.name)}
+          onSaveOnly={(food) => saveOnly.mutate(food, { onSuccess: () => setPanel(null) })}
         />
       )}
       {panel?.kind === "meal" && (

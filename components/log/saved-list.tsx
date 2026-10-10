@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Pencil, Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { SavedFood } from "@/lib/food-search";
 import type { SavedMeal } from "@/lib/queries/saved";
+import { cn } from "@/lib/utils";
 
 const PAGE = 15;
 
@@ -88,6 +90,9 @@ export function SavedList({ foods, meals, onPickFood, onPickMeal, onEditFood, on
           Ver mais
         </Button>
       )}
+      <Link href="/guardados" className={cn(buttonVariants({ variant: "link" }), "h-11 self-start px-1 text-muted-foreground")}>
+        Gerir alimentos e refeições
+      </Link>
     </section>
   );
 }

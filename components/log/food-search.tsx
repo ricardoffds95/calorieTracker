@@ -16,8 +16,10 @@ import {
   OFF_MIN_QUERY_LENGTH,
   mergeResults,
   normalizeQuery,
+  peekOffCache,
   searchOpenFoodFacts,
   searchSavedFoods,
+  shouldSearchOnline,
   type FoodSearchResult,
   type SavedFood,
 } from "@/lib/food-search";
@@ -45,11 +47,27 @@ export function FoodSearch({ saved, onPick, onScan, onAi, children }: FoodSearch
   const online = typed.length >= OFF_MIN_QUERY_LENGTH;
 
   const savedMatches = useMemo(() => searchSavedFoods(saved, query), [saved, query]);
-  // Saved foods that match are enough: Open Food Facts is only asked when none match, or on request.
-  const useOff = online && (savedMatches.length === 0 || forced);
+  // Cache first: results of past searches cost no request, so they are shown right away with the saved foods.
+  const cached = useQuery({
+    queryKey: ["off-cache", typed],
+    queryFn: async () => (await peekOffCache(typed, { cache: searchCache })) ?? [],
+    enabled: online,
+    placeholderData: keepPreviousData, // no flicker while the cache reads the new text
+    // Re-read whenever this text is typed again: an online search may have written the cache since.
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    meta: { persist: false },
+  });
+  const cacheRead = cached.isSuccess && !cached.isPlaceholderData;
+  const cachedResults = online ? (cached.data ?? []) : [];
+  // Open Food Facts is only asked on request, or when neither the saved foods nor the cache have anything.
+  const useOff =
+    online && shouldSearchOnline({ forced, cacheRead, savedCount: savedMatches.length, cachedCount: cachedResults.length });
   const off = useQuery({
-    queryKey: ["off-search", debounced],
-    queryFn: ({ signal }) => searchOpenFoodFacts(debounced, { signal, cache: searchCache }),
+    queryKey: ["off-search", debounced, forced],
+    queryFn: ({ signal }) => searchOpenFoodFacts(debounced, { signal, cache: searchCache, refresh: forced }),
     enabled: useOff && debounced.length >= OFF_MIN_QUERY_LENGTH,
     placeholderData: keepPreviousData,
     staleTime: Infinity,
@@ -58,8 +76,8 @@ export function FoodSearch({ saved, onPick, onScan, onAi, children }: FoodSearch
     meta: { persist: false }, // has its own 30-day IndexedDB cache
   });
 
-  const results = mergeResults(savedMatches, useOff ? (off.data?.results ?? []) : []);
-  const waiting = useOff && (debounced !== typed || off.isFetching);
+  const results = mergeResults(savedMatches, useOff ? (off.data?.results ?? []) : cachedResults);
+  const waiting = (online && !cacheRead && savedMatches.length === 0) || (useOff && (debounced !== typed || off.isFetching));
   const error = !useOff ? null : off.error instanceof FoodSearchError ? off.error.message : off.error ? FOOD_SEARCH_MESSAGES.http : null;
 
   return (
@@ -117,7 +135,7 @@ export function FoodSearch({ saved, onPick, onScan, onAi, children }: FoodSearch
           {!online && (
             <p className="text-sm text-muted-foreground">Escreve pelo menos {OFF_MIN_QUERY_LENGTH} letras para pesquisar também no Open Food Facts.</p>
           )}
-          {online && !useOff && (
+          {online && !useOff && cacheRead && (
             <Button type="button" variant="outline" className="h-11" onClick={() => setForced(true)}>
               Pesquisar no Open Food Facts
             </Button>

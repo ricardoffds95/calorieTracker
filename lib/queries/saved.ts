@@ -68,6 +68,17 @@ export async function ensureSavedFood(food: FoodSearchResult): Promise<string> {
   return data;
 }
 
+/** Saves a search/scan result in "Guardados" without logging it. */
+export function useSaveFoodOnly(userId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (food: FoodSearchResult) => ensureSavedFood(food),
+    onError: (error: { message?: string }) => toastSaveError(error),
+    onSuccess: () => toast.success("Guardado nos alimentos"),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: savedFoodsKey(userId) }),
+  });
+}
+
 /** Diary entries linked to a saved item: in total and from `todayKey` on (for the propagation dialog). */
 export async function countLinkedEntries(kind: "food" | "meal", id: string, todayKey: string) {
   const column = kind === "food" ? "saved_food_id" : "saved_meal_id";
@@ -174,9 +185,9 @@ export function useCreateSavedFood(userId: string) {
       const { error } = await createClient().from("saved_foods").insert({ ...rest, brand: brand || null });
       if (error) throw error;
     },
+    // A duplicate name is shown inline by the caller; everything else as a toast.
     onError: (error: { message?: string; code?: string }) => {
-      if (error.code === "23505") toast.error("Já tens um alimento guardado com esse nome.");
-      else toastSaveError(error);
+      if (error.code !== DUPLICATE_NAME) toastSaveError(error);
     },
     onSuccess: () => toast.success("Alimento guardado"),
     onSettled: () => queryClient.invalidateQueries({ queryKey: savedFoodsKey(userId) }),

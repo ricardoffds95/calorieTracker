@@ -12,19 +12,22 @@ import { Label } from "@/components/ui/label";
 import { searchSavedFoods, type SavedFood } from "@/lib/food-search";
 import type { LogTarget } from "@/lib/log";
 import { scaleFromPer100g } from "@/lib/nutrition";
+import type { SavedMeal } from "@/lib/queries/saved";
 
 interface NewMealDialogProps {
   userId: string;
-  target: LogTarget;
-  mealName: string;
+  /** Without a target (Guardados tab) the meal is only saved, not logged. */
+  target?: LogTarget;
+  mealName?: string;
   foods: readonly SavedFood[];
   onClose: () => void;
-  onAdded: (message: string) => void;
+  onAdded?: (message: string) => void;
+  onSaved?: (meal: SavedMeal) => void;
 }
 
 const DEFAULT_GRAMS = 100;
 
-export function NewMealDialog({ userId, target, mealName, foods, onClose, onAdded }: NewMealDialogProps) {
+export function NewMealDialog({ userId, target, mealName, foods, onClose, onAdded, onSaved }: NewMealDialogProps) {
   const [mode, setMode] = useState<"foods" | "portion">("foods");
   const [name, setName] = useState("");
   const [query, setQuery] = useState("");
@@ -108,7 +111,16 @@ export function NewMealDialog({ userId, target, mealName, foods, onClose, onAdde
 
           {items && trimmed ? (
             // Remount when the meal changes after being saved, so a stale saved copy is never reused.
-            <MealActions key={JSON.stringify([trimmed, items])} userId={userId} target={target} mealName={mealName} name={trimmed} items={items} onAdded={onAdded} />
+            <MealActions
+              key={JSON.stringify([trimmed, items])}
+              userId={userId}
+              target={target}
+              mealName={mealName}
+              name={trimmed}
+              items={items}
+              onAdded={onAdded}
+              onSaved={onSaved}
+            />
           ) : (
             <p className="text-xs text-muted-foreground">Indica o nome e {mode === "foods" ? "pelo menos um alimento" : "as calorias"} para guardar.</p>
           )}

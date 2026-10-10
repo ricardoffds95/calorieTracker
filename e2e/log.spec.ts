@@ -115,6 +115,54 @@ test("matching saved foods are enough: Open Food Facts is only asked on request"
   await expect.poll(() => queries).toEqual(["iogurte", "queijo"]); // previous results stay on screen meanwhile
 });
 
+test("cache first: a repeated search shows the cached results with no request, and the button refreshes them", async ({ page }) => {
+  const queries = await mockOff(page);
+  await login(page, "A");
+  await openLog(page);
+  const box = page.getByRole("searchbox", { name: "Pesquisar alimento" });
+  const result = page.getByRole("button", { name: "Escolher Arroz Teste E2E" });
+
+  await box.fill("iogurte"); // nothing saved, nothing cached: it goes online by itself
+  await expect(result).toBeVisible();
+  expect(queries).toEqual(["iogurte"]);
+
+  await box.fill("");
+  await box.fill("iogurte"); // now cached
+  await expect(result).toBeVisible();
+  await expect(page.getByRole("button", { name: "Pesquisar no Open Food Facts" })).toBeVisible();
+  await page.waitForTimeout(1_000); // longer than the debounce
+  expect(queries).toEqual(["iogurte"]);
+
+  await page.getByRole("button", { name: "Pesquisar no Open Food Facts" }).click();
+  await expect.poll(() => queries).toEqual(["iogurte", "iogurte"]);
+  await expect(page.getByRole("button", { name: "Pesquisar no Open Food Facts" })).toHaveCount(0);
+});
+
+test("a food from Open Food Facts can be only saved, or saved and logged", async ({ page }) => {
+  await mockOff(page);
+  await login(page, "A");
+  await openLog(page);
+  const box = page.getByRole("searchbox", { name: "Pesquisar alimento" });
+
+  await box.fill("arroz teste e2e");
+  await page.getByRole("button", { name: "Escolher Arroz Teste E2E" }).click();
+  await page.getByRole("button", { name: "Só guardar nos alimentos" }).click();
+  await expect(page.getByText("Guardado nos alimentos")).toBeVisible();
+  const [saved] = await fetchSavedFoods("A");
+  expect(saved).toMatchObject({ name: "Arroz Teste E2E", off_code: "5601234567890", calories_100g: 130, times_used: 0 });
+  expect(await fetchDiary("A", DAY)).toHaveLength(0);
+
+  // already saved: nothing left to save, it can only be logged
+  await box.fill("arroz teste e2e");
+  await page.getByRole("button", { name: "Escolher Arroz Teste E2E" }).click();
+  await expect(page.getByRole("button", { name: "Só guardar nos alimentos" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Adicionar a almoço" }).click();
+  await expect(page.getByText("Arroz Teste E2E adicionado a almoço")).toBeVisible();
+  const [row] = await fetchDiary("A", DAY);
+  expect(row).toMatchObject({ saved_food_id: saved!.id, quantity_g: 100 }); // a saved food has no label serving
+  expect((await fetchSavedFoods("A"))[0]).toMatchObject({ times_used: 1 });
+});
+
 test("when Open Food Facts is down: clear message, saved foods stay, and 'Tentar novamente' recovers", async ({ page }) => {
   await seedSavedFood("A", { name: "Arroz guardado E2E", calories_100g: 120, protein_100g: 2.5, carbs_100g: 26, fat_100g: 0.3 });
   let down = true;
