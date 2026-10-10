@@ -193,6 +193,11 @@ test("scrolling the results closes the keyboard", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Escolher Produto 20" })).toBeAttached();
   await searchBox(page).focus();
   await expect(searchBox(page)).toBeFocused();
+  // the browser scrolling to reveal the field right after focusing must not close the keyboard
+  await page.evaluate(() => window.scrollTo(0, 80));
+  await page.waitForTimeout(150);
+  await expect(searchBox(page)).toBeFocused();
+  await page.waitForTimeout(600);
   await page.mouse.move(100, 400);
   await page.mouse.wheel(0, 600);
   await expect(searchBox(page)).not.toBeFocused();
@@ -617,12 +622,15 @@ test("new meal: the AI result joins the meal and names it", async ({ page }) => 
   await page.getByLabel("O que comeste?").fill("frango com arroz");
   await page.getByRole("button", { name: "Analisar" }).click();
   await expect(page.getByText("Refeição com 2 alimentos")).toBeVisible();
+  await page.getByRole("button", { name: "Editar quantidades" }).click();
+  await page.getByLabel("Quantidade de Arroz (g)").fill("100");
+  await page.getByRole("button", { name: "Concluir" }).click();
   await page.getByRole("button", { name: "Usar refeição completa" }).click();
 
   await expect(page.getByLabel("Nome da refeição")).toHaveValue("Frango com arroz");
   await expect(page.getByLabel("Quantidade de Frango grelhado (g)")).toHaveValue("150");
-  await expect(page.getByLabel("Quantidade de Arroz (g)")).toHaveValue("150");
-  await expect(page.getByTestId("nutrient-summary")).toContainText("443");
+  await expect(page.getByLabel("Quantidade de Arroz (g)")).toHaveValue("100");
+  await expect(page.getByTestId("nutrient-summary")).toContainText("378"); // 248 + 130
 });
 
 test("new meal by joining saved foods: totals are the sum of the foods", async ({ page }) => {

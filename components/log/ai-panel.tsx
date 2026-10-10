@@ -124,6 +124,9 @@ export function AiPanel({ userId, initialTarget, now, onClose, onAdded, onUse, o
                   <Button type="button" size="lg" className="h-11" onClick={() => onUse?.(result, onClose)}>
                     {useLabels[result.kind]}
                   </Button>
+                  <Button type="button" variant="outline" size="lg" className="h-11" onClick={() => setEditing({ name: result.name, rows: toEditable(result.items) })}>
+                    Editar quantidades
+                  </Button>
                   <Button type="button" variant="ghost" className="h-11" onClick={() => setResult(null)}>
                     Tentar outra vez
                   </Button>

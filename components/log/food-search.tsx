@@ -26,6 +26,8 @@ import { cn } from "@/lib/utils";
 const SEARCH_DEBOUNCE_MS = 700;
 /** Scrolling this far with the field focused closes the keyboard (otherwise it covers the results). */
 const SCROLL_BLUR_PX = 24;
+/** Scrolls this soon after focusing are the browser revealing the field, not the user. */
+const SCROLL_ARM_MS = 500;
 
 type Source = "saved" | "off";
 
@@ -80,15 +82,30 @@ export function FoodSearch({ saved, onPick, onScan, onAi, onSearchingChange, chi
   const source: Source = current.source ?? (savedAll.length > 0 ? "saved" : "off");
   const update = (patch: Partial<typeof view>) => setView({ ...current, ...patch });
 
-  // Scrolling the results closes the keyboard, so neither it nor the browser bar covers them.
+  // Scrolling the results closes the keyboard, so neither it nor the browser bar covers them. The first moments after
+  // focusing are ignored: iOS itself scrolls the page (or the dialog) to reveal the field, which would close the keyboard
+  // as soon as it opened. Any scroller counts (the page, or the dialog the search sits in).
   useEffect(() => {
     if (!focused) return;
-    const start = window.scrollY;
-    const onScroll = () => {
-      if (Math.abs(window.scrollY - start) > SCROLL_BLUR_PX) inputRef.current?.blur();
+    const starts = new Map<EventTarget, number>();
+    const position = (target: EventTarget) => (target instanceof Element ? target.scrollTop : window.scrollY);
+    const onScroll = (event: Event) => {
+      const target = event.target === document ? window : (event.target ?? window);
+      const now = position(target);
+      const start = starts.get(target);
+      if (start === undefined) starts.set(target, now);
+      else if (Math.abs(now - start) > SCROLL_BLUR_PX) inputRef.current?.blur();
     };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    const arm = window.setTimeout(() => {
+      // Where every scroller around the field is now: scrolling is measured from here.
+      starts.set(window, window.scrollY);
+      for (let el = inputRef.current?.parentElement; el; el = el.parentElement) starts.set(el, el.scrollTop);
+      document.addEventListener("scroll", onScroll, { passive: true, capture: true });
+    }, SCROLL_ARM_MS);
+    return () => {
+      window.clearTimeout(arm);
+      document.removeEventListener("scroll", onScroll, { capture: true });
+    };
   }, [focused]);
 
   function onSubmit(event: FormEvent) {
