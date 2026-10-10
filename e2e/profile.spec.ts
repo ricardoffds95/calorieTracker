@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { clearCache, login, logout, openProfile } from "./helpers";
+import { clearCache, credentials, login, logout, openProfile } from "./helpers";
 import { fetchProfile, resetProfileRow } from "./seed";
 
 const calories = (page: Page) => page.getByLabel("Calorias diárias", { exact: true });
@@ -199,12 +199,14 @@ test("Gerir perfil: the name and the personal data are edited by hand, at the bo
     // after the goals, before the account; closed until opened
     const goalsY = (await save(page).boundingBox())!.y;
     expect((await manage.boundingBox())!.y).toBeGreaterThan(goalsY);
-    // one card for the account (e-mail, manage profile, sign out); the nutrition plan comes last
-    await expect(manage.getByTestId("user-email")).toBeVisible();
-    await expect(manage.getByRole("button", { name: "Sair" })).toBeVisible();
+    // a single "Gerir perfil" card, closed; the account (e-mail, sign out) is inside it; the nutrition plan comes last
+    await expect(page.getByRole("heading", { name: "Conta" })).toHaveCount(0);
+    await expect(manage.getByTestId("user-email")).toHaveCount(0);
     expect((await page.getByTestId("plan-card").boundingBox())!.y).toBeGreaterThan((await manage.boundingBox())!.y);
     await expect(page.getByLabel("Nome", { exact: true })).toHaveCount(0);
     await manage.getByRole("button", { name: /Gerir perfil/ }).click();
+    await expect(manage.getByTestId("user-email")).toHaveText(credentials("A").email);
+    await expect(manage.getByRole("button", { name: "Sair" })).toBeVisible();
 
     await page.getByLabel("Nome", { exact: true }).fill("Teste E2E");
     await page.getByRole("button", { name: "Feminino" }).click();
@@ -260,4 +262,89 @@ test("Gerir perfil: the name and the personal data are edited by hand, at the bo
     if (await page.getByRole("button", { name: "Guardar dados" }).isEnabled()) await page.getByRole("button", { name: "Guardar dados" }).click();
     await expect.poll(async () => (await fetchProfile("A")).name).toBe(original);
   }
+});
+
+test.describe("unsaved changes", () => {
+  test("leaving with edits asks what to do: keep editing", async ({ page }) => {
+    await openProfileForm(page);
+    await calories(page).fill("2300");
+    await page.getByRole("link", { name: "Histórico" }).click();
+    const dialog = page.getByRole("dialog", { name: "Guardar alterações?" });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole("button", { name: "Continuar a editar" }).click();
+    await expect(page).toHaveURL(/\/perfil$/);
+    await expect(calories(page)).toHaveValue("2300"); // nothing was lost
+    expect((await fetchProfile("A")).goal_calories).toBe(2000);
+    await calories(page).fill("2000"); // back to the saved value: no longer "changed", no question
+    await page.getByRole("link", { name: "Histórico" }).click();
+    await expect(page).toHaveURL(/\/historico/);
+  });
+
+  test("leaving with edits: discard drops them", async ({ page }) => {
+    await openProfileForm(page);
+    await calories(page).fill("2300");
+    await page.getByRole("link", { name: "Hoje" }).click();
+    await page.getByRole("button", { name: "Descartar" }).click();
+    await expect(page).toHaveURL(/\/$/);
+    expect((await fetchProfile("A")).goal_calories).toBe(2000);
+    await openProfile(page);
+    await expect(calories(page)).toHaveValue("2000");
+  });
+
+  test("leaving with edits: save stores them and goes on", async ({ page }) => {
+    await openProfileForm(page);
+    try {
+      await calories(page).fill("2300");
+      await page.getByRole("link", { name: "Guardados" }).click();
+      await page.getByRole("dialog", { name: "Guardar alterações?" }).getByRole("button", { name: "Guardar", exact: true }).click();
+      await expect(page).toHaveURL(/\/guardados$/);
+      await expect.poll(async () => (await fetchProfile("A")).goal_calories).toBe(2300);
+    } finally {
+      await resetProfile(page);
+    }
+  });
+
+  test("with errors in the form it cannot be saved from the question", async ({ page }) => {
+    await openProfileForm(page);
+    await calories(page).fill("400");
+    await page.getByRole("link", { name: "Histórico" }).click();
+    const dialog = page.getByRole("dialog", { name: "Guardar alterações?" });
+    await expect(dialog.getByRole("status")).toContainText("Corrige os erros");
+    await expect(dialog.getByRole("button", { name: "Guardar", exact: true })).toBeDisabled();
+    await dialog.getByRole("button", { name: "Descartar" }).click();
+    await expect(page).toHaveURL(/\/historico/);
+  });
+
+  test("after saving 'Gerir perfil' with a decimal comma there is no question when leaving", async ({ page }) => {
+    await openProfileForm(page);
+    try {
+      await page.getByRole("button", { name: /Gerir perfil/ }).click();
+      await page.getByLabel("Peso (kg)").fill("70,5");
+      await page.getByRole("button", { name: "Guardar dados" }).click();
+      await expect.poll(async () => (await fetchProfile("A")).weight_kg).toBe(70.5);
+      await page.getByRole("link", { name: "Histórico" }).click();
+      await expect(page).toHaveURL(/\/historico/);
+    } finally {
+      await resetProfileRow("A", { onboardingDone: true });
+    }
+  });
+
+  test("the personal data of 'Gerir perfil' is guarded too", async ({ page }) => {
+    await openProfileForm(page);
+    const original = (await fetchProfile("A")).name;
+    try {
+      await page.getByRole("button", { name: /Gerir perfil/ }).click();
+      await page.getByLabel("Nome", { exact: true }).fill("Nome E2E");
+      await page.getByRole("link", { name: "Hoje" }).click();
+      await page.getByRole("dialog", { name: "Guardar alterações?" }).getByRole("button", { name: "Guardar", exact: true }).click();
+      await expect(page).toHaveURL(/\/$/);
+      await expect.poll(async () => (await fetchProfile("A")).name).toBe("Nome E2E");
+    } finally {
+      await page.goto("/perfil");
+      await page.getByRole("button", { name: /Gerir perfil/ }).click();
+      await page.getByLabel("Nome", { exact: true }).fill(original);
+      await page.getByRole("button", { name: "Guardar dados" }).click();
+      await expect.poll(async () => (await fetchProfile("A")).name).toBe(original);
+    }
+  });
 });

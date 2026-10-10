@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Sparkles } from "lucide-react";
 import { ManageProfile } from "@/components/profile/manage-profile";
+import { UnsavedGuard } from "@/components/profile/unsaved-guard";
 import { ProfileForm } from "@/components/profile/profile-form";
 import { ProfileSummary } from "@/components/profile-summary";
 import { buttonVariants } from "@/components/ui/button";
@@ -15,6 +16,7 @@ export function ProfileScreen({ userId, email }: { userId: string; email: string
   const { data, isPending, isError } = useProfile(userId);
 
   return (
+    <UnsavedGuard>
     <div className="flex flex-col gap-6">
       <ProfileSummary userId={userId} />
       {isPending && <Skeleton className="h-96 w-full" aria-label="A carregar" />}
@@ -42,5 +44,6 @@ export function ProfileScreen({ userId, email }: { userId: string; email: string
         </Card>
       )}
     </div>
+    </UnsavedGuard>
   );
 }

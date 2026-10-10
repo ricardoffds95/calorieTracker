@@ -250,8 +250,9 @@ test("Perfil: the button redoes the plan with the saved answers, 'Cancelar' chan
   await expect(page.getByTestId("plan-card")).toContainText("Excedente pequeno para ganhar massa.");
   await expect(page.getByTestId("plan-card").getByRole("link", { name: "Refazer o meu plano" })).toBeVisible();
 
-  // redoing it starts from the saved answers
+  // redoing it starts from the saved answers (the goal switched above was not saved: the question comes first)
   await page.getByTestId("plan-card").getByRole("link", { name: "Refazer o meu plano" }).click();
+  await page.getByRole("button", { name: "Descartar" }).click();
   await expect(page.getByLabel("Idade")).toHaveValue("30");
   await expect(page.getByLabel("Peso (kg)")).toHaveValue("80.5");
   await expect(page.getByRole("button", { name: "Masculino" })).toHaveAttribute("aria-pressed", "true");

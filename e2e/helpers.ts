@@ -37,6 +37,8 @@ export async function openProfile(page: Page) {
 }
 
 export async function logout(page: Page) {
+  // "Sair" is inside "Gerir perfil", which starts closed
+  if (!(await page.getByRole("button", { name: "Sair" }).isVisible())) await page.getByRole("button", { name: /Gerir perfil/ }).click();
   await page.getByRole("button", { name: "Sair" }).click();
   await expect(page).toHaveURL(/\/login/);
 }

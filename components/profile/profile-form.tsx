@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { GoalModePicker } from "@/components/profile/goal-mode-picker";
+import { useUnsavedEntry } from "@/components/profile/unsaved-guard";
 import { MacroGrams, type MacroGramInputs } from "@/components/profile/macro-grams";
 import { MacroSplit, type MacroPercentInputs } from "@/components/profile/macro-split";
 import { NumberStepper } from "@/components/profile/number-stepper";
@@ -132,6 +133,16 @@ export function ProfileForm({ profile }: { profile: Profile }) {
     event.preventDefault();
     if (next && dirty) update.mutate(next);
   }
+
+  // Anything typed that is not what is saved counts as an unsaved change, even when it is not valid yet (e.g. "400" kcal).
+  const edited =
+    mode !== profile.mode ||
+    calories !== String(profile.goal_calories) ||
+    grams.protein !== String(profile.goal_protein) ||
+    grams.carbs !== String(profile.goal_carbs) ||
+    grams.fat !== String(profile.goal_fat);
+
+  useUnsavedEntry("goals", { dirty: edited, valid: parsed.success, save: () => (next ? update.mutateAsync(next) : Promise.reject(new Error("invalid"))) });
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-6" noValidate>

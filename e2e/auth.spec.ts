@@ -34,6 +34,7 @@ test("invalid input is explained inline instead of being silently blocked", asyn
 test("login shows the protected page and logout returns to /login", async ({ page }) => {
   await login(page, "A");
   await openProfile(page);
+  await page.getByRole("button", { name: /Gerir perfil/ }).click();
   await expect(page.getByTestId("user-email")).toHaveText(credentials("A").email);
   await expect(page.getByTestId("profile-summary")).toContainText("2000 kcal");
   await logout(page);
