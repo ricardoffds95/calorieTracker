@@ -247,6 +247,22 @@ export function searchSavedFoods(saved: readonly SavedFood[], query: string): Fo
   return matchSaved(saved, query).map(savedToResult);
 }
 
+/** A saved food or a saved meal that matches a search. */
+export type SavedHit<M> = { kind: "food"; food: FoodSearchResult } | { kind: "meal"; meal: M };
+
+/** Foods and meals together, ranked like `matchSaved` (prefix first, then most used, then A-Z). */
+export function searchSavedAll<M extends { name: string; times_used: number }>(
+  foods: readonly SavedFood[],
+  meals: readonly M[],
+  query: string,
+): SavedHit<M>[] {
+  const tagged = [
+    ...foods.map((food) => ({ name: food.name, brand: food.brand, times_used: food.times_used, hit: { kind: "food", food: savedToResult(food) } as SavedHit<M> })),
+    ...meals.map((meal) => ({ name: meal.name, brand: null, times_used: meal.times_used, hit: { kind: "meal", meal } as SavedHit<M> })),
+  ];
+  return matchSaved(tagged, query).map((t) => t.hit);
+}
+
 /** The same for the saved foods list of the Guardados tab (full rows, not search results). */
 export function filterSavedFoods(saved: readonly SavedFood[], query: string): SavedFood[] {
   return matchSaved(saved, query);

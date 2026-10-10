@@ -1,18 +1,22 @@
 "use client";
 
 import { useState, useSyncExternalStore } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { Plus } from "lucide-react";
 import { DayNav } from "@/components/today/day-nav";
 import { EditEntryDialog } from "@/components/today/edit-entry-dialog";
 import { MacroColumns } from "@/components/today/macro-columns";
 import { MealSection } from "@/components/today/meal-section";
 import { SummaryHero } from "@/components/today/summary-hero";
+import { buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { dateKeyOrToday } from "@/lib/dates";
 import { dayTotals, groupByMeal, mealTotals, type DiaryEntry } from "@/lib/diary";
 import { MEAL_TYPES } from "@/lib/macros";
 import { planItemRemoval, useDeleteEntry, useDiaryDay, useRemoveMealItem, useUpdateEntry } from "@/lib/queries/diary";
 import { useProfile } from "@/lib/queries/profile";
+import { cn } from "@/lib/utils";
 
 // "Today" depends on the browser's time zone, so nothing date-based renders on the server.
 const subscribeNothing = () => () => {};
@@ -55,6 +59,12 @@ function TodayDay({ userId }: { userId: string }) {
       ) : (
         <Skeleton className="h-52 w-full" aria-label="A carregar metas" />
       )}
+
+      {/* Without a meal in mind the food goes to the snacks; the meals' own + buttons pick theirs. */}
+      <Link href={`/registar?meal=snacks&d=${dateKey}`} className={cn(buttonVariants({ size: "lg" }), "h-11")}>
+        <Plus aria-hidden />
+        Adicionar alimento
+      </Link>
 
       {diary.isError && !diary.data && (
         <p role="alert" className="text-sm text-destructive">

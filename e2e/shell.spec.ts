@@ -3,7 +3,6 @@ import { login } from "./helpers";
 
 const TABS = [
   { name: "Hoje", url: /\/$/, heading: /^Hoje/ },
-  { name: "Registar", url: /\/registar$/, heading: "Registar" },
   { name: "Guardados", url: /\/guardados$/, heading: "Guardados" },
   { name: "Histórico", url: /\/historico$/, heading: "Histórico" },
   { name: "Perfil", url: /\/perfil$/, heading: "Perfil" },
@@ -23,6 +22,12 @@ test("tabs navigate and mark the active one", async ({ page }) => {
     await expect(page.getByRole("link", { name: tab.name })).toHaveAttribute("aria-current", "page");
     await expect(page.locator('nav a[aria-current="page"]')).toHaveCount(1);
   }
+});
+
+test("there is no Registar tab: only 4 tabs", async ({ page }) => {
+  await login(page, "A");
+  const nav = page.getByRole("navigation", { name: "Navegação principal" });
+  await expect(nav.getByRole("link")).toHaveText(["Hoje", "Guardados", "Histórico", "Perfil"]);
 });
 
 test("page content is not hidden behind the tab bar", async ({ page }) => {

@@ -22,3 +22,23 @@ export function FoodResultRow({ food, onPick }: { food: FoodSearchResult; onPick
     </li>
   );
 }
+
+/** A saved meal among the search results: the same row, tagged "Refeição". */
+export function MealResultRow({ meal, onPick }: { meal: { name: string; total_calories: number }; onPick: () => void }) {
+  return (
+    <li>
+      <button
+        type="button"
+        aria-label={`Escolher ${meal.name}`}
+        onClick={onPick}
+        className="flex min-h-11 w-full items-center justify-between gap-3 rounded-sm px-1 py-1.5 text-left"
+      >
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="truncate">{meal.name}</span>
+          <span className="shrink-0 rounded-sm bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">Refeição</span>
+        </span>
+        <span className="shrink-0 text-sm text-muted-foreground tabular-nums">{meal.total_calories} kcal</span>
+      </button>
+    </li>
+  );
+}

@@ -235,7 +235,8 @@ test("what is logged in Registar shows up in the history", async ({ page }) => {
   await page.getByRole("link", { name: "Histórico" }).click();
   await expect(page.getByTestId("history-empty")).toBeVisible();
 
-  await page.getByRole("link", { name: "Registar", exact: true }).click();
+  await page.getByRole("link", { name: "Hoje", exact: true }).click();
+  await page.getByRole("link", { name: "Adicionar alimento" }).click();
   await page.getByRole("button", { name: "Escolher Ovo E2E" }).click();
   await page.getByRole("button", { name: /Adicionar a/ }).click();
   await expect(page.getByText(/Ovo E2E adicionado a/)).toBeVisible();

@@ -257,7 +257,6 @@ test("opening a food or a meal never opens the keyboard: nothing is focused or s
   expect(await focusedField()).toBe(false);
   await page.keyboard.press("Escape");
 
-  await page.getByRole("button", { name: "Refeições" }).click();
   await page.getByRole("button", { name: "Escolher Sopa E2E" }).click();
   await expect(page.getByRole("status", { name: "Porções" })).toBeVisible();
   expect(await focusedField()).toBe(false);
@@ -375,7 +374,6 @@ test("a saved meal with 2 portions stores doses and doubled items", async ({ pag
   await login(page, "A");
   await openLog(page, DAY, "dinner");
 
-  await page.getByRole("button", { name: "Refeições" }).click();
   await page.getByRole("button", { name: "Escolher Almoço E2E" }).click();
   await page.getByRole("button", { name: "Usar 2 porções" }).click();
   await expect(page.getByRole("status", { name: "Porções" })).toHaveText("2 porções");
@@ -434,7 +432,6 @@ test("editing a saved meal re-applies it with each entry's doses (SQL = TypeScri
   await login(page, "A");
   await openLog(page, DAY, "breakfast");
 
-  await page.getByRole("button", { name: "Refeições" }).click();
   await page.getByRole("button", { name: "Editar guardado Papas E2E" }).click();
   await page.getByLabel("Quantidade de Aveia (g)").fill("60"); // rescaled from the saved item
   await page.getByRole("button", { name: "Guardar" }).click();
@@ -537,28 +534,65 @@ test("AI 'Só adicionar' logs an unlinked meal; a duplicate name is explained in
   expect(row).toMatchObject({ kind: "meal", saved_meal_id: null, doses: 1, calories: 443 });
 });
 
-test("Refeições: no barcode and no Open Food Facts; only saved meals are searched, or the AI is used", async ({ page }) => {
+test("one search covers saved foods and saved meals; a meal opens the portions sheet", async ({ page }) => {
   const seen = await mockOff(page);
   const items = [{ name: "Sopa", quantity_g: null, calories: 100, protein_g: 5, carbs_g: 10, fat_g: 2 }];
   await seedSavedMeal("A", { name: "Sopa de legumes", items, total_calories: 100, total_protein: 5, total_carbs: 10, total_fat: 2 });
   await seedSavedMeal("A", { name: "Bifana", items, total_calories: 450, total_protein: 25, total_carbs: 40, total_fat: 20 });
+  await seedSavedFood("A", { name: "Sopa instantânea E2E", calories_100g: 40, protein_100g: 1, carbs_100g: 6, fat_100g: 1 });
   await login(page, "A");
   await openLog(page);
 
+  // no Alimentos | Refeições switch any more; the barcode and the AI are still there
+  await expect(page.getByRole("group", { name: "Tipo de guardado" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Código de barras" })).toBeVisible();
-  await page.getByRole("button", { name: "Refeições", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Código de barras" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Pesquisar", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Com IA" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Criar refeição" })).toBeVisible();
 
-  await page.getByRole("searchbox", { name: "Pesquisar refeição" }).fill("sopa");
-  await expect(page.getByRole("button", { name: "Escolher Sopa de legumes" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Escolher Bifana" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: /^Open Food Facts/ })).toHaveCount(0);
-  expect(seen.queries).toEqual([]); // never asked Open Food Facts
+  await searchBox(page).fill("sopa");
+  await expect(savedTab(page)).toHaveText("Guardados · 2");
+  const results = page.getByRole("region", { name: "Resultados da pesquisa" });
+  await expect(results.getByRole("button", { name: "Escolher Sopa de legumes" })).toBeVisible();
+  await expect(results.getByRole("button", { name: "Escolher Sopa instantânea E2E" })).toBeVisible();
+  await expect(results.getByText("Refeição", { exact: true })).toHaveCount(1); // only the meal is tagged
+  await expect(results.getByRole("button", { name: "Escolher Bifana" })).toHaveCount(0);
+  expect(seen.queries).toContain("sopa"); // Open Food Facts is searched too
 
-  await page.getByRole("button", { name: "Escolher Sopa de legumes" }).click();
+  await results.getByRole("button", { name: "Escolher Sopa de legumes" }).click();
   await expect(page.getByRole("heading", { name: "Sopa de legumes" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Usar 2 porções" })).toBeVisible();
+});
+
+test("before searching, the saved foods and meals are listed together, most used first", async ({ page }) => {
+  const items = [{ name: "Sopa", quantity_g: null, calories: 100, protein_g: 5, carbs_g: 10, fat_g: 2 }];
+  await seedSavedFood("A", { name: "Aveia E2E", calories_100g: 380, protein_100g: 13, carbs_100g: 60, fat_100g: 7, times_used: 1 });
+  await seedSavedMeal("A", { name: "Bifana", items, total_calories: 450, total_protein: 25, total_carbs: 40, total_fat: 20, times_used: 5 });
+  await login(page, "A");
+  await openLog(page);
+
+  const rows = page.getByTestId("saved-all").getByRole("listitem");
+  await expect(rows).toHaveCount(2);
+  await expect(rows.first()).toContainText("Bifana");
+  await expect(rows.first()).toContainText("Refeição");
+  await expect(rows.nth(1)).toContainText("Aveia E2E");
+});
+
+test("'Adicionar alimento' on the day screen opens Registar on snacks and on that day", async ({ page }) => {
+  await seedSavedFood("A", { name: "Ovo E2E", calories_100g: 155, protein_100g: 13, carbs_100g: 1.1, fat_100g: 11 });
+  await login(page, "A");
+  await page.goto(`/?d=${DAY}`);
+  await page.getByRole("link", { name: "Adicionar alimento" }).click();
+  await expect(page).toHaveURL(new RegExp(`/registar\\?meal=snacks&d=${DAY}`));
+  await expect(page.getByTestId("log-day")).toContainText("20");
+  await page.getByRole("button", { name: "Escolher Ovo E2E" }).click();
+  await expect(mealButton(page, "Lanches")).toHaveAttribute("aria-pressed", "true");
+});
+
+test("the + of a meal on the day screen keeps its meal", async ({ page }) => {
+  await login(page, "A");
+  await page.goto(`/?d=${DAY}`);
+  await page.getByRole("link", { name: "Adicionar a Jantar" }).click();
+  await expect(page).toHaveURL(new RegExp(`/registar\\?meal=dinner&d=${DAY}`));
 });
 
 test("long lists of saved items scroll inside themselves", async ({ page }) => {
@@ -578,7 +612,6 @@ test("portions change 0.1 at a time, without floating point noise, and have shor
   await login(page, "A");
   await openLog(page);
 
-  await page.getByRole("button", { name: "Refeições" }).click();
   await page.getByRole("button", { name: "Escolher Sopa E2E" }).click();
   const portions = page.getByLabel("Porções", { exact: true });
   await expect(portions).toHaveText("1 porção");
@@ -598,8 +631,7 @@ test("new meal by values per portion: 1.5 portions, shown without grams on Today
   await login(page, "A");
   await openLog(page, DAY, "dinner");
 
-  await page.getByRole("button", { name: "Refeições" }).click();
-  await page.getByRole("button", { name: "Nova refeição" }).click();
+  await page.getByRole("button", { name: "Criar refeição" }).click();
   await page.getByRole("button", { name: "Valores por porção" }).click();
   await page.getByLabel("Nome da refeição").fill("Bifana");
   await page.getByLabel("Calorias (kcal)").fill("450");
@@ -625,8 +657,7 @@ test("new meal: a food from the Open Food Facts search asks its quantity", async
   await login(page, "A");
   await openLog(page);
 
-  await page.getByRole("button", { name: "Refeições" }).click();
-  await page.getByRole("button", { name: "Nova refeição" }).click();
+  await page.getByRole("button", { name: "Criar refeição" }).click();
   await page.getByRole("dialog").getByRole("searchbox", { name: "Pesquisar alimento" }).fill("arroz teste e2e");
   await offTab(page).click();
   await page.getByRole("button", { name: "Escolher Arroz Teste E2E" }).click();
@@ -671,8 +702,7 @@ test("new meal: the AI result joins the meal and names it", async ({ page }) => 
   await login(page, "A");
   await openLog(page);
 
-  await page.getByRole("button", { name: "Refeições" }).click();
-  await page.getByRole("button", { name: "Nova refeição" }).click();
+  await page.getByRole("button", { name: "Criar refeição" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Com IA" }).click();
   await page.getByLabel("O que comeste?").fill("frango com arroz");
   await page.getByRole("button", { name: "Analisar" }).click();
@@ -694,8 +724,7 @@ test("new meal: tick several saved foods in one list (with a filter) and join th
   await login(page, "A");
   await openLog(page);
 
-  await page.getByRole("button", { name: "Refeições", exact: true }).click();
-  await page.getByRole("button", { name: "Nova refeição" }).click();
+  await page.getByRole("button", { name: "Criar refeição" }).click();
   await page.getByLabel("Nome da refeição").fill("Pequeno-almoço E2E");
   await page.getByRole("button", { name: /^Escolher dos meus alimentos/ }).click();
 
@@ -724,8 +753,7 @@ test("new meal: the list of saved foods always has the filter, even with few foo
   await login(page, "A");
   await openLog(page);
 
-  await page.getByRole("button", { name: "Refeições", exact: true }).click();
-  await page.getByRole("button", { name: "Nova refeição" }).click();
+  await page.getByRole("button", { name: "Criar refeição" }).click();
   await page.getByRole("button", { name: /^Escolher dos meus alimentos/ }).click();
   await page.getByRole("searchbox", { name: "Filtrar alimentos" }).fill("lei");
   await expect(page.getByRole("checkbox")).toHaveCount(1);
@@ -740,8 +768,7 @@ test("new meal: every food can be removed, and the warning says exactly what is 
   await login(page, "A");
   await openLog(page);
 
-  await page.getByRole("button", { name: "Refeições", exact: true }).click();
-  await page.getByRole("button", { name: "Nova refeição" }).click();
+  await page.getByRole("button", { name: "Criar refeição" }).click();
   const warning = page.getByRole("status").filter({ hasText: "Falta" });
   await expect(warning).toHaveText("Falta indicar o nome da refeição e juntar pelo menos um alimento para poderes guardar.");
 
@@ -770,8 +797,7 @@ test("new meal: every food can be removed, and the warning says exactly what is 
 test("new meal by values per portion: the warning asks for the calories", async ({ page }) => {
   await login(page, "A");
   await openLog(page);
-  await page.getByRole("button", { name: "Refeições", exact: true }).click();
-  await page.getByRole("button", { name: "Nova refeição" }).click();
+  await page.getByRole("button", { name: "Criar refeição" }).click();
   await page.getByRole("button", { name: "Valores por porção" }).click();
   await expect(page.getByRole("status").filter({ hasText: "Falta" })).toHaveText("Falta indicar o nome da refeição e as calorias para poderes guardar.");
   await page.getByLabel("Nome da refeição").fill("Bifana");
@@ -804,8 +830,7 @@ test("other forms explain what is missing: short search, empty AI, no day, no se
   await page.keyboard.press("Escape");
 
   // new meal: the list of saved foods with nothing ticked
-  await page.getByRole("button", { name: "Refeições", exact: true }).click();
-  await page.getByRole("button", { name: "Nova refeição" }).click();
+  await page.getByRole("button", { name: "Criar refeição" }).click();
   await page.getByRole("button", { name: /^Escolher dos meus alimentos/ }).click();
   await expect(page.getByRole("status").filter({ hasText: "Marca pelo menos um alimento" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Juntar à refeição" })).toBeDisabled();
@@ -831,8 +856,7 @@ test("new meal by joining saved foods: totals are the sum of the foods", async (
   await login(page, "A");
   await openLog(page, DAY, "breakfast");
 
-  await page.getByRole("button", { name: "Refeições" }).click();
-  await page.getByRole("button", { name: "Nova refeição" }).click();
+  await page.getByRole("button", { name: "Criar refeição" }).click();
   await page.getByLabel("Nome da refeição").fill("Papas E2E");
   await page.getByRole("dialog").getByRole("searchbox", { name: "Pesquisar alimento" }).fill("aveia");
   await page.getByRole("button", { name: "Escolher Aveia E2E" }).click();
@@ -877,7 +901,7 @@ test("saved items are private: B does not see A's foods and cannot re-apply them
 
   await login(page, "B");
   await openLog(page);
-  await expect(page.getByText("Ainda sem alimentos guardados")).toBeVisible();
+  await expect(page.getByText("Ainda sem alimentos nem refeições guardados")).toBeVisible();
   await page.getByRole("searchbox", { name: "Pesquisar alimento" }).fill("privado e2e");
   await expect(page.getByRole("button", { name: "Escolher Privado E2E" })).toHaveCount(0);
 });
