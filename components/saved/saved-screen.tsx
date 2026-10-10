@@ -11,6 +11,7 @@ import { SavedActionsSheet } from "@/components/saved/saved-actions-sheet";
 import { SavedRow } from "@/components/saved/saved-row";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ScrollList } from "@/components/ui/scroll-list";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toDateKey } from "@/lib/dates";
 import { filterSavedFoods, filterSavedMeals, savedToResult } from "@/lib/food-search";
@@ -109,31 +110,33 @@ export function SavedScreen({ userId }: { userId: string }) {
       )}
 
       {!loading && total > 0 && (
-        <ul data-testid={`saved-${tab}`}>
-          {tab === "foods"
-            ? foodRows.slice(0, limit).map((food) => (
-                <SavedRow
-                  key={food.id}
-                  name={food.name}
-                  subtitle={food.brand ?? undefined}
-                  energy={`${food.calories_100g} kcal/100 g`}
-                  macros={`P ${food.protein_100g} · H ${food.carbs_100g} · G ${food.fat_100g}`}
-                  timesUsed={food.times_used}
-                  onEdit={() => setActions({ kind: "food", item: food })}
-                />
-              ))
-            : mealRows.slice(0, limit).map((meal) => (
-                <SavedRow
-                  key={meal.id}
-                  name={meal.name}
-                  subtitle={meal.items.length > 1 ? `${meal.items.length} alimentos` : undefined}
-                  energy={`${meal.total_calories} kcal`}
-                  macros={`P ${meal.total_protein} · H ${meal.total_carbs} · G ${meal.total_fat}`}
-                  timesUsed={meal.times_used}
-                  onEdit={() => setActions({ kind: "meal", item: meal })}
-                />
-              ))}
-        </ul>
+        <ScrollList aria-label="Lista de guardados" className="max-h-[60dvh]">
+          <ul data-testid={`saved-${tab}`}>
+            {tab === "foods"
+              ? foodRows.slice(0, limit).map((food) => (
+                  <SavedRow
+                    key={food.id}
+                    name={food.name}
+                    subtitle={food.brand ?? undefined}
+                    energy={`${food.calories_100g} kcal/100 g`}
+                    macros={`P ${food.protein_100g} · H ${food.carbs_100g} · G ${food.fat_100g}`}
+                    timesUsed={food.times_used}
+                    onEdit={() => setActions({ kind: "food", item: food })}
+                  />
+                ))
+              : mealRows.slice(0, limit).map((meal) => (
+                  <SavedRow
+                    key={meal.id}
+                    name={meal.name}
+                    subtitle={meal.items.length > 1 ? `${meal.items.length} alimentos` : undefined}
+                    energy={`${meal.total_calories} kcal`}
+                    macros={`P ${meal.total_protein} · H ${meal.total_carbs} · G ${meal.total_fat}`}
+                    timesUsed={meal.times_used}
+                    onEdit={() => setActions({ kind: "meal", item: meal })}
+                  />
+                ))}
+          </ul>
+        </ScrollList>
       )}
       {total > limit && (
         <Button type="button" variant="ghost" className="h-11" onClick={() => setLimit((n) => n + PAGE)}>

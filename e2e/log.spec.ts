@@ -537,6 +537,42 @@ test("AI 'Só adicionar' logs an unlinked meal; a duplicate name is explained in
   expect(row).toMatchObject({ kind: "meal", saved_meal_id: null, doses: 1, calories: 443 });
 });
 
+test("Refeições: no barcode and no Open Food Facts; only saved meals are searched, or the AI is used", async ({ page }) => {
+  const seen = await mockOff(page);
+  const items = [{ name: "Sopa", quantity_g: null, calories: 100, protein_g: 5, carbs_g: 10, fat_g: 2 }];
+  await seedSavedMeal("A", { name: "Sopa de legumes", items, total_calories: 100, total_protein: 5, total_carbs: 10, total_fat: 2 });
+  await seedSavedMeal("A", { name: "Bifana", items, total_calories: 450, total_protein: 25, total_carbs: 40, total_fat: 20 });
+  await login(page, "A");
+  await openLog(page);
+
+  await expect(page.getByRole("button", { name: "Código de barras" })).toBeVisible();
+  await page.getByRole("button", { name: "Refeições", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Código de barras" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Pesquisar", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Com IA" })).toBeVisible();
+
+  await page.getByRole("searchbox", { name: "Pesquisar refeição" }).fill("sopa");
+  await expect(page.getByRole("button", { name: "Escolher Sopa de legumes" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Escolher Bifana" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /^Open Food Facts/ })).toHaveCount(0);
+  expect(seen.queries).toEqual([]); // never asked Open Food Facts
+
+  await page.getByRole("button", { name: "Escolher Sopa de legumes" }).click();
+  await expect(page.getByRole("heading", { name: "Sopa de legumes" })).toBeVisible();
+});
+
+test("long lists of saved items scroll inside themselves", async ({ page }) => {
+  for (let i = 1; i <= 14; i++) {
+    await seedSavedFood("A", { name: `Alimento ${String(i).padStart(2, "0")}`, calories_100g: 100 + i, protein_100g: 1, carbs_100g: 1, fat_100g: 1 });
+  }
+  await login(page, "A");
+  await openLog(page);
+
+  const list = page.getByRole("region", { name: "Lista de guardados" });
+  await expect(list).toBeVisible();
+  expect(await list.evaluate((el) => el.scrollHeight > el.clientHeight && getComputedStyle(el).overflowY === "auto")).toBe(true);
+});
+
 test("portions change 0.1 at a time, without floating point noise, and have shortcuts", async ({ page }) => {
   await seedSavedMeal("A", { name: "Sopa E2E", items: [{ name: "Sopa", quantity_g: null, calories: 100, protein_g: 5, carbs_g: 10, fat_g: 2 }], total_calories: 100, total_protein: 5, total_carbs: 10, total_fat: 2 });
   await login(page, "A");

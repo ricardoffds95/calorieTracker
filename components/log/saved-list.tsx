@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Pencil, Plus } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { ScrollList } from "@/components/ui/scroll-list";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { SavedFood } from "@/lib/food-search";
 import type { SavedMeal } from "@/lib/queries/saved";
@@ -12,6 +13,7 @@ import { cn } from "@/lib/utils";
 const PAGE = 15;
 
 interface SavedListProps {
+  kind: "foods" | "meals";
   foods: readonly SavedFood[] | undefined;
   meals: readonly SavedMeal[] | undefined;
   onPickFood: (food: SavedFood) => void;
@@ -21,33 +23,12 @@ interface SavedListProps {
   onNewMeal: () => void;
 }
 
-export function SavedList({ foods, meals, onPickFood, onPickMeal, onEditFood, onEditMeal, onNewMeal }: SavedListProps) {
-  const [tab, setTab] = useState<"foods" | "meals">("foods");
+export function SavedList({ kind: tab, foods, meals, onPickFood, onPickMeal, onEditFood, onEditMeal, onNewMeal }: SavedListProps) {
   const [limit, setLimit] = useState(PAGE);
   const list = tab === "foods" ? foods : meals;
 
-  const switchTab = (next: "foods" | "meals") => {
-    setTab(next);
-    setLimit(PAGE);
-  };
-
   return (
     <section aria-label="Guardados" className="flex flex-col gap-2">
-      <div role="group" aria-label="Tipo de guardado" className="grid grid-cols-2 gap-1 rounded-md bg-muted p-1">
-        {(["foods", "meals"] as const).map((t) => (
-          <Button
-            key={t}
-            type="button"
-            variant={tab === t ? "secondary" : "ghost"}
-            aria-pressed={tab === t}
-            className="h-9 bg-transparent text-muted-foreground aria-pressed:bg-card aria-pressed:text-foreground dark:aria-pressed:bg-background"
-            onClick={() => switchTab(t)}
-          >
-            {t === "foods" ? "Alimentos" : "Refeições"}
-          </Button>
-        ))}
-      </div>
-
       {tab === "meals" && (
         <Button type="button" variant="outline" className="h-11" onClick={onNewMeal}>
           <Plus aria-hidden />
@@ -63,27 +44,29 @@ export function SavedList({ foods, meals, onPickFood, onPickMeal, onEditFood, on
         </p>
       )}
       {list && list.length > 0 && (
-        <ul data-testid={`saved-${tab}`}>
-          {tab === "foods"
-            ? (list as SavedFood[]).slice(0, limit).map((food) => (
-                <SavedRow
-                  key={food.id}
-                  name={food.name}
-                  detail={`${food.calories_100g} kcal/100 g`}
-                  onPick={() => onPickFood(food)}
-                  onEdit={() => onEditFood(food)}
-                />
-              ))
-            : (list as SavedMeal[]).slice(0, limit).map((meal) => (
-                <SavedRow
-                  key={meal.id}
-                  name={meal.name}
-                  detail={`${meal.total_calories} kcal`}
-                  onPick={() => onPickMeal(meal)}
-                  onEdit={() => onEditMeal(meal)}
-                />
-              ))}
-        </ul>
+        <ScrollList aria-label="Lista de guardados">
+          <ul data-testid={`saved-${tab}`}>
+            {tab === "foods"
+              ? (list as SavedFood[]).slice(0, limit).map((food) => (
+                  <SavedRow
+                    key={food.id}
+                    name={food.name}
+                    detail={`${food.calories_100g} kcal/100 g`}
+                    onPick={() => onPickFood(food)}
+                    onEdit={() => onEditFood(food)}
+                  />
+                ))
+              : (list as SavedMeal[]).slice(0, limit).map((meal) => (
+                  <SavedRow
+                    key={meal.id}
+                    name={meal.name}
+                    detail={`${meal.total_calories} kcal`}
+                    onPick={() => onPickMeal(meal)}
+                    onEdit={() => onEditMeal(meal)}
+                  />
+                ))}
+          </ul>
+        </ScrollList>
       )}
       {list && list.length > limit && (
         <Button type="button" variant="ghost" className="h-11" onClick={() => setLimit((n) => n + PAGE)}>

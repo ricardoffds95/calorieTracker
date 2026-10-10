@@ -40,6 +40,7 @@ function LogDay({ userId }: { userId: string }) {
   const initialTarget: LogTarget = { entry_date: dateKey, meal: mealFromParam(params.get("meal")) };
 
   const [panel, setPanel] = useState<Panel>(null);
+  const [kind, setKind] = useState<"foods" | "meals">("foods");
   const [editing, setEditing] = useState<SavedTarget | null>(null);
   const foods = useSavedFoods(userId);
   const meals = useSavedMeals(userId);
@@ -59,13 +60,35 @@ function LogDay({ userId }: { userId: string }) {
     <div className="flex flex-col gap-5">
       <LogHeader dateKey={dateKey} now={now} />
 
+      <div role="group" aria-label="Tipo de guardado" className="grid grid-cols-2 gap-1 rounded-md bg-muted p-1">
+        {(["foods", "meals"] as const).map((k) => (
+          <Button
+            key={k}
+            type="button"
+            variant="ghost"
+            aria-pressed={kind === k}
+            className="h-9 text-muted-foreground aria-pressed:bg-card aria-pressed:text-foreground dark:aria-pressed:bg-background"
+            onClick={() => setKind(k)}
+          >
+            {k === "foods" ? "Alimentos" : "Refeições"}
+          </Button>
+        ))}
+      </div>
+
       <FoodSearch
+        // each kind starts with its own empty search
+        key={kind}
+        kind={kind}
+        meals={meals.data ?? []}
+        onPickMeal={(meal) => setPanel({ kind: "meal", meal })}
         saved={foods.data ?? []}
         onPick={(food) => setPanel({ kind: "food", food })}
         onScan={() => setPanel({ kind: "scan" })}
         onAi={() => setPanel({ kind: "ai" })}
       >
         <SavedList
+          key={kind}
+          kind={kind}
           foods={foods.data}
           meals={meals.data}
           onPickFood={(food) => setPanel({ kind: "food", food: savedToResult(food) })}
