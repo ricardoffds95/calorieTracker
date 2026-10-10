@@ -52,7 +52,7 @@ test.describe("AI call (live Gemini)", () => {
 });
 
 const PLAN_ENDPOINT = "/api/ai/plan";
-const ANSWERS = { sex: "male", age: 30, height_cm: 180, weight_kg: 80, body_fat_pct: null, goal: "maintain", sessions_per_week: 3, exercise_types: ["strength"] };
+const ANSWERS = { sex: "male", age: 30, height_cm: 180, weight_kg: 80, body_fat_pct: null, goal: "maintain", aerobic_sessions: 1, anaerobic_sessions: 2, intensity: "moderate", daily_activity: "sedentary", notes: "" };
 
 test("the plan endpoint: 401 without a session, 400 for invalid answers", async ({ page, request }) => {
   const anonymous = await request.post(PLAN_ENDPOINT, { data: ANSWERS, maxRedirects: 0 });

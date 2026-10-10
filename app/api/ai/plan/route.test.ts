@@ -14,7 +14,7 @@ import { AiInvalidResponseError, AiUnavailableError, generateNutritionPlan } fro
 import { referencePlan } from "@/lib/nutrition-plan";
 import { POST } from "./route";
 
-const answers = { sex: "male", age: 30, height_cm: 180, weight_kg: 80, body_fat_pct: null, goal: "maintain", sessions_per_week: 3, exercise_types: ["strength"] } as const;
+const answers = { sex: "male", age: 30, height_cm: 180, weight_kg: 80, body_fat_pct: null, goal: "maintain", aerobic_sessions: 1, anaerobic_sessions: 2, intensity: "moderate", daily_activity: "light", notes: "" } as const;
 const post = (body: unknown) => POST(new Request("http://localhost/api/ai/plan", { method: "POST", body: typeof body === "string" ? body : JSON.stringify(body) }));
 
 beforeEach(() => {
@@ -48,7 +48,7 @@ describe("POST /api/ai/plan", () => {
     vi.mocked(generateNutritionPlan).mockRejectedValue(error);
     const response = await post(answers);
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ ...referencePlan({ ...answers, exercise_types: ["strength"] }), source: "standard" });
+    expect(await response.json()).toMatchObject({ ...referencePlan(answers), source: "standard" });
   });
 
   it("is 500 for an unexpected error", async () => {

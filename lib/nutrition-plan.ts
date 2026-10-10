@@ -1,19 +1,22 @@
 import { z } from "zod";
 import { CALORIE_PER_GRAM, type GoalMode } from "./macros";
 
-export const EXERCISE_TYPES = [
-  { key: "cardio", label: "Cardio" },
-  { key: "strength", label: "Musculação" },
-  { key: "running", label: "Corrida" },
-  { key: "cycling", label: "Ciclismo" },
-  { key: "swimming", label: "Natação" },
-  { key: "racket", label: "Ténis / raquetes" },
-  { key: "team", label: "Futebol / equipa" },
-  { key: "yoga", label: "Ioga / pilates" },
-  { key: "other", label: "Outro" },
+export const INTENSITIES = [
+  { key: "low", label: "Leve", description: "Dá para conversar sem esforço" },
+  { key: "moderate", label: "Moderada", description: "Respiração acelerada, a suar" },
+  { key: "high", label: "Intensa", description: "Perto do limite, difícil falar" },
 ] as const;
+export type Intensity = (typeof INTENSITIES)[number]["key"];
 
-export const EXERCISE_KEYS = EXERCISE_TYPES.map((t) => t.key) as [string, ...string[]];
+export const DAILY_ACTIVITIES = [
+  { key: "sedentary", label: "Sedentário", description: "Quase sempre sentado (teletrabalho, escritório)" },
+  { key: "light", label: "Pouco ativo", description: "Algum movimento, mas muito tempo parado" },
+  { key: "active", label: "Ativo", description: "Em pé ou a andar a maior parte do dia (loja, saúde, ensino)" },
+  { key: "very_active", label: "Muito ativo", description: "Trabalho físico pesado (obras, agricultura, cargas)" },
+] as const;
+export type DailyActivity = (typeof DAILY_ACTIVITIES)[number]["key"];
+
+export const MAX_NOTES_LENGTH = 2000;
 
 /** What the questionnaire asks. Body fat is optional; the lean mass is 100 − fat. */
 export const planAnswersSchema = z.object({
@@ -23,8 +26,11 @@ export const planAnswersSchema = z.object({
   weight_kg: z.number({ error: "Indica o peso." }).min(30, "O peso mínimo é 30 kg.").max(300, "O peso máximo é 300 kg."),
   body_fat_pct: z.number({ error: "Valor inválido." }).min(3, "Mínimo 3 %.").max(60, "Máximo 60 %.").nullable(),
   goal: z.enum(["cut", "maintain", "bulk"], { error: "Escolhe um objetivo." }),
-  sessions_per_week: z.number({ error: "Indica os treinos por semana." }).int("Usa números inteiros.").min(0, "Mínimo 0.").max(14, "Máximo 14."),
-  exercise_types: z.array(z.enum(EXERCISE_KEYS)).max(EXERCISE_KEYS.length),
+  daily_activity: z.enum(["sedentary", "light", "active", "very_active"], { error: "Indica como é o teu dia a dia." }),
+  aerobic_sessions: z.number({ error: "Indica os treinos aeróbicos por semana." }).int("Usa números inteiros.").min(0, "Mínimo 0 treinos.").max(14, "Máximo 14 treinos."),
+  anaerobic_sessions: z.number({ error: "Indica os treinos anaeróbicos por semana." }).int("Usa números inteiros.").min(0, "Mínimo 0 treinos.").max(14, "Máximo 14 treinos."),
+  intensity: z.enum(["low", "moderate", "high"], { error: "Escolhe a intensidade." }),
+  notes: z.string().trim().max(MAX_NOTES_LENGTH, `As notas podem ter no máximo ${MAX_NOTES_LENGTH} caracteres.`),
 });
 export type PlanAnswers = z.infer<typeof planAnswersSchema>;
 
@@ -48,18 +54,26 @@ export function basalMetabolicRate(a: Pick<PlanAnswers, "sex" | "age" | "height_
   return 10 * a.weight_kg + 6.25 * a.height_cm - 5 * a.age + (a.sex === "male" ? 5 : -161);
 }
 
-/** Multiplier of the basal rate for the weekly training. */
-export function activityFactor(sessionsPerWeek: number): number {
-  if (sessionsPerWeek <= 0) return 1.2;
-  if (sessionsPerWeek <= 2) return 1.375;
-  if (sessionsPerWeek <= 4) return 1.55;
-  if (sessionsPerWeek <= 6) return 1.725;
-  return 1.9;
+/** How much a session weighs for each intensity. */
+const INTENSITY_WEIGHT: Record<Intensity, number> = { low: 0.75, moderate: 1, high: 1.25 };
+
+/** What the day-to-day (the job, the commute, the house) adds on top of the factor of a sedentary person. */
+const DAILY_EXTRA: Record<DailyActivity, number> = { sedentary: 0, light: 0.075, active: 0.15, very_active: 0.3 };
+const MAX_ACTIVITY_FACTOR = 2.2;
+
+/**
+ * Multiplier of the basal rate: the weekly training (aerobic and anaerobic sessions, weighed by their intensity) as for a
+ * sedentary person, plus what the day-to-day adds (a builder burns far more than someone working from home).
+ */
+export function activityFactor(aerobicSessions: number, anaerobicSessions: number, intensity: Intensity, daily: DailyActivity = "sedentary"): number {
+  const effective = (aerobicSessions + anaerobicSessions) * INTENSITY_WEIGHT[intensity];
+  const training = effective <= 0 ? 1.2 : effective <= 2 ? 1.375 : effective <= 4 ? 1.55 : effective <= 6 ? 1.725 : 1.9;
+  return Math.min(MAX_ACTIVITY_FACTOR, Math.round((training + DAILY_EXTRA[daily]) * 1000) / 1000);
 }
 
 /** A standard, explainable plan: the safety net around the AI's answer and the fallback when it is not available. */
 export function referencePlan(a: PlanAnswers): NutritionPlan {
-  const maintenance = basalMetabolicRate(a) * activityFactor(a.sessions_per_week);
+  const maintenance = basalMetabolicRate(a) * activityFactor(a.aerobic_sessions, a.anaerobic_sessions, a.intensity, a.daily_activity);
   const calories = Math.max(MIN_PLAN_CALORIES, Math.round((maintenance * GOAL_FACTOR[a.goal]) / 10) * 10);
   const protein_g = Math.round(a.weight_kg * PROTEIN_PER_KG[a.goal]);
   const fat_g = Math.round((calories * 0.25) / CALORIE_PER_GRAM.fat);
@@ -105,5 +119,5 @@ export function reconcilePlan(ai: Pick<NutritionPlan, "calories" | "protein_g" |
 export function referenceSummary(a: PlanAnswers): string {
   const goal = a.goal === "cut" ? "um défice de cerca de 20 %" : a.goal === "bulk" ? "um excedente de cerca de 10 %" : "as calorias de manutenção";
   const method = a.body_fat_pct !== null ? "a tua massa magra" : "o teu peso, altura e idade";
-  return `Cálculo padrão com base em ${method} e nos ${a.sessions_per_week} treinos por semana, com ${goal} e cerca de ${Math.round((a.goal === "cut" ? 2 : a.goal === "bulk" ? 1.8 : 1.6) * 10) / 10} g de proteína por kg.`;
+  return `Cálculo padrão com base em ${method} , no dia a dia ${DAILY_ACTIVITIES.find((d) => d.key === a.daily_activity)?.label.toLowerCase()} e nos ${a.aerobic_sessions + a.anaerobic_sessions} treinos por semana (${INTENSITIES.find((i) => i.key === a.intensity)?.label.toLowerCase()}), com ${goal} e cerca de ${Math.round((a.goal === "cut" ? 2 : a.goal === "bulk" ? 1.8 : 1.6) * 10) / 10} g de proteína por kg.`;
 }

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { requestPlan } from "./plan-client";
 import type { PlanAnswers } from "./nutrition-plan";
 
-const answers: PlanAnswers = { sex: "female", age: 30, height_cm: 165, weight_kg: 60, body_fat_pct: null, goal: "cut", sessions_per_week: 3, exercise_types: [] };
+const answers: PlanAnswers = { sex: "female", age: 30, height_cm: 165, weight_kg: 60, body_fat_pct: null, goal: "cut", aerobic_sessions: 2, anaerobic_sessions: 1, intensity: "moderate", daily_activity: "light", notes: "" };
 const respond = (body: unknown, status: number) => async () => new Response(JSON.stringify(body), { status });
 
 describe("requestPlan", () => {

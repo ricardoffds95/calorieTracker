@@ -92,13 +92,18 @@ export type Database = {
       profiles: {
         Row: {
           activity_sessions_per_week: number | null
+          aerobic_sessions_per_week: number | null
+          anaerobic_sessions_per_week: number | null
           age: number | null
           body_fat_pct: number | null
+          daily_activity: string | null
           exercise_types: string[]
           height_cm: number | null
           onboarding_done_at: string | null
           plan_summary: string | null
           sex: string | null
+          training_intensity: string | null
+          training_notes: string | null
           weight_kg: number | null
           created_at: string
           goal_calories: number
@@ -112,13 +117,18 @@ export type Database = {
         }
         Insert: {
           activity_sessions_per_week?: number | null
+          aerobic_sessions_per_week?: number | null
+          anaerobic_sessions_per_week?: number | null
           age?: number | null
           body_fat_pct?: number | null
+          daily_activity?: string | null
           exercise_types?: string[]
           height_cm?: number | null
           onboarding_done_at?: string | null
           plan_summary?: string | null
           sex?: string | null
+          training_intensity?: string | null
+          training_notes?: string | null
           weight_kg?: number | null
           created_at?: string
           goal_calories?: number
@@ -132,13 +142,18 @@ export type Database = {
         }
         Update: {
           activity_sessions_per_week?: number | null
+          aerobic_sessions_per_week?: number | null
+          anaerobic_sessions_per_week?: number | null
           age?: number | null
           body_fat_pct?: number | null
+          daily_activity?: string | null
           exercise_types?: string[]
           height_cm?: number | null
           onboarding_done_at?: string | null
           plan_summary?: string | null
           sex?: string | null
+          training_intensity?: string | null
+          training_notes?: string | null
           weight_kg?: number | null
           created_at?: string
           goal_calories?: number

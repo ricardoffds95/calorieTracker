@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { activityFactor, basalMetabolicRate, planAnswersSchema, reconcilePlan, referencePlan, type PlanAnswers } from "./nutrition-plan";
 
-const man: PlanAnswers = { sex: "male", age: 30, height_cm: 180, weight_kg: 80, body_fat_pct: null, goal: "maintain", sessions_per_week: 3, exercise_types: ["strength"] };
-const woman: PlanAnswers = { sex: "female", age: 28, height_cm: 165, weight_kg: 60, body_fat_pct: null, goal: "cut", sessions_per_week: 0, exercise_types: [] };
+const man: PlanAnswers = { sex: "male", age: 30, height_cm: 180, weight_kg: 80, body_fat_pct: null, goal: "maintain", aerobic_sessions: 1, anaerobic_sessions: 2, intensity: "moderate", daily_activity: "sedentary", notes: "" };
+const woman: PlanAnswers = { sex: "female", age: 28, height_cm: 165, weight_kg: 60, body_fat_pct: null, goal: "cut", aerobic_sessions: 0, anaerobic_sessions: 0, intensity: "low", daily_activity: "sedentary", notes: "" };
 
 describe("basalMetabolicRate", () => {
   it("uses Mifflin-St Jeor without body fat", () => {
@@ -16,16 +16,44 @@ describe("basalMetabolicRate", () => {
 
 describe("activityFactor", () => {
   it.each([
-    [0, 1.2],
-    [1, 1.375],
-    [2, 1.375],
-    [3, 1.55],
-    [4, 1.55],
-    [5, 1.725],
-    [6, 1.725],
-    [7, 1.9],
-    [14, 1.9],
-  ])("%s sessions → %s", (sessions, factor) => expect(activityFactor(sessions)).toBe(factor));
+    [0, 0, "moderate", 1.2],
+    [1, 0, "moderate", 1.375],
+    [1, 1, "moderate", 1.375],
+    [2, 1, "moderate", 1.55],
+    [2, 2, "moderate", 1.55],
+    [3, 2, "moderate", 1.725],
+    [3, 3, "moderate", 1.725],
+    [4, 3, "moderate", 1.9],
+    [7, 7, "moderate", 1.9],
+  ] as const)("%s aerobic + %s anaerobic, %s → %s", (aerobic, anaerobic, intensity, factor) => expect(activityFactor(aerobic, anaerobic, intensity)).toBe(factor));
+
+  it("weighs the sessions by their intensity", () => {
+    expect(activityFactor(1, 0, "low")).toBe(1.375); // 0.75 of a session
+    expect(activityFactor(2, 0, "high")).toBe(1.55); // 2.5
+    expect(activityFactor(4, 0, "low")).toBe(1.55); // 3
+    expect(activityFactor(4, 0, "high")).toBe(1.725); // 5
+    expect(activityFactor(0, 0, "high")).toBe(1.2); // no sessions, no matter how intense
+  });
+});
+
+describe("the day-to-day activity", () => {
+  it("adds to the factor of the training, up to a ceiling", () => {
+    expect(activityFactor(2, 1, "moderate", "sedentary")).toBe(1.55);
+    expect(activityFactor(2, 1, "moderate", "light")).toBe(1.625);
+    expect(activityFactor(2, 1, "moderate", "active")).toBe(1.7);
+    expect(activityFactor(2, 1, "moderate", "very_active")).toBe(1.85);
+    expect(activityFactor(7, 7, "high", "very_active")).toBe(2.2);
+    expect(activityFactor(0, 0, "low", "very_active")).toBe(1.5); // a builder who does not train
+  });
+  it("a builder needs clearly more than someone working from home, with the same body and training", () => {
+    const desk = referencePlan({ ...man, daily_activity: "sedentary" });
+    const builder = referencePlan({ ...man, daily_activity: "very_active" });
+    expect(builder.calories).toBeGreaterThan(desk.calories + 400);
+  });
+  it("is required", () => {
+    expect(planAnswersSchema.safeParse({ ...man, daily_activity: undefined }).error?.issues[0]?.message).toBe("Indica como é o teu dia a dia.");
+    expect(planAnswersSchema.safeParse({ ...man, daily_activity: "extreme" }).success).toBe(false);
+  });
 });
 
 describe("referencePlan", () => {
@@ -86,14 +114,18 @@ describe("planAnswersSchema", () => {
     [{ height_cm: 99 }, "A altura mínima é 100 cm."],
     [{ weight_kg: 301 }, "O peso máximo é 300 kg."],
     [{ body_fat_pct: 2 }, "Mínimo 3 %."],
-    [{ sessions_per_week: 15 }, "Máximo 14."],
+    [{ aerobic_sessions: 15 }, "Máximo 14 treinos."],
+    [{ anaerobic_sessions: -1 }, "Mínimo 0 treinos."],
+    [{ intensity: undefined }, "Escolhe a intensidade."],
+    [{ notes: "x".repeat(2001) }, "As notas podem ter no máximo 2000 caracteres."],
   ])("rejects %j", (patch, message) => {
     const result = planAnswersSchema.safeParse({ ...man, ...patch });
     expect(result.success).toBe(false);
     expect(result.error?.issues[0]?.message).toBe(message);
   });
-  it("rejects an unknown exercise and a missing sex", () => {
-    expect(planAnswersSchema.safeParse({ ...man, exercise_types: ["quidditch"] }).success).toBe(false);
+  it("rejects an unknown intensity and a missing sex, and trims the notes", () => {
+    expect(planAnswersSchema.safeParse({ ...man, intensity: "extreme" }).success).toBe(false);
     expect(planAnswersSchema.safeParse({ ...man, sex: undefined }).error?.issues[0]?.message).toBe("Indica o sexo.");
+    expect(planAnswersSchema.parse({ ...man, notes: "  musculação 4x  " }).notes).toBe("musculação 4x");
   });
 });

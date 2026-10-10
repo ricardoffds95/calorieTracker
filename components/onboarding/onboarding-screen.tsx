@@ -10,19 +10,20 @@ import { Hint } from "@/components/ui/hint";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
 import type { GoalMode } from "@/lib/macros";
-import { EXERCISE_TYPES, planAnswersSchema, type NutritionPlan, type PlanAnswers } from "@/lib/nutrition-plan";
+import { DAILY_ACTIVITIES, INTENSITIES, MAX_NOTES_LENGTH, planAnswersSchema, type DailyActivity, type Intensity, type NutritionPlan, type PlanAnswers } from "@/lib/nutrition-plan";
 import { parseDecimalInput } from "@/lib/numbers";
 import { requestPlan } from "@/lib/plan-client";
 import { parseIntegerInput } from "@/lib/profile";
 import { useProfile, useSaveOnboarding, type Profile } from "@/lib/queries/profile";
-import { cn } from "@/lib/utils";
 
 const STEPS = [
   { title: "Sobre ti", fields: ["sex", "age", "height_cm", "weight_kg"] },
   { title: "Composição corporal", fields: ["body_fat_pct"] },
   { title: "Objetivo", fields: ["goal"] },
-  { title: "Atividade física", fields: ["sessions_per_week", "exercise_types"] },
+  { title: "O teu dia a dia", fields: ["daily_activity"] },
+  { title: "Treino", fields: ["aerobic_sessions", "anaerobic_sessions", "intensity", "notes"] },
 ] as const;
 
 interface Form {
@@ -33,8 +34,11 @@ interface Form {
   fat: string;
   lean: string;
   goal: GoalMode | null;
-  sessions: string;
-  types: string[];
+  daily: DailyActivity | null;
+  aerobic: string;
+  anaerobic: string;
+  intensity: Intensity | null;
+  notes: string;
 }
 
 const round1 = (n: number) => String(Math.round(n * 10) / 10);
@@ -50,8 +54,11 @@ function initialForm(profile: Profile, fromProfile: boolean): Form {
     lean: fat === null ? "" : round1(100 - fat),
     // A new user chooses; someone redoing the plan starts from the goal they have.
     goal: fromProfile ? (profile.mode as GoalMode) : null,
-    sessions: String(profile.activity_sessions_per_week ?? 3),
-    types: profile.exercise_types ?? [],
+    daily: DAILY_ACTIVITIES.some((d) => d.key === profile.daily_activity) ? (profile.daily_activity as DailyActivity) : null,
+    aerobic: String(profile.aerobic_sessions_per_week ?? 2),
+    anaerobic: String(profile.anaerobic_sessions_per_week ?? 2),
+    intensity: profile.training_intensity === "low" || profile.training_intensity === "moderate" || profile.training_intensity === "high" ? profile.training_intensity : null,
+    notes: profile.training_notes ?? "",
   };
 }
 
@@ -64,8 +71,11 @@ function toCandidate(f: Form) {
     weight_kg: parseDecimalInput(f.weight) ?? Number.NaN,
     body_fat_pct: f.fat.trim() === "" ? null : (parseDecimalInput(f.fat) ?? Number.NaN),
     goal: f.goal ?? undefined,
-    sessions_per_week: parseIntegerInput(f.sessions) ?? Number.NaN,
-    exercise_types: f.types,
+    daily_activity: f.daily ?? undefined,
+    aerobic_sessions: parseIntegerInput(f.aerobic) ?? Number.NaN,
+    anaerobic_sessions: parseIntegerInput(f.anaerobic) ?? Number.NaN,
+    intensity: f.intensity ?? undefined,
+    notes: f.notes,
   };
 }
 
@@ -137,8 +147,11 @@ function Flow({ userId, profile, fromProfile }: { userId: string; profile: Profi
         height_cm: a.height_cm,
         weight_kg: a.weight_kg,
         body_fat_pct: a.body_fat_pct,
-        activity_sessions_per_week: a.sessions_per_week,
-        exercise_types: a.exercise_types,
+        daily_activity: a.daily_activity,
+        aerobic_sessions_per_week: a.aerobic_sessions,
+        anaerobic_sessions_per_week: a.anaerobic_sessions,
+        training_intensity: a.intensity,
+        training_notes: a.notes === "" ? null : a.notes,
         plan_summary: result.summary,
         toast: "Plano guardado nos teus objetivos",
       },
@@ -167,7 +180,8 @@ function Flow({ userId, profile, fromProfile }: { userId: string; profile: Profi
       {!result && step === 0 && <AboutYou form={form} patch={patch} />}
       {!result && step === 1 && <BodyComposition form={form} patch={patch} />}
       {!result && step === 2 && <GoalModePicker value={form.goal} onChange={(goal) => patch({ goal })} />}
-      {!result && step === 3 && <Activity form={form} patch={patch} />}
+      {!result && step === 3 && <DailyLife form={form} patch={patch} />}
+      {!result && step === 4 && <Activity form={form} patch={patch} />}
 
       {result && (
         <PlanResult
@@ -283,34 +297,71 @@ function BodyComposition({ form, patch }: { form: Form; patch: (changes: Partial
   );
 }
 
+function DailyLife({ form, patch }: { form: Form; patch: (changes: Partial<Form>) => void }) {
+  return (
+    <fieldset className="flex flex-col gap-3">
+      <legend className="mb-1 text-sm font-medium">Fora do treino, quão ativo é o teu dia a dia?</legend>
+      <p className="text-sm text-muted-foreground">Pensa no trabalho e nas deslocações: quem trabalha em casa gasta muito menos do que quem passa o dia numa obra.</p>
+      {DAILY_ACTIVITIES.map(({ key, label, description }) => (
+        <Button
+          key={key}
+          type="button"
+          variant="outline"
+          aria-pressed={form.daily === key}
+          className="h-auto min-h-14 flex-col items-start gap-0.5 px-4 py-3 text-left whitespace-normal aria-pressed:border-primary aria-pressed:text-primary"
+          onClick={() => patch({ daily: key })}
+        >
+          <span>{label}</span>
+          <span className="text-xs leading-tight font-normal text-muted-foreground">{description}</span>
+        </Button>
+      ))}
+    </fieldset>
+  );
+}
+
 function Activity({ form, patch }: { form: Form; patch: (changes: Partial<Form>) => void }) {
-  const toggle = (key: string) => patch({ types: form.types.includes(key) ? form.types.filter((k) => k !== key) : [...form.types, key] });
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-2">
-        <Label>Treinos por semana</Label>
-        <NumberStepper label="Treinos por semana" value={form.sessions} onChange={(sessions) => patch({ sessions })} step={1} min={0} max={14} unit="x" fallback={3} />
+        <Label>Treinos aeróbicos por semana</Label>
+        <NumberStepper label="Treinos aeróbicos por semana" value={form.aerobic} onChange={(aerobic) => patch({ aerobic })} step={1} min={0} max={14} unit="x" fallback={0} />
+        <p className="text-xs text-muted-foreground">Corrida, ciclismo, natação, caminhadas rápidas, ténis, futebol…</p>
+      </div>
+      <div className="flex flex-col gap-2">
+        <Label>Treinos anaeróbicos por semana</Label>
+        <NumberStepper label="Treinos anaeróbicos por semana" value={form.anaerobic} onChange={(anaerobic) => patch({ anaerobic })} step={1} min={0} max={14} unit="x" fallback={0} />
+        <p className="text-xs text-muted-foreground">Musculação, treino de força, HIIT, crossfit, calistenia…</p>
       </div>
       <fieldset className="flex flex-col gap-2">
-        <legend className="mb-1 text-sm font-medium">Que tipo de exercício fazes?</legend>
-        <div className="flex flex-wrap gap-2">
-          {EXERCISE_TYPES.map(({ key, label }) => {
-            const on = form.types.includes(key);
-            return (
-              <Button
-                key={key}
-                type="button"
-                variant="outline"
-                aria-pressed={on}
-                className={cn("h-11 px-3", on && "border-primary text-primary")}
-                onClick={() => toggle(key)}
-              >
-                {label}
-              </Button>
-            );
-          })}
+        <legend className="mb-1 text-sm font-medium">Intensidade dos treinos</legend>
+        <div className="grid grid-cols-3 gap-2">
+          {INTENSITIES.map(({ key, label, description }) => (
+            <Button
+              key={key}
+              type="button"
+              variant="outline"
+              aria-pressed={form.intensity === key}
+              className="h-auto min-h-11 flex-col gap-0.5 px-1 py-2 whitespace-normal aria-pressed:border-primary aria-pressed:text-primary"
+              onClick={() => patch({ intensity: key })}
+            >
+              <span>{label}</span>
+              <span className="text-xs leading-tight font-normal text-muted-foreground">{description}</span>
+            </Button>
+          ))}
         </div>
       </fieldset>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="onb-notes">Notas sobre os teus treinos (opcional)</Label>
+        <Textarea
+          id="onb-notes"
+          className="min-h-32 text-base"
+          maxLength={MAX_NOTES_LENGTH}
+          placeholder="Explica como quiseres, ao pormenor: que treinos fazes, quanto duram, em que dias, o que fazes no trabalho… Ex: musculação 4x por semana (1h, pernas e costas à segunda), corrida de 5 km ao sábado, trabalho sentado."
+          value={form.notes}
+          onChange={(e) => patch({ notes: e.target.value })}
+        />
+        <p className="text-xs text-muted-foreground">Quanto mais detalhe, melhor o plano. Só serve para este cálculo.</p>
+      </div>
     </div>
   );
 }

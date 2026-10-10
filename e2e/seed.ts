@@ -164,8 +164,11 @@ export async function resetProfileRow(user: TestUser, { onboardingDone }: { onbo
       height_cm: null,
       weight_kg: null,
       body_fat_pct: null,
-      activity_sessions_per_week: null,
-      exercise_types: [],
+      daily_activity: null,
+      aerobic_sessions_per_week: null,
+      anaerobic_sessions_per_week: null,
+      training_intensity: null,
+      training_notes: null,
       plan_summary: null,
       onboarding_done_at: onboardingDone ? new Date().toISOString() : null,
     })

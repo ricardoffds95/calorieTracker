@@ -55,10 +55,20 @@ test("first login: the questionnaire, the AI plan, and the goals are saved", asy
   await page.getByText("Ganhar massa").click();
   await next(page).click();
 
-  // step 4
-  await page.getByRole("button", { name: "Aumentar Treinos por semana" }).click();
-  await page.getByRole("button", { name: "Musculação" }).click();
-  await page.getByRole("button", { name: "Corrida" }).click();
+  // step 4: the day-to-day (a desk job and a building site are not the same)
+  await expect(next(page)).toBeDisabled();
+  await expect(page.getByRole("status").filter({ hasText: "Indica como é o teu dia a dia." })).toBeVisible();
+  await page.getByRole("button", { name: /^Muito ativo/ }).click();
+  await next(page).click();
+
+  // step 5: the training
+  await expect(next(page)).toHaveCount(0); // the last step has "Calcular", not "Seguinte"
+  await expect(page.getByRole("status").filter({ hasText: "Escolhe a intensidade." })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Calcular o meu plano" })).toBeDisabled();
+  await page.getByRole("button", { name: "Aumentar Treinos aeróbicos por semana" }).click(); // 2 → 3
+  await page.getByRole("button", { name: "Diminuir Treinos anaeróbicos por semana" }).click(); // 2 → 1
+  await page.getByRole("button", { name: /^Intensa/ }).click();
+  await page.getByLabel("Notas sobre os teus treinos (opcional)").fill("Musculação 1x (1h) e corrida 3x de 5 km.");
   await page.getByRole("button", { name: "Calcular o meu plano" }).click();
 
   await expect(page.getByTestId("plan-calories")).toHaveText("2800");
@@ -71,8 +81,11 @@ test("first login: the questionnaire, the AI plan, and the goals are saved", asy
     weight_kg: 80.5,
     body_fat_pct: 20,
     goal: "bulk",
-    sessions_per_week: 4,
-    exercise_types: ["strength", "running"],
+    daily_activity: "very_active",
+    aerobic_sessions: 3,
+    anaerobic_sessions: 1,
+    intensity: "high",
+    notes: "Musculação 1x (1h) e corrida 3x de 5 km.",
   });
 
   await page.getByRole("button", { name: "Usar este plano" }).click();
@@ -92,8 +105,11 @@ test("first login: the questionnaire, the AI plan, and the goals are saved", asy
     height_cm: 180,
     weight_kg: 80.5,
     body_fat_pct: 20,
-    activity_sessions_per_week: 4,
-    exercise_types: ["strength", "running"],
+    aerobic_sessions_per_week: 3,
+    anaerobic_sessions_per_week: 1,
+    daily_activity: "very_active",
+    training_intensity: "high",
+    training_notes: "Musculação 1x (1h) e corrida 3x de 5 km.",
     plan_summary: "Excedente pequeno para ganhar massa.",
   });
   expect((await fetchProfile("A")).onboarding_done_at).not.toBeNull();
@@ -142,6 +158,9 @@ test("without the AI, the standard calculation is shown and says so", async ({ p
   await next(page).click();
   await page.getByText("Perder peso").click();
   await next(page).click();
+  await page.getByRole("button", { name: /^Sedentário/ }).click();
+  await next(page).click();
+  await page.getByRole("button", { name: /^Moderada/ }).click();
   await page.getByRole("button", { name: "Calcular o meu plano" }).click();
   await expect(page.getByTestId("plan-calories")).toHaveText("2210");
   await expect(page.getByRole("status").filter({ hasText: "usei um cálculo padrão" })).toBeVisible();
@@ -155,6 +174,9 @@ test("a failed calculation shows the error and can be tried again", async ({ pag
   await next(page).click();
   await page.getByText("Manter peso").click();
   await next(page).click();
+  await page.getByRole("button", { name: /^Ativo/ }).click();
+  await next(page).click();
+  await page.getByRole("button", { name: /^Leve/ }).click();
   await page.getByRole("button", { name: "Calcular o meu plano" }).click();
   await expect(page.getByRole("alert").filter({ hasText: "Não foi possível calcular agora" })).toBeVisible();
 
@@ -187,6 +209,10 @@ test("Perfil: the button redoes the plan with the saved answers, 'Cancelar' chan
   await expect(page.getByRole("radio", { name: /Manter peso/ })).toBeChecked(); // starts from the current goal
   await page.getByText("Ganhar massa").click();
   await next(page).click();
+  await page.getByRole("button", { name: /^Pouco ativo/ }).click();
+  await next(page).click();
+  await page.getByRole("button", { name: /^Moderada/ }).click();
+  await page.getByLabel("Notas sobre os teus treinos (opcional)").fill("Treino de pernas à segunda.");
   await page.getByRole("button", { name: "Calcular o meu plano" }).click();
   await page.getByRole("button", { name: "Usar e ajustar à mão" }).click();
   await expect(page).toHaveURL(/\/perfil$/);
@@ -200,4 +226,12 @@ test("Perfil: the button redoes the plan with the saved answers, 'Cancelar' chan
   await expect(page.getByLabel("Idade")).toHaveValue("30");
   await expect(page.getByLabel("Peso (kg)")).toHaveValue("80.5");
   await expect(page.getByRole("button", { name: "Masculino" })).toHaveAttribute("aria-pressed", "true");
+  await next(page).click();
+  await next(page).click();
+  await next(page).click();
+  await expect(page.getByRole("button", { name: /^Pouco ativo/ })).toHaveAttribute("aria-pressed", "true");
+  await next(page).click();
+  await expect(page.getByRole("button", { name: /^Moderada/ })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByLabel("Notas sobre os teus treinos (opcional)")).toHaveValue("Treino de pernas à segunda.");
+  await expect(page.getByLabel("Treinos aeróbicos por semana", { exact: true })).toHaveValue("2");
 });
