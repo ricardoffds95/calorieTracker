@@ -58,15 +58,15 @@ describe("POST /api/ai/parse", () => {
   });
 
   it("returns the meal for a text request", async () => {
-    vi.mocked(parseFoodText).mockResolvedValue({ name: "Arroz", items });
+    vi.mocked(parseFoodText).mockResolvedValue({ name: "Arroz", kind: "food" as const, items });
     const response = await post({ type: "text", text: "  100g de arroz " });
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ name: "Arroz", items });
+    expect(await response.json()).toEqual({ name: "Arroz", kind: "food" as const, items });
     expect(parseFoodText).toHaveBeenCalledWith("100g de arroz");
   });
 
   it("returns the meal for an image request", async () => {
-    vi.mocked(analyzeFoodImage).mockResolvedValue({ name: "Arroz", items });
+    vi.mocked(analyzeFoodImage).mockResolvedValue({ name: "Arroz", kind: "food" as const, items });
     const response = await post({ type: "image", image: "QUJD", mimeType: "image/jpeg" });
     expect(response.status).toBe(200);
     expect(analyzeFoodImage).toHaveBeenCalledWith("QUJD", "image/jpeg");

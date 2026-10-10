@@ -12,6 +12,8 @@ import { scaleFromPer100g } from "@/lib/nutrition";
 
 interface AddFoodSheetProps {
   food: FoodSearchResult;
+  /** Grams the quantity starts on (the AI's estimate); otherwise the serving or 100 g. */
+  initialGrams?: number;
   /** Day and meal the picker starts on. */
   initialTarget: LogTarget;
   pending: boolean;
@@ -22,10 +24,10 @@ interface AddFoodSheetProps {
   onSaveOnly?: (food: FoodSearchResult) => void;
 }
 
-export function AddFoodSheet({ food, initialTarget, pending, onClose, onAdd, onSaveOnly }: AddFoodSheetProps) {
+export function AddFoodSheet({ food, initialGrams, initialTarget, pending, onClose, onAdd, onSaveOnly }: AddFoodSheetProps) {
   const isNew = food.source !== "saved" && onSaveOnly !== undefined;
   const presets = servingPresets(food.serving_size);
-  const [grams, setGrams] = useState(presets[1]?.grams ?? 100);
+  const [grams, setGrams] = useState(initialGrams ?? presets[1]?.grams ?? 100);
   const [target, setTarget] = useState(initialTarget);
   const parsed = quantitySchema.safeParse(grams);
   const ready = parsed.success && isValidTarget(target);

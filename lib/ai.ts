@@ -17,9 +17,11 @@ export class AiInvalidResponseError extends Error {
   }
 }
 
-const SYSTEM_PROMPT = `Identifica a refeição e os alimentos descritos ou visíveis, estima as quantidades em gramas se não especificadas, e devolve APENAS um objeto JSON sem markdown nem texto extra:
-{"name":"Frango com arroz","items":[{"name":"frango grelhado","quantity_g":150,"calories":248,"protein_g":46.5,"carbs_g":0,"fat_g":5.4},{"name":"arroz branco cozido","quantity_g":150,"calories":195,"protein_g":4.1,"carbs_g":42.3,"fat_g":0.5}]}
-"name" é um nome curto para a refeição inteira, em português, com maiúscula inicial (ex: "Frango com arroz", "Tosta mista").
+const SYSTEM_PROMPT = `Identifica o que foi descrito ou está visível, estima as quantidades em gramas se não especificadas, e devolve APENAS um objeto JSON sem markdown nem texto extra:
+{"name":"Frango com arroz","kind":"meal","items":[{"name":"frango grelhado","quantity_g":150,"calories":248,"protein_g":46.5,"carbs_g":0,"fat_g":5.4},{"name":"arroz branco cozido","quantity_g":150,"calories":195,"protein_g":4.1,"carbs_g":42.3,"fat_g":0.5}]}
+"kind" é "food" quando é UM só alimento ou produto (ex: "peito de frango grelhado", "uma maçã", "um iogurte grego") e "meal" quando é um prato feito ou vários alimentos juntos (ex: "frango com arroz", "tosta mista", "bifana com batatas").
+Se "kind" é "food", "items" tem exatamente um item e "name" é o nome desse alimento. Exemplo: {"name":"Peito de frango grelhado","kind":"food","items":[{"name":"peito de frango grelhado","quantity_g":150,"calories":248,"protein_g":46.5,"carbs_g":0,"fat_g":5.4}]}
+"name" é um nome curto em português, com maiúscula inicial (ex: "Frango com arroz", "Tosta mista", "Maçã").
 Os valores (calories, protein_g, carbs_g, fat_g) de cada item são para a quantidade indicada em quantity_g, não por 100 g.
 Usa valores nutricionais padrão e nomes em português. Responde APENAS com o objeto JSON.`;
 
@@ -48,11 +50,17 @@ function parseModelText(text: string): AiMeal {
     throw new AiInvalidResponseError();
   }
   const meal = aiMealSchema.safeParse(json);
-  if (meal.success) return meal.data;
+  if (meal.success) return withKind(meal.data);
   // Older/looser answers: a bare array of items, or an object without a usable name.
   const items = aiResultSchema.safeParse(Array.isArray(json) ? json : (json as { items?: unknown } | null)?.items);
   if (!items.success) throw new AiInvalidResponseError();
-  return { name: items.data.length === 1 ? items.data[0]!.name : "Refeição", items: items.data };
+  return withKind({ name: items.data.length === 1 ? items.data[0]!.name : "Refeição", items: items.data });
+}
+
+/** A food has exactly one item: anything else is a meal, and a missing kind follows the item count. */
+function withKind(answer: { name: string; kind?: "food" | "meal"; items: AiMeal["items"] }): AiMeal {
+  const single = answer.items.length === 1;
+  return { ...answer, kind: single && (answer.kind ?? "food") === "food" ? "food" : "meal" };
 }
 
 async function callGemini(parts: GeminiPart[], options: GeminiOptions): Promise<AiMeal> {

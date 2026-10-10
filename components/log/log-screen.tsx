@@ -29,7 +29,7 @@ export function LogScreen({ userId }: { userId: string }) {
   return <LogDay userId={userId} />;
 }
 
-type Panel = { kind: "food"; food: FoodSearchResult } | { kind: "meal"; meal: SavedMeal } | { kind: "ai" | "manual" | "scan" | "newMeal" } | null;
+type Panel = { kind: "food"; food: FoodSearchResult; grams?: number } | { kind: "meal"; meal: SavedMeal } | { kind: "ai" | "manual" | "scan" | "newMeal" } | null;
 
 function LogDay({ userId }: { userId: string }) {
   const [now] = useState(() => new Date());
@@ -85,6 +85,7 @@ function LogDay({ userId }: { userId: string }) {
         <AddFoodSheet
           key={panel.food.id}
           food={panel.food}
+          initialGrams={panel.grams}
           initialTarget={initialTarget}
           pending={add.isPending || saveOnly.isPending}
           onClose={() => setPanel(null)}
@@ -104,7 +105,14 @@ function LogDay({ userId }: { userId: string }) {
           onAdd={(m, doses, target) => addRows([mealEntryRow(target, m, doses)], m.name, target)}
         />
       )}
-      {panel?.kind === "ai" && <AiPanel userId={userId} initialTarget={initialTarget} now={now} onClose={() => setPanel(null)} onAdded={showAdded} />}
+      {panel?.kind === "ai" && <AiPanel
+          userId={userId}
+          initialTarget={initialTarget}
+          now={now}
+          onClose={() => setPanel(null)}
+          onAdded={showAdded}
+          onFood={(food, grams) => setPanel({ kind: "food", food, grams })}
+        />}
       {panel?.kind === "newMeal" && (
         <NewMealDialog userId={userId} initialTarget={initialTarget} now={now} foods={foods.data ?? []} onClose={() => setPanel(null)} onAdded={showAdded} />
       )}

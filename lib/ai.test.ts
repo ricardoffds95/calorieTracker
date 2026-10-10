@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { AiInvalidResponseError, AiUnavailableError, analyzeFoodImage, parseFoodText } from "./ai";
 
 const items = [{ name: "frango grelhado", quantity_g: 200, calories: 330, protein_g: 62, carbs_g: 0, fat_g: 7.2 }];
-const meal = { name: "Frango grelhado", items };
+const meal = { name: "Frango grelhado", kind: "food" as const, items };
 
 function geminiResponse(parts: unknown[], status = 200) {
   return new Response(JSON.stringify({ candidates: [{ content: { parts } }] }), { status });
@@ -20,7 +20,7 @@ describe("parseFoodText", () => {
 
   it("accepts a bare array of items (older answer) and names the meal", async () => {
     const one = async () => geminiResponse([{ text: JSON.stringify(items) }]);
-    expect(await parseFoodText("x", { ...base, fetch: one })).toEqual({ name: "frango grelhado", items });
+    expect(await parseFoodText("x", { ...base, fetch: one })).toEqual({ name: "frango grelhado", kind: "food", items });
     const two = [...items, { ...items[0]!, name: "arroz" }];
     const many = async () => geminiResponse([{ text: JSON.stringify(two) }]);
     expect((await parseFoodText("x", { ...base, fetch: many })).name).toBe("Refeição");
@@ -28,7 +28,16 @@ describe("parseFoodText", () => {
 
   it("falls back to a name when the meal name is missing or blank", async () => {
     const text = JSON.stringify({ name: "  ", items });
-    expect(await parseFoodText("x", { ...base, fetch: async () => geminiResponse([{ text }]) })).toEqual({ name: "frango grelhado", items });
+    expect(await parseFoodText("x", { ...base, fetch: async () => geminiResponse([{ text }]) })).toEqual({ name: "frango grelhado", kind: "food", items });
+  });
+
+  it("classifies: the model's kind is kept for one item, and several items are always a meal", async () => {
+    const two = [...items, { ...items[0]!, name: "arroz" }];
+    const ask = (body: unknown) => parseFoodText("x", { ...base, fetch: async () => geminiResponse([{ text: JSON.stringify(body) }]) });
+    expect(await ask({ name: "Frango", kind: "meal", items })).toMatchObject({ kind: "meal" });
+    expect(await ask({ name: "Frango", kind: "food", items })).toMatchObject({ kind: "food" });
+    expect(await ask({ name: "Frango com arroz", kind: "food", items: two })).toMatchObject({ kind: "meal" });
+    expect(await ask({ name: "Frango com arroz", items: two })).toMatchObject({ kind: "meal" });
   });
 
   it("sends the key in a header (never in the URL), the model in the path and the user text in the prompt", async () => {

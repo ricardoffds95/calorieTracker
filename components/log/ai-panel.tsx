@@ -12,7 +12,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { requestAiParse } from "@/lib/ai-client";
 import type { AiImage } from "@/lib/image";
 import type { LogTarget } from "@/lib/log";
-import type { FoodItem } from "@/lib/nutrition";
+import type { FoodSearchResult } from "@/lib/food-search";
+import { per100gFromItems, type FoodItem } from "@/lib/nutrition";
 import { AI_MAX_TEXT_LENGTH } from "@/lib/schemas";
 
 interface AiPanelProps {
@@ -24,12 +25,14 @@ interface AiPanelProps {
   onAdded?: (message: string, day: string) => void;
   /** Instead of logging, hand the result back (used while creating a saved meal or food). */
   onUse?: (result: { name: string; items: FoodItem[] }, close: () => void) => void;
+  /** A single food (not a meal): hand it over per 100 g with the estimated grams, to be added like a searched food. */
+  onFood?: (food: FoodSearchResult, grams: number) => void;
   useLabel?: string;
 }
 
 type Result = { name: string; items: FoodItem[] };
 
-export function AiPanel({ userId, initialTarget, now, onClose, onAdded, onUse, useLabel = "Usar" }: AiPanelProps) {
+export function AiPanel({ userId, initialTarget, now, onClose, onAdded, onUse, onFood, useLabel = "Usar" }: AiPanelProps) {
   const [text, setText] = useState("");
   const [photo, setPhoto] = useState<AiImage | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -42,7 +45,15 @@ export function AiPanel({ userId, initialTarget, now, onClose, onAdded, onUse, u
     setAnalyzing(true);
     const response = await requestAiParse(photo ? { type: "image", ...photo } : { type: "text", text });
     setAnalyzing(false);
-    if (response.ok) setResult({ name: response.name, items: response.items });
+    if (response.ok) {
+      const per100 = response.kind === "food" && !onUse ? per100gFromItems(response.items) : null;
+      const [item] = response.items;
+      if (onFood && per100 && item?.quantity_g) {
+        onFood({ id: `ai-${Date.now()}`, source: "off", name: response.name, ...per100 }, item.quantity_g);
+        return;
+      }
+      setResult({ name: response.name, items: response.items });
+    }
     else setError(response.message);
   }
 

@@ -1,7 +1,7 @@
 import type { AiFoodItem, AiRequest } from "./schemas";
 
 export type AiClientResult =
-  | { ok: true; name: string; items: AiFoodItem[] }
+  | { ok: true; name: string; kind: "food" | "meal"; items: AiFoodItem[] }
   | { ok: false; reason: "unavailable" | "invalid" | "unauthorized" | "network"; message: string };
 
 const FALLBACK: Record<"unavailable" | "invalid" | "unauthorized" | "network", string> = {
@@ -24,8 +24,11 @@ export async function requestAiParse(input: AiRequest, fetchFn: typeof fetch = f
     return { ok: false, reason: "network", message: FALLBACK.network };
   }
 
-  const body = (await response.json().catch(() => null)) as { name?: string; items?: AiFoodItem[]; message?: string } | null;
-  if (response.ok && body?.items) return { ok: true, name: body.name?.trim() || "Refeição", items: body.items };
+  const body = (await response.json().catch(() => null)) as { name?: string; kind?: string; items?: AiFoodItem[]; message?: string } | null;
+  if (response.ok && body?.items) {
+    const kind = body.kind === "food" && body.items.length === 1 ? "food" : "meal";
+    return { ok: true, name: body.name?.trim() || "Refeição", kind, items: body.items };
+  }
 
   if (response.status === 401) return { ok: false, reason: "unauthorized", message: FALLBACK.unauthorized };
   if (response.status === 400 || response.status === 502) {

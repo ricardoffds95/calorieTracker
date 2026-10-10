@@ -26,7 +26,12 @@ export const aiItemSchema = foodItemSchema.extend({ quantity_g: grams });
 export const aiResultSchema = z.array(aiItemSchema).min(1).max(30);
 
 /** What the AI returns: one meal (e.g. "Frango com arroz") made of food lines. */
-export const aiMealSchema = z.object({ name: z.string().trim().min(1).max(200), items: aiResultSchema });
+export const aiMealSchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  /** "food": one product or ingredient; "meal": a dish or several foods. Older answers have none. */
+  kind: z.enum(["food", "meal"]).optional(),
+  items: aiResultSchema,
+});
 
 export const AI_MAX_TEXT_LENGTH = 1000;
 /** Base64 characters (~4 MB of image data). The client resizes photos before sending. */
@@ -50,4 +55,5 @@ export const aiRequestSchema = z.discriminatedUnion("type", [
 
 export type AiRequest = z.infer<typeof aiRequestSchema>;
 export type AiFoodItem = z.infer<typeof aiItemSchema>;
-export type AiMeal = z.infer<typeof aiMealSchema>;
+/** The AI answer; a "food" always has exactly one item. */
+export type AiMeal = Omit<z.infer<typeof aiMealSchema>, "kind"> & { kind: "food" | "meal" };

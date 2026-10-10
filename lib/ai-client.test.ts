@@ -8,7 +8,7 @@ const respond = (body: unknown, status: number) => async () => new Response(JSON
 describe("requestAiParse", () => {
   it("returns the meal on success and posts JSON to the endpoint", async () => {
     const fetchMock = vi.fn(respond({ name: "Arroz", items }, 200));
-    expect(await requestAiParse(input, fetchMock)).toEqual({ ok: true, name: "Arroz", items });
+    expect(await requestAiParse(input, fetchMock)).toEqual({ ok: true, name: "Arroz", kind: "meal", items });
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("/api/ai/parse");
     expect(init.method).toBe("POST");
@@ -16,7 +16,12 @@ describe("requestAiParse", () => {
   });
 
   it("names the meal when the server sends no name", async () => {
-    expect(await requestAiParse(input, respond({ items }, 200))).toEqual({ ok: true, name: "Refeição", items });
+    expect(await requestAiParse(input, respond({ items }, 200))).toEqual({ ok: true, name: "Refeição", kind: "meal", items });
+  });
+
+  it("passes 'food' through only for a single item", async () => {
+    expect(await requestAiParse(input, respond({ name: "Arroz", kind: "food", items }, 200))).toMatchObject({ kind: "food" });
+    expect(await requestAiParse(input, respond({ name: "Arroz", kind: "food", items: [...items, ...items] }, 200))).toMatchObject({ kind: "meal" });
   });
 
   it("maps 503 to unavailable with the 'IA não disponível' message", async () => {

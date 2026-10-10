@@ -575,6 +575,35 @@ test("new meal: a food from the Open Food Facts search joins with 100 g", async 
   await expect(page.getByTestId("nutrient-summary")).toContainText("130");
 });
 
+test("AI knows a single food from a meal: it opens the food sheet with the estimated grams and saves it as a food", async ({ page }) => {
+  await page.route("**/api/ai/parse", (route) =>
+    route.fulfill({
+      json: {
+        name: "Peito de frango grelhado",
+        kind: "food",
+        items: [{ name: "peito de frango grelhado", quantity_g: 150, calories: 248, protein_g: 46.5, carbs_g: 0, fat_g: 5.4 }],
+      },
+    }),
+  );
+  await login(page, "A");
+  await openLog(page);
+
+  await page.getByRole("button", { name: "Com IA" }).click();
+  await page.getByLabel("O que comeste?").fill("150 g de peito de frango grelhado");
+  await page.getByRole("button", { name: "Analisar" }).click();
+
+  await expect(page.getByRole("heading", { name: "Peito de frango grelhado" })).toBeVisible();
+  await expect(page.getByTestId("nutrient-summary")).toContainText("248"); // the 150 g estimate
+  await expect(page.getByRole("button", { name: "Guardar nas refeições" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Guardar e adicionar ao diário" }).click();
+  await expect(page.getByText(/Peito de frango grelhado adicionado a/)).toBeVisible();
+
+  const [food] = await fetchSavedFoods("A");
+  expect(food).toMatchObject({ name: "Peito de frango grelhado", calories_100g: 165, protein_100g: 31, fat_100g: 3.6 });
+  expect(await fetchSavedMeals("A")).toHaveLength(0);
+  expect((await fetchDiary("A", DAY))[0]).toMatchObject({ kind: "food", quantity_g: 150, calories: 248, saved_food_id: food!.id });
+});
+
 test("new meal: the AI result joins the meal and names it", async ({ page }) => {
   await mockAi(page);
   await login(page, "A");
