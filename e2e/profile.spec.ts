@@ -198,8 +198,10 @@ test("Gerir perfil: the name and the personal data are edited by hand, at the bo
     const manage = page.getByTestId("manage-profile");
     // after the goals, before the account; closed until opened
     const goalsY = (await save(page).boundingBox())!.y;
-    expect((await manage.boundingBox())!.y).toBeGreaterThan(goalsY);
-    // a single "Gerir perfil" card, closed; the account (e-mail, sign out) is inside it; the nutrition plan comes last
+    expect((await manage.boundingBox())!.y).toBeLessThan(goalsY);
+    expect((await manage.boundingBox())!.y).toBeLessThan(200); // the first thing on the page
+    await expect(summary(page)).toContainText("Manter peso · 2000 kcal");
+    // a single "Gerir perfil" card on top, closed; the account (e-mail, sign out) is inside it; the nutrition plan comes last
     await expect(page.getByRole("heading", { name: "Conta" })).toHaveCount(0);
     await expect(manage.getByTestId("user-email")).toHaveCount(0);
     expect((await page.getByTestId("plan-card").boundingBox())!.y).toBeGreaterThan((await manage.boundingBox())!.y);
@@ -244,7 +246,7 @@ test("Gerir perfil: the name and the personal data are edited by hand, at the bo
     await page.reload();
     await page.getByTestId("manage-profile").getByRole("button", { name: /Gerir perfil/ }).click();
     await expect(page.getByLabel("Peso (kg)")).toHaveValue("61.5");
-    await expect(page.getByTestId("manage-profile")).toContainText("Teste E2E · 61.5 kg · 168 cm");
+    await expect(summary(page)).toContainText("Teste E2E · Manter peso · 2000 kcal");
     await page.getByLabel("Peso (kg)").fill("");
     await page.getByRole("button", { name: "Guardar dados" }).click();
     await expect.poll(async () => (await fetchProfile("A")).weight_kg).toBeNull();

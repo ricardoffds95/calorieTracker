@@ -5,7 +5,6 @@ import { Sparkles } from "lucide-react";
 import { ManageProfile } from "@/components/profile/manage-profile";
 import { UnsavedGuard } from "@/components/profile/unsaved-guard";
 import { ProfileForm } from "@/components/profile/profile-form";
-import { ProfileSummary } from "@/components/profile-summary";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,7 +17,7 @@ export function ProfileScreen({ userId, email }: { userId: string; email: string
   return (
     <UnsavedGuard>
     <div className="flex flex-col gap-6">
-      <ProfileSummary userId={userId} />
+      {data && <ManageProfile profile={data} email={email} />}
       {isPending && <Skeleton className="h-96 w-full" aria-label="A carregar" />}
       {isError && !data && (
         <p role="alert" className="text-sm text-destructive">
@@ -26,7 +25,6 @@ export function ProfileScreen({ userId, email }: { userId: string; email: string
         </p>
       )}
       {data && <ProfileForm profile={data} />}
-      {data && <ManageProfile profile={data} email={email} />}
       {data && (
         <Card data-testid="plan-card">
           <CardHeader>

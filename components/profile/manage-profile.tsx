@@ -11,6 +11,7 @@ import { Hint } from "@/components/ui/hint";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { parseDecimalInput } from "@/lib/numbers";
+import { GOAL_MODE_OPTIONS } from "@/lib/profile";
 import { parseProfileData, toProfileDataUpdate } from "@/lib/profile-data";
 import { useUpdateProfile, type Profile } from "@/lib/queries/profile";
 import { cn } from "@/lib/utils";
@@ -47,21 +48,23 @@ export function ManageProfile({ profile, email }: { profile: Profile; email: str
 
   useUnsavedEntry("manage", { dirty: edited, valid: parsed.success, save: () => (next ? update.mutateAsync(next) : Promise.reject(new Error("invalid"))) });
 
-  const summary = [profile.name, profile.weight_kg !== null ? `${profile.weight_kg} kg` : null, profile.height_cm !== null ? `${profile.height_cm} cm` : null].filter(Boolean).join(" · ");
+  const goalLabel = GOAL_MODE_OPTIONS.find((o) => o.mode === profile.mode)?.label ?? profile.mode;
 
   return (
-    <Card data-testid="manage-profile">
-      <CardHeader>
+    <Card data-testid="manage-profile" className="gap-2 py-2">
+      <CardHeader className="px-4">
         <button type="button" aria-expanded={open} aria-controls="manage-profile-content" onClick={() => setOpen((o) => !o)} className="flex min-h-11 items-center justify-between gap-3 text-left">
-          <span className="flex flex-col">
-            <CardTitle className="text-base">Gerir perfil</CardTitle>
-            <span className="text-sm text-muted-foreground">{summary}</span>
+          <span className="flex min-w-0 flex-col">
+            <CardTitle className="text-sm">Gerir perfil</CardTitle>
+            <span data-testid="profile-summary" className="truncate text-sm text-muted-foreground tabular-nums">
+              {profile.name} · {goalLabel} · {profile.goal_calories} kcal
+            </span>
           </span>
           <ChevronDown aria-hidden className={cn("size-5 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} />
         </button>
       </CardHeader>
       {open && (
-        <CardContent id="manage-profile-content" className="flex flex-col gap-6">
+        <CardContent id="manage-profile-content" className="flex flex-col gap-6 px-4">
           <div className="flex flex-col gap-0.5">
             <p className="text-sm font-medium">Conta</p>
             <p data-testid="user-email" className="text-sm text-muted-foreground">
