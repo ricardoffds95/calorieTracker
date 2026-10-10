@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { toDiaryEntry, type DiaryEntry } from "@/lib/diary";
 import { itemsToJson, mealItemRemovalUpdate, toInsertRow, type EntryUpdate, type MealItemRemoval } from "@/lib/diary-edit";
+import type { NewDiaryEntry } from "@/lib/log";
 import { toastSaveError } from "@/lib/queries/errors";
 import { createClient } from "@/lib/supabase/client";
 
@@ -124,5 +125,40 @@ export function useDeleteEntry(userId: string, dateKey: string) {
     },
     apply: (entries, entry) => entries.filter((e) => e.id !== entry.id),
     onSuccess: (entry) => toast("Entrada removida", { action: { label: "Anular", onClick: () => void restore(entry) } }),
+  });
+}
+
+interface AddEntriesInput {
+  /** Rows to insert, or a function that builds them (e.g. after auto-saving a searched food). */
+  rows: NewDiaryEntry[] | (() => Promise<NewDiaryEntry[]>);
+}
+
+/** Write-through insert of one or more entries. No optimistic rows: the cache only shows what the DB returned. */
+export function useAddEntries(userId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ rows }: AddEntriesInput): Promise<DiaryEntry[]> => {
+      const built = typeof rows === "function" ? await rows() : rows;
+      const { data, error } = await createClient().from("diary_entries").insert(built).select("*");
+      if (error) throw error;
+      return data.map(toDiaryEntry);
+    },
+    onSuccess: (entries) => {
+      for (const entry of entries) {
+        queryClient.setQueryData<DiaryEntry[]>(diaryKey(userId, entry.entry_date), (current) =>
+          current && !current.some((e) => e.id === entry.id) ? [...current, entry].sort(byCreatedAt) : current,
+        );
+      }
+    },
+    onError: (error: { message?: string }) => toastSaveError(error),
+    onSettled: (entries) =>
+      Promise.all([
+        ...[...new Set((entries ?? []).map((e) => e.entry_date))].map((date) =>
+          queryClient.invalidateQueries({ queryKey: diaryKey(userId, date) }),
+        ),
+        // times_used changed in SQL
+        queryClient.invalidateQueries({ queryKey: ["saved_foods", userId] }),
+        queryClient.invalidateQueries({ queryKey: ["saved_meals", userId] }),
+      ]),
   });
 }

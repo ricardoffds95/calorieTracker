@@ -16,6 +16,7 @@ const row: DiaryRow = {
   items: null,
   saved_food_id: null,
   saved_meal_id: null,
+  doses: null,
   created_at: "2026-10-10T12:00:00Z",
   updated_at: "2026-10-10T12:00:00Z",
 };

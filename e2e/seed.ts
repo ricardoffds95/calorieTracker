@@ -84,3 +84,43 @@ export function dataDayRows(date = DAY_DATA): SeedRow[] {
 export function overGoalRows(date = DAY_OVER): SeedRow[] {
   return [{ entry_date: date, meal: "dinner", kind: "food", name: "Banquete", quantity_g: 900, calories: 2300, protein_g: 80, carbs_g: 250, fat_g: 100, created_at: at(date, "20:00") }];
 }
+
+/** Saved foods and meals of a user (diary entries keep their rows: the FK sets the link to null). */
+export async function clearSaved(user: TestUser) {
+  const supabase = await clientFor(user);
+  const [foods, meals] = await Promise.all([
+    supabase.from("saved_foods").delete().gte("created_at", "1970-01-01"),
+    supabase.from("saved_meals").delete().gte("created_at", "1970-01-01"),
+  ]);
+  if (foods.error) throw foods.error;
+  if (meals.error) throw meals.error;
+}
+
+export async function seedSavedFood(user: TestUser, row: Omit<TablesInsert<"saved_foods">, "user_id">) {
+  const supabase = await clientFor(user);
+  const { data, error } = await supabase.from("saved_foods").insert(row).select().single();
+  if (error) throw error;
+  return data;
+}
+
+export async function seedSavedMeal(user: TestUser, row: Omit<TablesInsert<"saved_meals">, "user_id">) {
+  const supabase = await clientFor(user);
+  const { data, error } = await supabase.from("saved_meals").insert(row).select().single();
+  if (error) throw error;
+  return data;
+}
+
+export async function fetchSavedFoods(user: TestUser) {
+  const supabase = await clientFor(user);
+  const { data, error } = await supabase.from("saved_foods").select("*");
+  if (error) throw error;
+  return data;
+}
+
+/** Calls apply_saved_food as `user` (RLS applies): returns how many entries changed. */
+export async function applySavedFoodAs(user: TestUser, foodId: string) {
+  const supabase = await clientFor(user);
+  const { data, error } = await supabase.rpc("apply_saved_food", { p_food_id: foodId });
+  if (error) throw error;
+  return data;
+}

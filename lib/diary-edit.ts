@@ -41,6 +41,9 @@ export interface EntryUpdate {
   protein_g: number;
   carbs_g: number;
   fat_g: number;
+  /** Set to null when the entry no longer follows its saved food/meal (manual override). */
+  saved_food_id?: null;
+  saved_meal_id?: null;
 }
 
 /** Calories whole, macros 1 decimal; `quantity_g` only for food entries. */
@@ -79,10 +82,14 @@ export interface MealItemRemoval {
   protein_g: number;
   carbs_g: number;
   fat_g: number;
+  saved_meal_id?: null;
 }
 
 /** Columns to update after removing one item of a meal entry; null if it is not possible (last item or bad index). */
-export function mealItemRemovalUpdate(entry: Pick<DiaryEntry, "items">, index: number): MealItemRemoval | null {
+export function mealItemRemovalUpdate(
+  entry: Pick<DiaryEntry, "items"> & Partial<Pick<DiaryEntry, "saved_meal_id">>,
+  index: number,
+): MealItemRemoval | null {
   const items = entry.items;
   if (!items || items.length <= 1 || index < 0 || index >= items.length) return null;
   const { items: next, totals } = removeItemFromMeal(items, index);
@@ -92,7 +99,38 @@ export function mealItemRemovalUpdate(entry: Pick<DiaryEntry, "items">, index: n
     protein_g: totals.total_protein,
     carbs_g: totals.total_carbs,
     fat_g: totals.total_fat,
+    // The meal was customised: a later edit of the saved meal must not bring the item back.
+    ...(entry.saved_meal_id ? { saved_meal_id: null } : {}),
   };
+}
+
+type LinkedEntry = Pick<
+  DiaryEntry,
+  "kind" | "name" | "quantity_g" | "calories" | "protein_g" | "carbs_g" | "fat_g" | "saved_food_id" | "saved_meal_id"
+>;
+
+/**
+ * Unlinks the entry from its saved food/meal when the user overrides the name or nutrients by hand,
+ * so re-applying the saved item later never overwrites the correction. Changing only the quantity
+ * of a food (nutrients rescaled from it) keeps the link.
+ */
+export function withLinkOverride(entry: LinkedEntry, update: EntryUpdate): EntryUpdate {
+  const differs = (expected: { calories: number; protein_g: number; carbs_g: number; fat_g: number }) =>
+    update.name !== entry.name ||
+    update.calories !== expected.calories ||
+    update.protein_g !== expected.protein_g ||
+    update.carbs_g !== expected.carbs_g ||
+    update.fat_g !== expected.fat_g;
+
+  if (entry.kind === "food" && entry.saved_food_id) {
+    const quantityChanged = update.quantity_g !== undefined && update.quantity_g !== entry.quantity_g;
+    const expected = (quantityChanged && rescaleEntry(entry, update.quantity_g!)) || entry;
+    return differs(expected) ? { ...update, saved_food_id: null } : update;
+  }
+  if (entry.kind === "meal" && entry.saved_meal_id) {
+    return differs(entry) ? { ...update, saved_meal_id: null } : update;
+  }
+  return update;
 }
 
 /** The same row again (used by "Anular" after a delete). Keeps the original id and created_at. */
@@ -112,6 +150,7 @@ export function toInsertRow(entry: DiaryEntry): TablesInsert<"diary_entries"> {
     items: itemsToJson(entry.items),
     saved_food_id: entry.saved_food_id,
     saved_meal_id: entry.saved_meal_id,
+    doses: entry.doses,
     created_at: entry.created_at,
   };
 }

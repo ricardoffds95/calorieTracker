@@ -188,7 +188,7 @@ export async function searchByBarcode(
   return mapped;
 }
 
-function savedToResult(food: SavedFood): FoodSearchResult {
+export function savedToResult(food: SavedFood): FoodSearchResult {
   return {
     id: food.id,
     source: "saved",

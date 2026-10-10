@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { DiaryEntry } from "@/lib/diary";
-import { foodEditSchema, mealEditSchema, rescaleEntry, toEntryUpdate, type EntryUpdate } from "@/lib/diary-edit";
+import { foodEditSchema, mealEditSchema, rescaleEntry, toEntryUpdate, withLinkOverride, type EntryUpdate } from "@/lib/diary-edit";
 import { formatNumberInput, parseDecimalInput } from "@/lib/numbers";
 
 interface EditEntryDialogProps {
@@ -53,7 +53,7 @@ export function EditEntryDialog({ entry, onClose, onSave }: EditEntryDialogProps
   function onSubmit(event: FormEvent) {
     event.preventDefault();
     if (!parsed.success) return;
-    onSave(entry.id, toEntryUpdate(entry.kind, parsed.data));
+    onSave(entry.id, withLinkOverride(entry, toEntryUpdate(entry.kind, parsed.data)));
     onClose();
   }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DiaryEntry } from "./diary";
-import { foodEditSchema, itemsToJson, mealEditSchema, mealItemRemovalUpdate, rescaleEntry, toEntryUpdate, toInsertRow } from "./diary-edit";
+import { foodEditSchema, itemsToJson, mealEditSchema, mealItemRemovalUpdate, rescaleEntry, toEntryUpdate, toInsertRow, withLinkOverride } from "./diary-edit";
 
 const food: DiaryEntry = {
   id: "e1",
@@ -17,6 +17,7 @@ const food: DiaryEntry = {
   items: null,
   saved_food_id: "sf1",
   saved_meal_id: null,
+  doses: null,
   created_at: "2026-01-15T08:00:00Z",
   updated_at: "2026-01-15T08:00:00Z",
 };
@@ -80,7 +81,7 @@ describe("rescaleEntry", () => {
 
 describe("mealItemRemovalUpdate", () => {
   it("removes the item and recomputes the totals from the remaining items", () => {
-    expect(mealItemRemovalUpdate(meal, 1)).toEqual({ items: [items[0]], calories: 248, protein_g: 46.5, carbs_g: 0, fat_g: 5.4 });
+    expect(mealItemRemovalUpdate(meal, 1)).toEqual({ items: [items[0]], calories: 248, protein_g: 46.5, carbs_g: 0, fat_g: 5.4, saved_meal_id: null });
     expect(mealItemRemovalUpdate(meal, 0)?.calories).toBe(260);
   });
   it("is not possible for the last item, a bad index or a food entry", () => {
@@ -105,5 +106,31 @@ describe("toInsertRow / itemsToJson", () => {
   it("keeps items null for foods", () => {
     expect(toInsertRow(food).items).toBeNull();
     expect(itemsToJson(null)).toBeNull();
+  });
+});
+
+describe("withLinkOverride", () => {
+  const same = { name: food.name, quantity_g: 60, calories: 224, protein_g: 8, carbs_g: 35, fat_g: 4 };
+  it("keeps the link when nothing or only the quantity changes", () => {
+    expect(withLinkOverride(food, same)).toEqual(same);
+    const rescaled = { ...same, quantity_g: 120, ...rescaleEntry(food, 120)! };
+    expect(withLinkOverride(food, rescaled)).toEqual(rescaled);
+  });
+  it("unlinks a food when its nutrients or name are overridden by hand", () => {
+    expect(withLinkOverride(food, { ...same, protein_g: 9 })).toEqual({ ...same, protein_g: 9, saved_food_id: null });
+    expect(withLinkOverride(food, { ...same, name: "Aveia fina" }).saved_food_id).toBeNull();
+    const rescaled = { ...same, quantity_g: 120, ...rescaleEntry(food, 120)! };
+    expect(withLinkOverride(food, { ...rescaled, calories: rescaled.calories + 1 }).saved_food_id).toBeNull();
+  });
+  it("unlinks a meal whose totals are overridden, and ignores unlinked entries", () => {
+    const totals = { name: meal.name, calories: 508, protein_g: 51.9, carbs_g: 56, fat_g: 6 };
+    expect(withLinkOverride(meal, totals)).toEqual(totals);
+    expect(withLinkOverride(meal, { ...totals, calories: 600 }).saved_meal_id).toBeNull();
+    const manual = { ...food, saved_food_id: null };
+    expect(withLinkOverride(manual, { ...same, protein_g: 9 })).not.toHaveProperty("saved_food_id");
+  });
+  it("removing an item unlinks the meal from its saved meal", () => {
+    expect(mealItemRemovalUpdate(meal, 0)?.saved_meal_id).toBeNull();
+    expect(mealItemRemovalUpdate({ items }, 0)).not.toHaveProperty("saved_meal_id");
   });
 });

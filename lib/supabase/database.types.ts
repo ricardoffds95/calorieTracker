@@ -19,6 +19,7 @@ export type Database = {
           calories: number
           carbs_g: number
           created_at: string
+          doses: number | null
           entry_date: string
           fat_g: number
           id: string
@@ -37,6 +38,7 @@ export type Database = {
           calories: number
           carbs_g: number
           created_at?: string
+          doses?: number | null
           entry_date: string
           fat_g: number
           id?: string
@@ -55,6 +57,7 @@ export type Database = {
           calories?: number
           carbs_g?: number
           created_at?: string
+          doses?: number | null
           entry_date?: string
           fat_g?: number
           id?: string
@@ -214,7 +217,26 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      apply_saved_food: {
+        Args: { p_food_id: string; p_from_date?: string }
+        Returns: number
+      }
+      apply_saved_meal: {
+        Args: { p_from_date?: string; p_meal_id: string }
+        Returns: number
+      }
+      upsert_saved_food: {
+        Args: {
+          p_brand: string
+          p_calories_100g: number
+          p_carbs_100g: number
+          p_fat_100g: number
+          p_name: string
+          p_off_code: string
+          p_protein_100g: number
+        }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never

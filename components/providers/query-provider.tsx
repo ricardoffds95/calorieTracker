@@ -20,7 +20,10 @@ export function QueryProvider({ userId, children }: { userId: string | null; chi
           buster: CACHE_BUSTER,
           // A failed refetch (offline) leaves status "error" but keeps the data: keep persisting it,
           // otherwise going offline would wipe the persisted cache.
-          dehydrateOptions: { shouldDehydrateQuery: (query: Query) => query.state.data !== undefined },
+          // meta.persist = false: data with its own cache (e.g. Open Food Facts searches in IndexedDB).
+          dehydrateOptions: {
+            shouldDehydrateQuery: (query: Query) => query.state.data !== undefined && query.meta?.persist !== false,
+          },
         }
       : null,
   );
