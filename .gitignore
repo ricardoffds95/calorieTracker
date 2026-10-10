@@ -16,3 +16,6 @@ playwright-report/
 
 # zxing wasm (copied from node_modules by scripts/copy-zxing-wasm.mjs)
 public/zxing/
+
+# supabase cli local state (linked project)
+supabase/.temp/
