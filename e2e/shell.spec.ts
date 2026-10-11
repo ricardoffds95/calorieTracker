@@ -33,8 +33,7 @@ test("there is no Registar tab: only 4 tabs", async ({ page }) => {
 test("page content is not hidden behind the tab bar", async ({ page }) => {
   await login(page, "A");
   await page.getByRole("link", { name: "Profile" }).click();
-  await page.getByRole("button", { name: /Manage profile/ }).click(); // "Sign out" is inside it
-  const button = page.getByRole("button", { name: "Sign out" });
+  const button = page.getByTestId("plan-card").getByRole("link"); // the last thing on the page
   await button.scrollIntoViewIfNeeded();
   const buttonBox = await button.boundingBox();
   const navBox = await page.getByRole("navigation", { name: "Main navigation" }).boundingBox();

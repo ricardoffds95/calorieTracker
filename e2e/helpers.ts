@@ -37,9 +37,9 @@ export async function openProfile(page: Page) {
 }
 
 export async function logout(page: Page) {
-  // "Sign out" is inside "Manage profile", which starts closed
-  if (!(await page.getByRole("button", { name: "Sign out" }).isVisible())) await page.getByRole("button", { name: /Manage profile/ }).click();
-  await page.getByRole("button", { name: "Sign out" }).click();
+  // "Log out" is in the account menu (the picture in the corner of the Profile)
+  await page.getByRole("button", { name: "Account menu" }).click();
+  await page.getByRole("button", { name: "Log out" }).click();
   await expect(page).toHaveURL(/\/login/);
 }
 

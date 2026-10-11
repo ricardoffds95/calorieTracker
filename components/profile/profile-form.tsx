@@ -3,8 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { GoalModePicker } from "@/components/profile/goal-mode-picker";
 import { useUnsavedEntry } from "@/components/profile/unsaved-guard";
-import { MacroGrams, type MacroGramInputs } from "@/components/profile/macro-grams";
-import { MacroSplit, type MacroPercentInputs } from "@/components/profile/macro-split";
+import { MacroSplit, type MacroGramInputs, type MacroPercentInputs } from "@/components/profile/macro-split";
 import { NumberStepper } from "@/components/profile/number-stepper";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -171,9 +170,7 @@ export function ProfileForm({ profile }: { profile: Profile }) {
         )}
       </div>
 
-      <MacroSplit values={pcts} onChange={changePercent} total={total} />
-
-      <MacroGrams values={grams} onChange={changeGrams} calories={values.calories} errors={gramsErrors} />
+      <MacroSplit values={pcts} onChange={changePercent} grams={grams} onGramsChange={changeGrams} gramsErrors={gramsErrors} total={total} calories={values.calories} />
 
       {parsed.success && !dirty && <p className="text-center text-sm text-muted-foreground">No changes</p>}
       <Button type="submit" size="lg" disabled={!parsed.success || !dirty || update.isPending}>

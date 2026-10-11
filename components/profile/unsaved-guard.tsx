@@ -13,7 +13,13 @@ interface Entry {
   save: () => Promise<unknown>;
 }
 
-const GuardContext = createContext<{ set: (id: string, entry: Entry) => void; remove: (id: string) => void } | null>(null);
+const GuardContext = createContext<{ set: (id: string, entry: Entry) => void; remove: (id: string) => void; leave: (action: () => void) => void } | null>(null);
+
+/** For leaving by something that is not a link (closing a sheet, going back): runs `action`, after asking when there are unsaved changes. */
+export function useLeave(): (action: () => void) => void {
+  const guard = useContext(GuardContext);
+  return (action) => (guard ? guard.leave(action) : action());
+}
 
 /** Registers a form with the surrounding `UnsavedGuard`. */
 export function useUnsavedEntry(id: string, entry: Entry) {
@@ -37,7 +43,7 @@ export function UnsavedGuard({ children }: { children: ReactNode }) {
   const router = useRouter();
   const entries = useRef(new Map<string, Entry>());
   // where the user wanted to go, and whether every form with changes can be saved as it is (known when the link was clicked)
-  const [target, setTarget] = useState<{ href: string; canSave: boolean } | null>(null);
+  const [target, setTarget] = useState<{ href: string | null; run?: () => void; canSave: boolean } | null>(null);
   const [saving, setSaving] = useState(false);
   const [leaving, setLeaving] = useState(false); // navigating on purpose: no browser warning
 
@@ -73,14 +79,21 @@ export function UnsavedGuard({ children }: { children: ReactNode }) {
     () => ({
       set: (id: string, entry: Entry) => void entries.current.set(id, entry),
       remove: (id: string) => void entries.current.delete(id),
+      leave: (action: () => void) => {
+        const dirty = dirtyEntries();
+        if (dirty.length === 0) return action();
+        setTarget({ href: null, run: action, canSave: dirty.every((e) => e.valid) });
+      },
     }),
-    [],
+    [dirtyEntries],
   );
 
   function go() {
-    setLeaving(true);
-    router.push(target!.href);
+    const { href, run } = target!;
     setTarget(null);
+    if (run) return run();
+    setLeaving(true);
+    router.push(href!);
   }
 
   async function saveAndGo() {

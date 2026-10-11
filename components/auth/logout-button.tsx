@@ -14,7 +14,7 @@ export function LogoutButton({ userId }: { userId: string }) {
 
   return (
     <Button type="button" variant="outline" size="lg" onClick={onClick}>
-      Sign out
+      Log out
     </Button>
   );
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { authErrorMessage, validateCredentials } from "./auth";
+import { authErrorMessage, passwordProblem, validateCredentials } from "./auth";
 
 describe("validateCredentials", () => {
   it("accepts a valid email and trims it", () => {
@@ -43,5 +43,13 @@ describe("authErrorMessage", () => {
   it("falls back to a generic message", () => {
     expect(authErrorMessage({ status: 400 }, "signin")).toBe("Wrong email or password");
     expect(authErrorMessage({ status: 500 }, "signup")).toBe("Something went wrong");
+  });
+});
+
+describe("passwordProblem", () => {
+  it("asks for at least 8 characters, then for both to match", () => {
+    expect(passwordProblem("short", "short")).toBe("Min 8 characters");
+    expect(passwordProblem("longenough", "different1")).toBe("Passwords differ");
+    expect(passwordProblem("longenough", "longenough")).toBe("");
   });
 });

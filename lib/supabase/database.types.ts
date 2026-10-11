@@ -92,6 +92,7 @@ export type Database = {
       profiles: {
         Row: {
           activity_sessions_per_week: number | null
+          avatar: string | null
           aerobic_sessions_per_week: number | null
           anaerobic_sessions_per_week: number | null
           age: number | null
@@ -118,6 +119,7 @@ export type Database = {
         }
         Insert: {
           activity_sessions_per_week?: number | null
+          avatar?: string | null
           aerobic_sessions_per_week?: number | null
           anaerobic_sessions_per_week?: number | null
           age?: number | null
@@ -144,6 +146,7 @@ export type Database = {
         }
         Update: {
           activity_sessions_per_week?: number | null
+          avatar?: string | null
           aerobic_sessions_per_week?: number | null
           anaerobic_sessions_per_week?: number | null
           age?: number | null
@@ -262,6 +265,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      delete_my_account: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       diary_daily_totals: {
         Args: { p_from: string; p_to: string }
         Returns: {

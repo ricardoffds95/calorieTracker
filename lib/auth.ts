@@ -67,3 +67,10 @@ export function authErrorMessage(error: AuthErrorLike, mode: AuthMode): string {
   if (mode === "signin" && error.status === 400) return "Wrong email or password";
   return "Something went wrong";
 }
+
+/** What stops a new password from being used, in words (empty when it is fine). */
+export function passwordProblem(password: string, repeat: string): string {
+  if (password.length < MIN_PASSWORD_LENGTH) return `Min ${MIN_PASSWORD_LENGTH} characters`;
+  if (password !== repeat) return "Passwords differ";
+  return "";
+}

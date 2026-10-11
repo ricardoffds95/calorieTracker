@@ -1,6 +1,7 @@
 "use client";
 
 import { NumberStepper } from "@/components/profile/number-stepper";
+import { Input } from "@/components/ui/input";
 import { PERCENT_STEP } from "@/lib/profile";
 import { cn } from "@/lib/utils";
 
@@ -16,38 +17,71 @@ const ROWS = [
   { key: "fat", label: "Fat", dot: "bg-fat" },
 ] as const;
 
+export interface MacroGramInputs {
+  protein: string;
+  carbs: string;
+  fat: string;
+}
+
 interface MacroSplitProps {
   values: MacroPercentInputs;
   onChange: (key: keyof MacroPercentInputs, value: string) => void;
+  /** The same macros in grams, editable next to the percentage: each one updates the other. */
+  grams: MacroGramInputs;
+  onGramsChange: (key: keyof MacroGramInputs, value: string) => void;
+  gramsErrors: Partial<Record<keyof MacroGramInputs, string>>;
   total: number;
+  /** Calories the grams add up to. */
+  calories: number;
 }
 
-export function MacroSplit({ values, onChange, total }: MacroSplitProps) {
+export function MacroSplit({ values, onChange, grams, onGramsChange, gramsErrors, total, calories }: MacroSplitProps) {
   const ok = total === 100;
+  const gramsError = Object.values(gramsErrors).find(Boolean);
   return (
-    <fieldset className="flex flex-col gap-3">
+    <fieldset className="flex flex-col gap-4">
       <legend className="mb-1 text-sm font-medium">Macro split</legend>
       {ROWS.map(({ key, label, dot }) => (
-        <div key={key} className="flex items-center gap-3">
-          <span className={cn("size-2.5 shrink-0 rounded-full", dot)} aria-hidden />
-          <span className="w-16 shrink-0 text-sm">{label}</span>
-          <NumberStepper
-            label={`${label} %`}
-            value={values[key]}
-            onChange={(v) => onChange(key, v)}
-            step={PERCENT_STEP}
-            min={0}
-            max={100}
-            unit="%"
-            fallback={0}
-            invalid={!ok}
-            className="flex-1"
-          />
+        <div key={key} className="flex flex-col gap-1.5">
+          <span className="flex items-center gap-2 text-sm">
+            <span className={cn("size-2.5 shrink-0 rounded-full", dot)} aria-hidden />
+            {label}
+          </span>
+          <div className="flex items-center gap-3">
+            <NumberStepper
+              label={`${label} %`}
+              value={values[key]}
+              onChange={(v) => onChange(key, v)}
+              step={PERCENT_STEP}
+              min={0}
+              max={100}
+              unit="%"
+              fallback={0}
+              invalid={!ok}
+              className="min-w-0 flex-1"
+            />
+            <div className="flex w-24 shrink-0 items-center gap-1.5">
+              <Input
+                aria-label={`${label} (g)`}
+                inputMode="numeric"
+                aria-invalid={gramsErrors[key] ? true : undefined}
+                value={grams[key]}
+                onChange={(e) => onGramsChange(key, e.target.value)}
+                className="h-11 min-w-0 px-2 text-center text-base tabular-nums"
+              />
+              <span className="text-sm text-muted-foreground">g</span>
+            </div>
+          </div>
         </div>
       ))}
       <p data-testid="macro-total" role={ok ? undefined : "alert"} className={cn("text-sm tabular-nums", ok ? "text-muted-foreground" : "text-destructive")}>
-        Total: {total}% {ok ? "" : "· Must total 100%"}
+        Total: {total}% {ok ? `· ${Number.isFinite(calories) ? calories : "—"} kcal` : "· Must total 100%"}
       </p>
+      {gramsError && (
+        <p role="alert" className="text-sm text-destructive">
+          {gramsError}
+        </p>
+      )}
     </fieldset>
   );
 }

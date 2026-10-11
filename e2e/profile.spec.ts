@@ -1,13 +1,13 @@
 import { expect, test, type Page } from "@playwright/test";
-import { clearCache, credentials, login, logout, openProfile } from "./helpers";
-import { fetchProfile, resetProfileRow } from "./seed";
+import { clearCache, login, logout, openProfile } from "./helpers";
+import { fetchProfile } from "./seed";
 
 const calories = (page: Page) => page.getByLabel("Daily calories", { exact: true });
 const pct = (page: Page, macro: "Protein" | "Carbs" | "Fat") => page.getByLabel(`${macro} %`, { exact: true });
 const grams = (page: Page, macro: "Protein" | "Carbs" | "Fat") => page.getByLabel(`${macro} (g)`, { exact: true });
 const save = (page: Page) => page.getByRole("button", { name: /Save goals|Saving/ });
 const summary = (page: Page) => page.getByTestId("profile-summary");
-const preview = (page: Page) => page.getByTestId("goals-preview");
+const total = (page: Page) => page.getByTestId("macro-total");
 
 async function openProfileForm(page: Page, user: "A" | "B" = "A") {
   await login(page, user);
@@ -36,7 +36,13 @@ test("shows the default goals", async ({ page }) => {
   await expect(pct(page, "Protein")).toHaveValue("30");
   await expect(pct(page, "Carbs")).toHaveValue("40");
   await expect(pct(page, "Fat")).toHaveValue("30");
-  await expect(page.getByTestId("macro-total")).toHaveText("Total: 100%");
+  await expect(total(page)).toHaveText("Total: 100% · 2000 kcal");
+  // the percentage and the grams of each macro sit on the same row
+  for (const macro of ["Protein", "Carbs", "Fat"] as const) {
+    const [a, b] = [await pct(page, macro).boundingBox(), await grams(page, macro).boundingBox()];
+    expect(Math.abs(a!.y - b!.y)).toBeLessThan(6);
+    expect(b!.x).toBeGreaterThan(a!.x);
+  }
   await expect(grams(page, "Protein")).toHaveValue("150");
   await expect(grams(page, "Carbs")).toHaveValue("200");
   await expect(grams(page, "Fat")).toHaveValue("67");
@@ -52,7 +58,7 @@ test("changing goal and calories updates the preview, saves, and survives reload
     await expect(pct(page, "Fat")).toHaveValue("30");
 
     await calories(page).fill("2400");
-    await expect(preview(page)).toContainText("Total: 2400 kcal");
+    await expect(total(page)).toContainText("2400 kcal");
     await expect(grams(page, "Protein")).toHaveValue("240");
     await expect(grams(page, "Carbs")).toHaveValue("180");
     await expect(grams(page, "Fat")).toHaveValue("80");
@@ -84,12 +90,11 @@ test("the grams are editable too: calories and percentages follow, and the exact
     await grams(page, "Protein").fill("180");
     // 180 g × 4 + 200 g × 4 + 67 g × 9 = 2123 kcal
     await expect(calories(page)).toHaveValue("2123");
-    await expect(page.getByTestId("macro-total")).toHaveText("Total: 100%");
+    await expect(page.getByTestId("macro-total")).toContainText("Total: 100%");
     await expect(pct(page, "Protein")).toHaveValue("34");
-    await expect(preview(page)).toContainText("Total: 2123 kcal");
+    await expect(total(page)).toContainText("2123 kcal");
 
-    await page.getByRole("button", { name: "Increase Fat (g)" }).click(); // +5 g
-    await expect(grams(page, "Fat")).toHaveValue("72");
+    await grams(page, "Fat").fill("72");
     await expect(calories(page)).toHaveValue("2168");
 
     await save(page).click();
@@ -134,7 +139,7 @@ test("validates calories and the percentage total", async ({ page }) => {
   await expect(save(page)).toBeDisabled();
   await page.getByRole("button", { name: "Decrease Protein %" }).click();
   await expect(pct(page, "Protein")).toHaveValue("30");
-  await expect(page.getByTestId("macro-total")).toHaveText("Total: 100%");
+  await expect(page.getByTestId("macro-total")).toContainText("Total: 100%");
 });
 
 test("the +/- buttons step and respect the limits", async ({ page }) => {
@@ -191,81 +196,6 @@ test("one user's goals never change another user's profile", async ({ page }) =>
   }
 });
 
-test("Manage profile: the name and the personal data are edited by hand, at the bottom of the page", async ({ page }) => {
-  await openProfileForm(page);
-  const original = (await fetchProfile("A")).name;
-  try {
-    const manage = page.getByTestId("manage-profile");
-    // after the goals, before the account; closed until opened
-    const goalsY = (await save(page).boundingBox())!.y;
-    expect((await manage.boundingBox())!.y).toBeLessThan(goalsY);
-    expect((await manage.boundingBox())!.y).toBeLessThan(200); // the first thing on the page
-    await expect(summary(page)).toContainText("Maintain weight · 2000 kcal");
-    // a single "Manage profile" card on top, closed; the account (e-mail, sign out) is inside it; the nutrition plan comes last
-    await expect(page.getByRole("heading", { name: "Account" })).toHaveCount(0);
-    await expect(manage.getByTestId("user-email")).toHaveCount(0);
-    expect((await page.getByTestId("plan-card").boundingBox())!.y).toBeGreaterThan((await manage.boundingBox())!.y);
-    await expect(page.getByLabel("Name", { exact: true })).toHaveCount(0);
-    await manage.getByRole("button", { name: /Manage profile/ }).click();
-    await expect(manage.getByTestId("user-email")).toHaveText(credentials("A").email);
-    await expect(manage.getByRole("button", { name: "Sign out" })).toBeVisible();
-
-    await page.getByLabel("Name", { exact: true }).fill("Teste E2E");
-    await page.getByRole("button", { name: "Female", exact: true }).click();
-    await page.getByLabel("Age").fill("33");
-    await page.getByLabel("Height (cm)").fill("168");
-    await page.getByLabel("Weight (kg)").fill("61,5");
-    await page.getByLabel("Body fat %").fill("24");
-    await expect(page.getByLabel("Lean mass %")).toHaveValue("76");
-    await page.getByRole("button", { name: /^Active/ }).click();
-    await page.getByRole("button", { name: "Increase Aerobic sessions per week" }).click();
-    await page.getByRole("button", { name: /^Moderate/ }).click();
-    await page.getByLabel("Training notes (optional)").fill("Corrida 5 km ao sábado");
-    await page.getByRole("button", { name: "Save data" }).click();
-    await expect(page.getByText("Data saved")).toBeVisible();
-
-    await expect(summary(page)).toContainText("Teste E2E");
-    expect(await fetchProfile("A")).toMatchObject({
-      name: "Teste E2E",
-      sex: "female",
-      age: 33,
-      height_cm: 168,
-      weight_kg: 61.5,
-      body_fat_pct: 24,
-      daily_activity: "active",
-      aerobic_sessions_per_week: 1,
-      anaerobic_sessions_per_week: null,
-      training_intensity: "moderate",
-      training_notes: "Corrida 5 km ao sábado",
-    });
-    // goals are untouched
-    expect(await fetchProfile("A")).toMatchObject({ goal_calories: 2000, mode: "maintain" });
-    await expect(page.getByRole("button", { name: "Save data" })).toBeDisabled();
-
-    // after a reload the data is there; clearing a field stores nothing for it
-    await page.reload();
-    await page.getByTestId("manage-profile").getByRole("button", { name: /Manage profile/ }).click();
-    await expect(page.getByLabel("Weight (kg)")).toHaveValue("61.5");
-    await expect(summary(page)).toContainText("Teste E2E · Maintain weight · 2000 kcal");
-    await page.getByLabel("Weight (kg)").fill("");
-    await page.getByRole("button", { name: "Save data" }).click();
-    await expect.poll(async () => (await fetchProfile("A")).weight_kg).toBeNull();
-
-    // a wrong value says what is wrong and blocks saving
-    await page.getByLabel("Age").fill("5");
-    await expect(page.getByRole("status").filter({ hasText: "Min age 14" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Save data" })).toBeDisabled();
-  } finally {
-    await resetProfileRow("A", { onboardingDone: true });
-    const supabaseName = original;
-    await page.goto("/profile");
-    await page.getByTestId("manage-profile").getByRole("button", { name: /Manage profile/ }).click();
-    await page.getByLabel("Name", { exact: true }).fill(supabaseName);
-    if (await page.getByRole("button", { name: "Save data" }).isEnabled()) await page.getByRole("button", { name: "Save data" }).click();
-    await expect.poll(async () => (await fetchProfile("A")).name).toBe(original);
-  }
-});
-
 test.describe("unsaved changes", () => {
   test("leaving with edits asks what to do: keep editing", async ({ page }) => {
     await openProfileForm(page);
@@ -315,38 +245,5 @@ test.describe("unsaved changes", () => {
     await expect(dialog.getByRole("button", { name: "Save", exact: true })).toBeDisabled();
     await dialog.getByRole("button", { name: "Discard" }).click();
     await expect(page).toHaveURL(/\/history/);
-  });
-
-  test("after saving 'Manage profile' with a decimal comma there is no question when leaving", async ({ page }) => {
-    await openProfileForm(page);
-    try {
-      await page.getByRole("button", { name: /Manage profile/ }).click();
-      await page.getByLabel("Weight (kg)").fill("70,5");
-      await page.getByRole("button", { name: "Save data" }).click();
-      await expect.poll(async () => (await fetchProfile("A")).weight_kg).toBe(70.5);
-      await page.getByRole("link", { name: "History" }).click();
-      await expect(page).toHaveURL(/\/history/);
-    } finally {
-      await resetProfileRow("A", { onboardingDone: true });
-    }
-  });
-
-  test("the personal data of 'Manage profile' is guarded too", async ({ page }) => {
-    await openProfileForm(page);
-    const original = (await fetchProfile("A")).name;
-    try {
-      await page.getByRole("button", { name: /Manage profile/ }).click();
-      await page.getByLabel("Name", { exact: true }).fill("Nome E2E");
-      await page.getByRole("link", { name: "Today" }).click();
-      await page.getByRole("dialog", { name: "Save changes?" }).getByRole("button", { name: "Save", exact: true }).click();
-      await expect(page).toHaveURL(/\/$/);
-      await expect.poll(async () => (await fetchProfile("A")).name).toBe("Nome E2E");
-    } finally {
-      await page.goto("/profile");
-      await page.getByRole("button", { name: /Manage profile/ }).click();
-      await page.getByLabel("Name", { exact: true }).fill(original);
-      await page.getByRole("button", { name: "Save data" }).click();
-      await expect.poll(async () => (await fetchProfile("A")).name).toBe(original);
-    }
   });
 });

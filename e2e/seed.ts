@@ -155,6 +155,7 @@ export async function resetProfileRow(user: TestUser, { onboardingDone }: { onbo
   const { error } = await supabase
     .from("profiles")
     .update({
+      name: "Utilizador",
       mode: "maintain",
       goal_calories: 2000,
       goal_protein: 150,
@@ -166,6 +167,7 @@ export async function resetProfileRow(user: TestUser, { onboardingDone }: { onbo
       weight_kg: null,
       body_fat_pct: null,
       daily_activity: null,
+      avatar: null,
       saved_plans: null,
       aerobic_sessions_per_week: null,
       anaerobic_sessions_per_week: null,
@@ -176,4 +178,19 @@ export async function resetProfileRow(user: TestUser, { onboardingDone }: { onbo
     })
     .eq("user_id", auth.session.user.id);
   if (error) throw error;
+}
+
+/**
+ * Puts a test user's password back after a test changed it: signs in with the temporary one (if the change happened)
+ * and sets the original from the environment.
+ */
+export async function restorePassword(user: TestUser, temporary: string) {
+  const { email, password } = credentials(user);
+  const supabase = createClient<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { error } = await supabase.auth.signInWithPassword({ email, password: temporary });
+  if (error) return; // the change did not happen: the original still works
+  const { error: updateError } = await supabase.auth.updateUser({ password });
+  if (updateError) throw updateError;
 }

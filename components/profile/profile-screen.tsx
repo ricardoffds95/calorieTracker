@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { Sparkles } from "lucide-react";
-import { ManageProfile } from "@/components/profile/manage-profile";
+import { AccountMenu } from "@/components/profile/account-menu";
 import { UnsavedGuard } from "@/components/profile/unsaved-guard";
+import { PageHeader } from "@/components/page-header";
 import { ProfileForm } from "@/components/profile/profile-form";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { GOAL_MODE_OPTIONS } from "@/lib/profile";
 import { useProfile } from "@/lib/queries/profile";
 import { cn } from "@/lib/utils";
 
@@ -16,8 +18,13 @@ export function ProfileScreen({ userId, email }: { userId: string; email: string
 
   return (
     <UnsavedGuard>
+      <PageHeader title="Profile">{data && <AccountMenu profile={data} email={email} />}</PageHeader>
     <div className="flex flex-col gap-6">
-      {data && <ManageProfile profile={data} email={email} />}
+      {data && (
+        <p data-testid="profile-summary" className="-mt-4 truncate text-sm text-muted-foreground tabular-nums">
+          {data.name} · {GOAL_MODE_OPTIONS.find((o) => o.mode === data.mode)?.label ?? data.mode} · {data.goal_calories} kcal
+        </p>
+      )}
       {isPending && <Skeleton className="h-96 w-full" aria-label="Loading" />}
       {isError && !data && (
         <p role="alert" className="text-sm text-destructive">
