@@ -23,11 +23,11 @@ interface MealActionsProps {
   onAdded?: (message: string, day: string) => void;
   /** Called after the meal was saved (with or without logging it). */
   onSaved?: (meal: SavedMeal) => void;
-  /** Shown as "Editar" when given (AI result). */
+  /** Shown as "Edit" when given (AI result). */
   onEdit?: () => void;
 }
 
-const DUPLICATE_MESSAGE = "Já tens uma refeição guardada com este nome. Muda o nome para a guardar.";
+const DUPLICATE_MESSAGE = "Meal name already saved";
 
 /** Save the meal, save and add it to the diary (in portions), edit it, or only add it. */
 export function MealActions({ userId, initialTarget, now = new Date(), name, items, onAdded, onSaved, onEdit }: MealActionsProps) {
@@ -59,9 +59,9 @@ export function MealActions({ userId, initialTarget, now = new Date(), name, ite
     if (!target) return;
     try {
       await add.mutateAsync({ rows: [mealEntryRow(target, meal, portions)] });
-      onAdded?.(`${meal.name} adicionado a ${describeTarget(target, now)}`, target.entry_date);
+      onAdded?.(`${meal.name} added to ${describeTarget(target, now)}`, target.entry_date);
     } catch {
-      // the mutation already shows "Sem ligação…"
+      // the mutation already shows the error
     }
   }
 
@@ -70,7 +70,7 @@ export function MealActions({ userId, initialTarget, now = new Date(), name, ite
       <NutrientSummary
         value={{ calories: totals.total_calories, protein_g: totals.total_protein, carbs_g: totals.total_carbs, fat_g: totals.total_fat }}
       />
-      <p className="-mt-2 text-xs text-muted-foreground">Valores de 1 porção</p>
+      <p className="-mt-2 text-xs text-muted-foreground">Per portion</p>
       {target && (
         <>
           <PortionStepper value={portions} onChange={setPortions} />
@@ -93,7 +93,7 @@ export function MealActions({ userId, initialTarget, now = new Date(), name, ite
             if (meal) await addToDiary(meal);
           }}
         >
-          {saved ? "Adicionar ao diário" : "Guardar e adicionar ao diário"}
+          {saved ? "Add to diary" : "Save and add"}
         </Button>
       )}
       <div className={target ? "grid grid-cols-2 gap-2" : "flex flex-col"}>
@@ -107,21 +107,21 @@ export function MealActions({ userId, initialTarget, now = new Date(), name, ite
         >
           {saved ? (
             <>
-              <Check aria-hidden /> Guardada
+              <Check aria-hidden /> Saved
             </>
           ) : (
-            "Guardar nas refeições"
+            "Save meal"
           )}
         </Button>
         {onEdit && (
           <Button type="button" variant="outline" className="h-11" disabled={pending || saved !== null} onClick={onEdit}>
-            Editar
+            Edit
           </Button>
         )}
       </div>
       {target && !saved && (
         <Button type="button" variant="link" className="h-11 text-muted-foreground" disabled={pending || !isValidTarget(target)} onClick={() => addToDiary({ id: null, name, items })}>
-          Só adicionar ao diário (sem guardar)
+          Add only
         </Button>
       )}
     </div>

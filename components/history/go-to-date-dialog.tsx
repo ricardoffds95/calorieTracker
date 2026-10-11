@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { parseDateKey } from "@/lib/dates";
 import { periodFor, periodHref, type Period } from "@/lib/history";
 
-const NAMES = { week: "semana", month: "mês", year: "ano" } as const;
+const NAMES = { week: "week", month: "month", year: "year" } as const;
 
 /** Jumps to the week/month/year that contains a chosen date (one native date field works everywhere, unlike month/week inputs on iOS). */
 export function GoToDateDialog({ period, now, onClose }: { period: Period; now: Date; onClose: () => void }) {
@@ -29,25 +29,25 @@ export function GoToDateDialog({ period, now, onClose }: { period: Period; now: 
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Ir para uma data</DialogTitle>
-          <DialogDescription>Abre o {NAMES[kind]} que contém essa data.</DialogDescription>
+          <DialogTitle>Go to date</DialogTitle>
+          <DialogDescription>Opens that {NAMES[kind]}</DialogDescription>
         </DialogHeader>
         <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="goto-date">Data</Label>
+            <Label htmlFor="goto-date">Date</Label>
             <Input id="goto-date" type="date" className="h-11" value={date} onChange={(e) => setDate(e.target.value)} />
           </div>
           {!valid && (
             <p role="alert" className="text-sm text-destructive">
-              Indica uma data válida.
+              Invalid date
             </p>
           )}
           <DialogFooter className="gap-2">
             <Button type="button" variant="outline" size="lg" onClick={onClose}>
-              Cancelar
+              Cancel
             </Button>
             <Button type="submit" size="lg" disabled={!valid}>
-              Ir
+              Go
             </Button>
           </DialogFooter>
         </form>

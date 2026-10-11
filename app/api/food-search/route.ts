@@ -7,8 +7,8 @@ import { createClient } from "@/lib/supabase/server";
 const MAX_QUERY_LENGTH = 100;
 
 const querySchema = z.object({
-  q: z.string().min(MIN_QUERY_LENGTH, `Escreve pelo menos ${MIN_QUERY_LENGTH} letras.`).max(MAX_QUERY_LENGTH, "Pesquisa demasiado longa."),
-  page: z.coerce.number().int("Página inválida.").min(1, "Página inválida.").max(MAX_PAGES, "Página inválida."),
+  q: z.string().min(MIN_QUERY_LENGTH, `Min ${MIN_QUERY_LENGTH} letters`).max(MAX_QUERY_LENGTH, "Search too long"),
+  page: z.coerce.number().int("Invalid page").min(1, "Invalid page").max(MAX_PAGES, "Invalid page"),
 });
 
 function jsonError(status: number, error: string, message: string) {
@@ -18,18 +18,18 @@ function jsonError(status: number, error: string, message: string) {
 export async function GET(request: Request) {
   const supabase = await createClient();
   const { data } = await supabase.auth.getClaims();
-  if (!data?.claims) return jsonError(401, "unauthorized", "Sessão expirada. Entra novamente.");
+  if (!data?.claims) return jsonError(401, "unauthorized", "Session expired");
 
   const params = new URL(request.url).searchParams;
   const parsed = querySchema.safeParse({ q: normalizeQuery(params.get("q") ?? ""), page: params.get("page") ?? "1" });
-  if (!parsed.success) return jsonError(400, "invalid_request", parsed.error.issues[0]?.message ?? "Pesquisa inválida.");
+  if (!parsed.success) return jsonError(400, "invalid_request", parsed.error.issues[0]?.message ?? "Invalid search");
 
   try {
     return NextResponse.json(await searchOffServer(parsed.data.q, { page: parsed.data.page, contactEmail: process.env.OFF_CONTACT_EMAIL }));
   } catch (error) {
     if (error instanceof OffUnavailableError) {
-      return jsonError(503, "off_unavailable", "O Open Food Facts não respondeu. Tenta daqui a pouco.");
+      return jsonError(503, "off_unavailable", "Open Food Facts not responding");
     }
-    return jsonError(500, "internal", "Erro inesperado.");
+    return jsonError(500, "internal", "Unexpected error");
   }
 }

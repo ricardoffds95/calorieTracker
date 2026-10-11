@@ -2,10 +2,10 @@ import { getMacroStatus, getProgressPercent, type MacroGoals, type MacroTotals, 
 import { roundCalories } from "./nutrition";
 
 const MEAL_LABELS: Record<MealType, string> = {
-  breakfast: "Pequeno-almoço",
-  lunch: "Almoço",
-  dinner: "Jantar",
-  snacks: "Lanches",
+  breakfast: "Breakfast",
+  lunch: "Lunch",
+  dinner: "Dinner",
+  snacks: "Snacks",
 };
 
 export function mealLabel(meal: MealType): string {
@@ -15,7 +15,7 @@ export function mealLabel(meal: MealType): string {
 export interface RemainingSummary {
   /** Always positive: how many kcal are left, or how many were exceeded. */
   amount: number;
-  label: "kcal restantes" | "kcal acima";
+  label: "kcal left" | "kcal over";
   over: boolean;
   /** 0..1, capped. */
   progress: number;
@@ -25,7 +25,7 @@ export function describeRemaining(goalCalories: number, consumed: number): Remai
   const diff = roundCalories(goalCalories - consumed);
   return {
     amount: Math.abs(diff),
-    label: diff < 0 ? "kcal acima" : "kcal restantes",
+    label: diff < 0 ? "kcal over" : "kcal left",
     over: diff < 0,
     progress: getProgressPercent(consumed, goalCalories),
   };
@@ -41,9 +41,9 @@ export interface MacroColumn {
 }
 
 const MACRO_LABELS = [
-  { key: "protein", label: "Proteína" },
-  { key: "carbs", label: "Hidratos" },
-  { key: "fat", label: "Gordura" },
+  { key: "protein", label: "Protein" },
+  { key: "carbs", label: "Carbs" },
+  { key: "fat", label: "Fat" },
 ] as const;
 
 export function macroColumns(goals: MacroGoals, totals: MacroTotals): MacroColumn[] {

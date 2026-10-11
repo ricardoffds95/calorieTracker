@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 
 export function HistoryScreen({ userId }: { userId: string }) {
   // "Current week" depends on the browser's clock, so nothing date-based renders on the server.
-  if (!useMounted()) return <Skeleton className="h-96 w-full" aria-label="A carregar" />;
+  if (!useMounted()) return <Skeleton className="h-96 w-full" aria-label="Loading" />;
   return <HistoryPeriod userId={userId} />;
 }
 
@@ -37,14 +37,14 @@ function HistoryPeriod({ userId }: { userId: string }) {
       {history.isError && !history.data && (
         <div className="flex items-center justify-between gap-3">
           <p role="alert" className="text-sm text-destructive">
-            Não foi possível carregar o histórico.
+            Couldn’t load history
           </p>
           <Button type="button" variant="outline" className="h-11 shrink-0" onClick={() => void history.refetch()}>
-            Tentar novamente
+            Try again
           </Button>
         </div>
       )}
-      {history.isPending && <Skeleton className="h-96 w-full" aria-label="A carregar histórico" />}
+      {history.isPending && <Skeleton className="h-96 w-full" aria-label="Loading history" />}
 
       {history.data && (
         // While the next period loads the previous one stays on screen, dimmed: no skeleton, no layout jump.

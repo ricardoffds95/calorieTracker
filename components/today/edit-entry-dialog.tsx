@@ -80,26 +80,26 @@ export function EditEntryDialog({ entry, onClose, onSave }: EditEntryDialogProps
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Editar {isFood ? "alimento" : "refeição"}</DialogTitle>
+          <DialogTitle>Edit {isFood ? "food" : "meal"}</DialogTitle>
           <DialogDescription>
-            {isFood ? "Ao mudar a quantidade, os valores nutricionais ajustam-se." : "Os totais da refeição."}
+            {isFood ? "Values follow the amount" : "Meal totals"}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
-          {field("name", "Nome", name, setName, "name", false)}
-          {isFood && field("quantity", "Quantidade (g)", quantity, onQuantityChange, "quantity_g")}
-          {field("calories", "Calorias (kcal)", calories, setCalories, "calories")}
+          {field("name", "Name", name, setName, "name", false)}
+          {isFood && field("quantity", "Amount (g)", quantity, onQuantityChange, "quantity_g")}
+          {field("calories", "Calories (kcal)", calories, setCalories, "calories")}
           <div className="grid grid-cols-3 gap-3">
-            {field("protein", "Proteína (g)", protein, setProtein, "protein_g")}
-            {field("carbs", "Hidratos (g)", carbs, setCarbs, "carbs_g")}
-            {field("fat", "Gordura (g)", fat, setFat, "fat_g")}
+            {field("protein", "Protein (g)", protein, setProtein, "protein_g")}
+            {field("carbs", "Carbs (g)", carbs, setCarbs, "carbs_g")}
+            {field("fat", "Fat (g)", fat, setFat, "fat_g")}
           </div>
           <DialogFooter className="gap-2">
             <Button type="button" variant="outline" size="lg" onClick={onClose}>
-              Cancelar
+              Cancel
             </Button>
             <Button type="submit" size="lg" disabled={!parsed.success}>
-              Guardar
+              Save
             </Button>
           </DialogFooter>
         </form>

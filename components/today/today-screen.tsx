@@ -24,7 +24,7 @@ const useMounted = () => useSyncExternalStore(subscribeNothing, () => true, () =
 
 export function TodayScreen({ userId }: { userId: string }) {
   const mounted = useMounted();
-  if (!mounted) return <Skeleton className="h-96 w-full" aria-label="A carregar" />;
+  if (!mounted) return <Skeleton className="h-96 w-full" aria-label="Loading" />;
   return <TodayDay userId={userId} />;
 }
 
@@ -63,22 +63,22 @@ function TodayDay({ userId }: { userId: string }) {
           <MacroColumns goals={goals} totals={totals} />
         </>
       ) : (
-        <Skeleton className="h-52 w-full" aria-label="A carregar metas" />
+        <Skeleton className="h-52 w-full" aria-label="Loading goals" />
       )}
 
       {/* Without a meal in mind the food goes to the snacks; the meals' own + buttons pick theirs. */}
-      <Link href={`/registar?meal=snacks&d=${dateKey}`} className={cn(buttonVariants({ size: "lg" }), "h-11")}>
+      <Link href={`/add?meal=snacks&d=${dateKey}`} className={cn(buttonVariants({ size: "lg" }), "h-11")}>
         <Plus aria-hidden />
-        Adicionar alimento
+        Add meal
       </Link>
 
       {diary.isError && !diary.data && (
         <p role="alert" className="text-sm text-destructive">
-          Não foi possível carregar o diário.
+          Couldn’t load diary
         </p>
       )}
-      {diary.isPending && <Skeleton className="h-64 w-full" aria-label="A carregar diário" />}
-      {diary.data && entries.length === 0 && <p className="text-sm text-muted-foreground">Ainda sem registos neste dia.</p>}
+      {diary.isPending && <Skeleton className="h-64 w-full" aria-label="Loading diary" />}
+      {diary.data && entries.length === 0 && <p className="text-sm text-muted-foreground">Nothing logged</p>}
 
       {diary.data && (
         <div className="flex flex-col gap-2">

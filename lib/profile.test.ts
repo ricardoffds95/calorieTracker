@@ -54,7 +54,7 @@ describe("profileFormSchema", () => {
   it("requires the percentages to sum to exactly 100", () => {
     const result = profileFormSchema.safeParse({ ...valid, fatPct: 35 });
     expect(result.success).toBe(false);
-    expect(result.error?.issues[0]?.message).toBe("A soma tem de ser 100%.");
+    expect(result.error?.issues[0]?.message).toBe("Must total 100%");
     expect(profileFormSchema.safeParse({ ...valid, proteinPct: 29 }).success).toBe(false);
   });
   it("rejects negative, >100 and fractional percentages", () => {

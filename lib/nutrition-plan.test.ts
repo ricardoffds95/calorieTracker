@@ -51,7 +51,7 @@ describe("the day-to-day activity", () => {
     expect(builder.calories).toBeGreaterThan(desk.calories + 400);
   });
   it("is required", () => {
-    expect(planAnswersSchema.safeParse({ ...man, daily_activity: undefined }).error?.issues[0]?.message).toBe("Indica como é o teu dia a dia.");
+    expect(planAnswersSchema.safeParse({ ...man, daily_activity: undefined }).error?.issues[0]?.message).toBe("Pick daily activity");
     expect(planAnswersSchema.safeParse({ ...man, daily_activity: "extreme" }).success).toBe(false);
   });
 });
@@ -110,14 +110,14 @@ describe("planAnswersSchema", () => {
     expect(planAnswersSchema.safeParse({ ...man, body_fat_pct: 18.5 }).success).toBe(true);
   });
   it.each([
-    [{ age: 13 }, "A idade mínima é 14 anos."],
-    [{ height_cm: 99 }, "A altura mínima é 100 cm."],
-    [{ weight_kg: 301 }, "O peso máximo é 300 kg."],
-    [{ body_fat_pct: 2 }, "Mínimo 3 %."],
-    [{ aerobic_sessions: 15 }, "Máximo 14 treinos."],
-    [{ anaerobic_sessions: -1 }, "Mínimo 0 treinos."],
-    [{ intensity: undefined }, "Escolhe a intensidade."],
-    [{ notes: "x".repeat(2001) }, "As notas podem ter no máximo 2000 caracteres."],
+    [{ age: 13 }, "Min age 14"],
+    [{ height_cm: 99 }, "Min 100 cm"],
+    [{ weight_kg: 301 }, "Max 300 kg"],
+    [{ body_fat_pct: 2 }, "Min 3%"],
+    [{ aerobic_sessions: 15 }, "Max 14"],
+    [{ anaerobic_sessions: -1 }, "Min 0"],
+    [{ intensity: undefined }, "Pick an intensity"],
+    [{ notes: "x".repeat(2001) }, "Max 2000 characters"],
   ])("rejects %j", (patch, message) => {
     const result = planAnswersSchema.safeParse({ ...man, ...patch });
     expect(result.success).toBe(false);
@@ -125,7 +125,7 @@ describe("planAnswersSchema", () => {
   });
   it("rejects an unknown intensity and a missing sex, and trims the notes", () => {
     expect(planAnswersSchema.safeParse({ ...man, intensity: "extreme" }).success).toBe(false);
-    expect(planAnswersSchema.safeParse({ ...man, sex: undefined }).error?.issues[0]?.message).toBe("Indica o sexo.");
+    expect(planAnswersSchema.safeParse({ ...man, sex: undefined }).error?.issues[0]?.message).toBe("Sex required");
     expect(planAnswersSchema.parse({ ...man, notes: "  musculação 4x  " }).notes).toBe("musculação 4x");
   });
 });

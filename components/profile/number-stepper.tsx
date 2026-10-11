@@ -26,7 +26,7 @@ export function NumberStepper({ label, value, onChange, step, min, max, unit, fa
 
   return (
     <div className={cn("flex items-center gap-2", className)}>
-      <Button type="button" variant="outline" size="icon" className="size-11 shrink-0" aria-label={`Diminuir ${label}`} onClick={() => apply(-step)}>
+      <Button type="button" variant="outline" size="icon" className="size-11 shrink-0" aria-label={`Decrease ${label}`} onClick={() => apply(-step)}>
         <Minus aria-hidden />
       </Button>
       <Input
@@ -38,7 +38,7 @@ export function NumberStepper({ label, value, onChange, step, min, max, unit, fa
         className="h-11 min-w-0 text-center text-base tabular-nums"
       />
       <span className="w-9 shrink-0 text-sm text-muted-foreground">{unit}</span>
-      <Button type="button" variant="outline" size="icon" className="size-11 shrink-0" aria-label={`Aumentar ${label}`} onClick={() => apply(step)}>
+      <Button type="button" variant="outline" size="icon" className="size-11 shrink-0" aria-label={`Increase ${label}`} onClick={() => apply(step)}>
         <Plus aria-hidden />
       </Button>
     </div>

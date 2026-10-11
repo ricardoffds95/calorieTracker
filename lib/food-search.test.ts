@@ -113,9 +113,9 @@ describe("searchOpenFoodFacts (through our server)", () => {
   });
 
   it.each([
-    [503, "unavailable", /Open Food Facts não respondeu/],
-    [401, "unauthorized", /Sessão expirada/],
-    [500, "http", /Erro ao pesquisar/],
+    [503, "unavailable", /Open Food Facts not responding/],
+    [401, "unauthorized", /Session expired/],
+    [500, "http", /Search failed/],
   ] as const)("maps HTTP %i to the '%s' error with its own message", async (status, kind, message) => {
     const error = await searchOpenFoodFacts("aveia", { fetch: async () => jsonResponse({}, status) }).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(FoodSearchError);
@@ -123,10 +123,10 @@ describe("searchOpenFoodFacts (through our server)", () => {
     expect((error as Error).message).toMatch(message);
   });
 
-  it("only says 'Sem ligação' when the request itself fails", async () => {
+  it("only says 'No connection' when the request itself fails", async () => {
     const offline = vi.fn().mockRejectedValue(new TypeError("fetch failed"));
     const error = await searchOpenFoodFacts("aveia", { fetch: offline }).catch((e: unknown) => e);
-    expect(error).toMatchObject({ kind: "network", message: expect.stringMatching(/^Sem ligação/) });
+    expect(error).toMatchObject({ kind: "network", message: expect.stringMatching(/^No connection/) });
   });
 
   it("rejects a malformed answer instead of showing garbage", async () => {
@@ -230,10 +230,10 @@ describe("filterSavedFoods / filterSavedMeals", () => {
   });
   it("filters meals by name", () => {
     const meals = [
-      { name: "Frango com arroz", times_used: 1 },
+      { name: "Chicken and rice", times_used: 1 },
       { name: "Bifana", times_used: 4 },
     ];
-    expect(filterSavedMeals(meals, "ARROZ").map((m) => m.name)).toEqual(["Frango com arroz"]);
+    expect(filterSavedMeals(meals, "RICE").map((m) => m.name)).toEqual(["Chicken and rice"]);
   });
 });
 

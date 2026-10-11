@@ -16,8 +16,8 @@ export async function login(page: Page, user: TestUser) {
   await page.waitForLoadState("networkidle");
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill(password);
-  await page.getByRole("button", { name: "Entrar" }).click();
-  await expect(page.getByRole("navigation", { name: "Navegação principal" })).toBeVisible();
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page.getByRole("navigation", { name: "Main navigation" })).toBeVisible();
 }
 
 /** Signs in and waits to be away from /login, wherever the app sends the user (e.g. the questionnaire has no tab bar). */
@@ -27,19 +27,19 @@ export async function signIn(page: Page, user: TestUser) {
   await page.waitForLoadState("networkidle");
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill(password);
-  await page.getByRole("button", { name: "Entrar" }).click();
+  await page.getByRole("button", { name: "Sign in" }).click();
   await page.waitForURL((url) => !url.pathname.startsWith("/login"));
 }
 
 export async function openProfile(page: Page) {
-  await page.getByRole("link", { name: "Perfil" }).click();
-  await expect(page).toHaveURL(/\/perfil/);
+  await page.getByRole("link", { name: "Profile" }).click();
+  await expect(page).toHaveURL(/\/profile/);
 }
 
 export async function logout(page: Page) {
-  // "Sair" is inside "Gerir perfil", which starts closed
-  if (!(await page.getByRole("button", { name: "Sair" }).isVisible())) await page.getByRole("button", { name: /Gerir perfil/ }).click();
-  await page.getByRole("button", { name: "Sair" }).click();
+  // "Sign out" is inside "Manage profile", which starts closed
+  if (!(await page.getByRole("button", { name: "Sign out" }).isVisible())) await page.getByRole("button", { name: /Manage profile/ }).click();
+  await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/login/);
 }
 

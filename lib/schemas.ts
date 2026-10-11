@@ -19,13 +19,13 @@ export const foodItemSchema = z.object({
   fat_g: nonNegative,
 });
 
-export const foodItemsSchema = z.array(foodItemSchema, { error: "Corrige os alimentos: cada um precisa de nome e de uma quantidade maior que 0." }).min(1, "Falta juntar pelo menos um alimento.").max(50, "Máximo de 50 alimentos.");
+export const foodItemsSchema = z.array(foodItemSchema, { error: "Each food needs a name and an amount above 0" }).min(1, "Add at least one food").max(50, "Max 50 foods");
 
 /** AI items always come with estimated grams (used to rescale when the user edits them). */
 export const aiItemSchema = foodItemSchema.extend({ quantity_g: grams });
 export const aiResultSchema = z.array(aiItemSchema).min(1).max(30);
 
-/** What the AI returns: one meal (e.g. "Frango com arroz") made of food lines. */
+/** What the AI returns: one meal (e.g. "Chicken and rice") made of food lines. */
 export const aiMealSchema = z.object({
   name: z.string().trim().min(1).max(200),
   /** "food": one product or ingredient; "meal": a dish or several foods. Older answers have none. */
@@ -40,15 +40,15 @@ export const AI_MAX_IMAGE_BASE64_LENGTH = 5_600_000;
 export const aiRequestSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("text"),
-    text: z.string().trim().min(1, "Escreve o que comeste.").max(AI_MAX_TEXT_LENGTH, "Texto demasiado longo."),
+    text: z.string().trim().min(1, "Describe what you ate").max(AI_MAX_TEXT_LENGTH, "Text too long"),
   }),
   z.object({
     type: z.literal("image"),
     image: z
       .string()
-      .min(1, "Imagem em falta.")
-      .max(AI_MAX_IMAGE_BASE64_LENGTH, "Imagem demasiado grande.")
-      .regex(/^[A-Za-z0-9+/]+={0,2}$/, "Imagem inválida."),
+      .min(1, "Image missing")
+      .max(AI_MAX_IMAGE_BASE64_LENGTH, "Image too large")
+      .regex(/^[A-Za-z0-9+/]+={0,2}$/, "Invalid image"),
     mimeType: z.enum(["image/jpeg", "image/png", "image/webp"]),
   }),
 ]);

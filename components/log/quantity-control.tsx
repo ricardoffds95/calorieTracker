@@ -34,18 +34,18 @@ export function QuantityControl({ grams, onChange, presets }: QuantityControlPro
         {formatNumberInput(grams)} <span className="text-lg font-normal text-muted-foreground">g</span>
       </p>
       <div className="flex items-center gap-2">
-        <Button type="button" variant="outline" size="icon" className="size-11 shrink-0" aria-label={`Menos ${GRAMS_STEP} g`} disabled={grams <= GRAMS_STEP} onClick={() => set(Math.ceil(grams / GRAMS_STEP) * GRAMS_STEP - GRAMS_STEP)}>
+        <Button type="button" variant="outline" size="icon" className="size-11 shrink-0" aria-label={`Minus ${GRAMS_STEP} g`} disabled={grams <= GRAMS_STEP} onClick={() => set(Math.ceil(grams / GRAMS_STEP) * GRAMS_STEP - GRAMS_STEP)}>
           <Minus aria-hidden />
         </Button>
         <Slider
-          aria-label="Quantidade em gramas"
+          aria-label="Amount in grams"
           min={GRAMS_STEP}
           max={SLIDER_MAX}
           step={GRAMS_STEP}
           value={[Math.min(SLIDER_MAX, Math.max(GRAMS_STEP, grams))]}
           onValueChange={([value]) => value !== undefined && set(value)}
         />
-        <Button type="button" variant="outline" size="icon" className="size-11 shrink-0" aria-label={`Mais ${GRAMS_STEP} g`} disabled={grams >= MAX_QUANTITY_G} onClick={() => set(Math.floor(grams / GRAMS_STEP) * GRAMS_STEP + GRAMS_STEP)}>
+        <Button type="button" variant="outline" size="icon" className="size-11 shrink-0" aria-label={`Plus ${GRAMS_STEP} g`} disabled={grams >= MAX_QUANTITY_G} onClick={() => set(Math.floor(grams / GRAMS_STEP) * GRAMS_STEP + GRAMS_STEP)}>
           <Plus aria-hidden />
         </Button>
       </div>
@@ -57,13 +57,13 @@ export function QuantityControl({ grams, onChange, presets }: QuantityControlPro
         ))}
         <Button type="button" variant="ghost" className="h-9" aria-expanded={typing !== null} onClick={() => setTyping(typing === null ? formatNumberInput(grams) : null)}>
           <Pencil aria-hidden />
-          Escrever gramas
+          Type grams
         </Button>
       </div>
       {typing !== null && (
         <div className="flex flex-col gap-1.5">
           <Input
-            aria-label="Gramas"
+            aria-label="Grams"
             inputMode="decimal"
             autoFocus // the user asked to type: this is the one place where the keyboard should open
             className="h-11 text-base tabular-nums"

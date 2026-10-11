@@ -13,10 +13,10 @@ export interface PortionTotals {
 }
 
 const FIELDS = [
-  ["calories", "Calorias (kcal)"],
-  ["protein_g", "Proteína (g)"],
-  ["carbs_g", "Hidratos (g)"],
-  ["fat_g", "Gordura (g)"],
+  ["calories", "Calories (kcal)"],
+  ["protein_g", "Protein (g)"],
+  ["carbs_g", "Carbs (g)"],
+  ["fat_g", "Fat (g)"],
 ] as const;
 
 export function totalsFromItem(item: FoodItem): PortionTotals {
@@ -49,7 +49,7 @@ export function portionItems(name: string, totals: PortionTotals): FoodItem[] | 
 
 export function PortionTotalsFields({ value, onChange }: { value: PortionTotals; onChange: (value: PortionTotals) => void }) {
   return (
-    <div className="grid grid-cols-2 gap-3" role="group" aria-label="Valores de 1 porção">
+    <div className="grid grid-cols-2 gap-3" role="group" aria-label="Per portion">
       {FIELDS.map(([key, label]) => (
         <div key={key} className="flex flex-col gap-1.5">
           <Label htmlFor={`portion-${key}`}>{label}</Label>

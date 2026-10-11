@@ -80,7 +80,7 @@ export function useUpdateEntry(userId: string, dateKey: string) {
       assertTouched(data);
     },
     apply: (entries, { id, update }) => entries.map((e) => (e.id === id ? { ...e, ...update, quantity_g: update.quantity_g ?? e.quantity_g } : e)),
-    onSuccess: () => toast.success("Entrada atualizada"),
+    onSuccess: () => toast.success("Entry updated"),
   });
 }
 

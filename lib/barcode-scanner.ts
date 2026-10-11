@@ -6,11 +6,11 @@ import { createScanConfirmer, normalizeScannedBarcode, PRODUCT_BARCODE_FORMATS }
 export type ScanErrorKind = "insecure_context" | "unsupported" | "permission_denied" | "no_camera" | "load_failed";
 
 export const SCAN_ERROR_MESSAGES: Record<ScanErrorKind, string> = {
-  insecure_context: "A câmara só funciona numa ligação segura (HTTPS).",
-  unsupported: "Este browser não permite usar a câmara.",
-  permission_denied: "Sem acesso à câmara. Autoriza a câmara nas definições do browser e tenta novamente.",
-  no_camera: "Não foi encontrada nenhuma câmara.",
-  load_failed: "Não foi possível carregar o leitor. Verifica a ligação e tenta novamente.",
+  insecure_context: "Camera needs HTTPS",
+  unsupported: "Camera not supported",
+  permission_denied: "Camera access denied",
+  no_camera: "No camera found",
+  load_failed: "Couldn't load scanner",
 };
 
 export class ScanError extends Error {

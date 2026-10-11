@@ -3,13 +3,13 @@ import { describeRemaining, macroColumns, mealLabel } from "./today";
 
 describe("describeRemaining", () => {
   it("shows what is left", () => {
-    expect(describeRemaining(2000, 919)).toEqual({ amount: 1081, label: "kcal restantes", over: false, progress: 0.4595 });
+    expect(describeRemaining(2000, 919)).toEqual({ amount: 1081, label: "kcal left", over: false, progress: 0.4595 });
   });
   it("shows how much the goal was exceeded", () => {
-    expect(describeRemaining(2000, 2300)).toEqual({ amount: 300, label: "kcal acima", over: true, progress: 1 });
+    expect(describeRemaining(2000, 2300)).toEqual({ amount: 300, label: "kcal over", over: true, progress: 1 });
   });
   it("is exactly on target at 0 remaining (not over)", () => {
-    expect(describeRemaining(2000, 2000)).toMatchObject({ amount: 0, label: "kcal restantes", over: false, progress: 1 });
+    expect(describeRemaining(2000, 2000)).toMatchObject({ amount: 0, label: "kcal left", over: false, progress: 1 });
   });
   it("handles an empty day and a zero goal", () => {
     expect(describeRemaining(2000, 0)).toMatchObject({ amount: 2000, over: false, progress: 0 });
@@ -26,9 +26,9 @@ describe("macroColumns", () => {
   it("returns the three macros with progress against the goals", () => {
     const cols = macroColumns(goals, { calories: 919, protein: 75, carbs: 125, fat: 13.4 });
     expect(cols.map((c) => c.key)).toEqual(["protein", "carbs", "fat"]);
-    expect(cols[0]).toMatchObject({ label: "Proteína", consumed: 75, goal: 150, progress: 0.5, over: false });
-    expect(cols[1]).toMatchObject({ label: "Hidratos", consumed: 125, goal: 200, progress: 0.625, over: false });
-    expect(cols[2]).toMatchObject({ label: "Gordura", consumed: 13.4, goal: 67, over: false });
+    expect(cols[0]).toMatchObject({ label: "Protein", consumed: 75, goal: 150, progress: 0.5, over: false });
+    expect(cols[1]).toMatchObject({ label: "Carbs", consumed: 125, goal: 200, progress: 0.625, over: false });
+    expect(cols[2]).toMatchObject({ label: "Fat", consumed: 13.4, goal: 67, over: false });
   });
   it("flags a macro as over only beyond 105% and caps progress at 1", () => {
     const cols = macroColumns(goals, { calories: 0, protein: 157, carbs: 211, fat: 0 });
@@ -40,10 +40,10 @@ describe("macroColumns", () => {
 describe("mealLabel", () => {
   it("has Portuguese names", () => {
     expect([mealLabel("breakfast"), mealLabel("lunch"), mealLabel("dinner"), mealLabel("snacks")]).toEqual([
-      "Pequeno-almoço",
-      "Almoço",
-      "Jantar",
-      "Lanches",
+      "Breakfast",
+      "Lunch",
+      "Dinner",
+      "Snacks",
     ]);
   });
 });

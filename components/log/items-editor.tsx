@@ -63,11 +63,11 @@ export function ItemsEditor({ rows, onChange, allowEmpty = false }: ItemsEditorP
         return (
           <li key={row.key} className="flex flex-col gap-1.5 border-b border-border pb-3">
             <div className="flex items-center gap-2">
-              <Input aria-label="Nome do item" className="h-11 flex-1" value={row.name} onChange={(e) => update(row.key, { name: e.target.value })} />
+              <Input aria-label="Item name" className="h-11 flex-1" value={row.name} onChange={(e) => update(row.key, { name: e.target.value })} />
               {row.quantity !== null && (
                 <>
                   <Input
-                    aria-label={`Quantidade de ${row.name} (g)`}
+                    aria-label={`Amount of ${row.name} (g)`}
                     inputMode="decimal"
                     className="h-11 w-20 text-right tabular-nums"
                     value={row.quantity}
@@ -82,7 +82,7 @@ export function ItemsEditor({ rows, onChange, allowEmpty = false }: ItemsEditorP
                 variant="ghost"
                 size="icon"
                 className="size-11 text-muted-foreground"
-                aria-label={`Remover ${row.name}`}
+                aria-label={`Remove ${row.name}`}
                 disabled={!allowEmpty && rows.length <= 1}
                 onClick={() => onChange(rows.filter((r) => r.key !== row.key))}
               >
@@ -90,7 +90,7 @@ export function ItemsEditor({ rows, onChange, allowEmpty = false }: ItemsEditorP
               </Button>
             </div>
             <p className="text-xs text-muted-foreground tabular-nums">
-              {item ? `${item.calories} kcal · P ${item.protein_g} · H ${item.carbs_g} · G ${item.fat_g}` : "Indica um nome e uma quantidade maior que 0."}
+              {item ? `${item.calories} kcal · P ${item.protein_g} · C ${item.carbs_g} · F ${item.fat_g}` : "Needs a name and an amount"}
             </p>
           </li>
         );

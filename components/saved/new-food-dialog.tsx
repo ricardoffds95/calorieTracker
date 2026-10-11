@@ -15,18 +15,18 @@ import { parseDecimalInput } from "@/lib/numbers";
 import { DUPLICATE_NAME, useCreateSavedFood } from "@/lib/queries/saved";
 
 const FIELDS = [
-  ["calories_100g", "Calorias (kcal)"],
-  ["protein_100g", "Proteína (g)"],
-  ["carbs_100g", "Hidratos (g)"],
-  ["fat_100g", "Gordura (g)"],
+  ["calories_100g", "Calories (kcal)"],
+  ["protein_100g", "Protein (g)"],
+  ["carbs_100g", "Carbs (g)"],
+  ["fat_100g", "Fat (g)"],
 ] as const;
 type Field = (typeof FIELDS)[number][0];
 
-const NO_GRAMS = "A IA não indicou gramas para todos os itens. Descreve o alimento com a quantidade, ex: 100 g de pão.";
+const NO_GRAMS = "No grams given. Add an amount";
 
 /**
  * A food typed by hand, values per 100 g (labels on packaging use the same unit).
- * The search, the scanner and the AI only fill the form: nothing is saved until "Guardar".
+ * The search, the scanner and the AI only fill the form: nothing is saved until "Save".
  */
 export function NewFoodDialog({ userId, foods, onClose }: { userId: string; foods: readonly SavedFood[]; onClose: () => void }) {
   const [name, setName] = useState("");
@@ -50,7 +50,7 @@ export function NewFoodDialog({ userId, foods, onClose }: { userId: string; food
     carbs_100g: num(values.carbs_100g),
     fat_100g: num(values.fat_100g),
   });
-  const message = parsed.success ? null : (parsed.error.issues[0]?.message ?? "Valores inválidos.");
+  const message = parsed.success ? null : (parsed.error.issues[0]?.message ?? "Invalid values");
 
   function fill(next: { name: string; brand?: string; calories_100g: number; protein_100g: number; carbs_100g: number; fat_100g: number }) {
     setName(next.name);
@@ -61,7 +61,7 @@ export function NewFoodDialog({ userId, foods, onClose }: { userId: string; food
       carbs_100g: String(next.carbs_100g),
       fat_100g: String(next.fat_100g),
     });
-    setFillNote(`Preenchido com «${next.name}»: confirma os valores e guarda.`);
+    setFillNote(`Filled from ${next.name}`);
     contentRef.current?.scrollTo({ top: 0 });
     setDuplicate(false);
     setPanel(null);
@@ -90,8 +90,8 @@ export function NewFoodDialog({ userId, foods, onClose }: { userId: string; food
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent ref={contentRef} className="max-h-[90dvh] max-w-sm overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Novo alimento</DialogTitle>
-          <DialogDescription>Preenche à mão (valores por 100 g, como no rótulo) ou procura acima.</DialogDescription>
+          <DialogTitle>New food</DialogTitle>
+          <DialogDescription>Per 100 g</DialogDescription>
         </DialogHeader>
         <FoodSearch key={searchKey} saved={foods} onPick={(food: FoodSearchResult) => fill(food)} onScan={() => setPanel("scan")} onAi={() => setPanel("ai")} onSearchingChange={setSearching} />
         {fillNote && !searching && (
@@ -101,11 +101,11 @@ export function NewFoodDialog({ userId, foods, onClose }: { userId: string; food
         )}
         <form onSubmit={onSubmit} noValidate hidden={searching} className="flex flex-col gap-3">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="new-food-name">Nome</Label>
+            <Label htmlFor="new-food-name">Name</Label>
             <Input id="new-food-name" className="h-11" value={name} onChange={(e) => setName(e.target.value)} />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="new-food-brand">Marca (opcional)</Label>
+            <Label htmlFor="new-food-brand">Brand (optional)</Label>
             <Input id="new-food-brand" className="h-11" value={brand} onChange={(e) => setBrand(e.target.value)} />
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -129,21 +129,21 @@ export function NewFoodDialog({ userId, foods, onClose }: { userId: string; food
           )}
           {duplicate && (
             <p role="alert" className="text-sm text-destructive">
-              Já tens um alimento guardado com este nome.
+              Food name already saved
             </p>
           )}
           <DialogFooter className="gap-2">
             <Button type="button" variant="outline" size="lg" onClick={onClose}>
-              Cancelar
+              Cancel
             </Button>
             <Button type="submit" size="lg" disabled={create.isPending}>
-              {create.isPending ? "A guardar…" : "Guardar"}
+              {create.isPending ? "Saving…" : "Save"}
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
       <BarcodeScannerDialog open={panel === "scan"} onOpenChange={(open) => !open && setPanel((p) => (p === "scan" ? null : p))} onFound={fill} />
-      {panel === "ai" && <AiPanel userId={userId} onClose={() => setPanel(null)} onUse={fillFromAi} useLabels={{ food: "Usar estes valores", meal: "Usar na mesma" }} mealNote="Isto é uma refeição com vários alimentos: os valores seriam por 100 g do conjunto. Para uma refeição usa «Nova refeição»; ou descreve só um alimento." />}
+      {panel === "ai" && <AiPanel userId={userId} onClose={() => setPanel(null)} onUse={fillFromAi} useLabels={{ food: "Use these values", meal: "Use anyway" }} mealNote="This is a meal, not one food" />}
     </Dialog>
   );
 }

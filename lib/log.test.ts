@@ -32,8 +32,8 @@ describe("mealFromParam / describeTarget / isValidTarget", () => {
     expect(mealFromParam("breakfast")).toBe("breakfast");
   });
   it("says where an entry went", () => {
-    expect(describeTarget({ entry_date: "2026-10-10", meal: "snacks" }, at(15))).toBe("lanches (hoje, 10 out)");
-    expect(describeTarget({ entry_date: "2026-10-09", meal: "dinner" }, at(15))).toBe("jantar (ontem, 9 out)");
+    expect(describeTarget({ entry_date: "2026-10-10", meal: "snacks" }, at(15))).toBe("snacks (today, 10 oct)");
+    expect(describeTarget({ entry_date: "2026-10-09", meal: "dinner" }, at(15))).toBe("dinner (yesterday, 9 oct)");
   });
   it("only accepts a real calendar day", () => {
     expect(isValidTarget({ entry_date: "2026-10-10", meal: "lunch" })).toBe(true);
@@ -63,7 +63,7 @@ describe("foodEntryRow", () => {
 });
 
 describe("mealEntryRow", () => {
-  const meal = { id: "sm1", name: "Almoço", items };
+  const meal = { id: "sm1", name: "Lunch", items };
   it("keeps items as saved for 1 dose and stores the doses", () => {
     expect(mealEntryRow(target, meal, 1)).toMatchObject({
       kind: "meal",
@@ -135,7 +135,7 @@ describe("savedFoodSchema", () => {
 
 describe("savedMealRow / propagationFromDate", () => {
   it("derives the totals from the items", () => {
-    expect(savedMealRow(" Almoço ", items)).toMatchObject({ name: "Almoço", total_calories: 411, total_protein: 49.9 });
+    expect(savedMealRow(" Lunch ", items)).toMatchObject({ name: "Lunch", total_calories: 411, total_protein: 49.9 });
   });
   it("maps the propagation choice to the RPC date", () => {
     expect(propagationFromDate("from_today", "2026-10-10")).toBe("2026-10-10");

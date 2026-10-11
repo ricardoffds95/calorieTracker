@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 const TONES = { protein: "bg-protein", carbs: "bg-carbs", fat: "bg-fat" } as const;
 const TEXT = { protein: "text-protein", carbs: "text-carbs", fat: "text-fat" } as const;
 
-export function MacroColumns({ goals, totals, label = "Macros do dia" }: { goals: MacroGoals; totals: MacroTotals; label?: string }) {
+export function MacroColumns({ goals, totals, label = "Macros" }: { goals: MacroGoals; totals: MacroTotals; label?: string }) {
   return (
     <section aria-label={label} className="grid grid-cols-3 gap-4">
       {macroColumns(goals, totals).map((col) => (

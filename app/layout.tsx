@@ -8,9 +8,9 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "CalorieTracker",
-  description: "Contagem de calorias e macros",
+  description: "Calorie and macro tracking",
   // Name under the home screen shortcut. Not `capable`: the shortcut opens in Safari, not standalone.
-  appleWebApp: { title: "Calorias", capable: false },
+  appleWebApp: { title: "Calories", capable: false },
 };
 
 export const viewport: Viewport = {
@@ -29,7 +29,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   const userId = data?.claims?.sub ?? null;
 
   return (
-    <html lang="pt" className={GeistSans.variable}>
+    <html lang="en" className={GeistSans.variable}>
       <body>
         {/* key resets the cache provider when the user changes */}
         <QueryProvider key={userId ?? "anon"} userId={userId}>

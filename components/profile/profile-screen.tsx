@@ -18,25 +18,25 @@ export function ProfileScreen({ userId, email }: { userId: string; email: string
     <UnsavedGuard>
     <div className="flex flex-col gap-6">
       {data && <ManageProfile profile={data} email={email} />}
-      {isPending && <Skeleton className="h-96 w-full" aria-label="A carregar" />}
+      {isPending && <Skeleton className="h-96 w-full" aria-label="Loading" />}
       {isError && !data && (
         <p role="alert" className="text-sm text-destructive">
-          Não foi possível carregar o perfil.
+          Couldn’t load profile
         </p>
       )}
       {data && <ProfileForm profile={data} />}
       {data && (
         <Card data-testid="plan-card">
           <CardHeader>
-            <CardTitle className="text-base">Plano nutricional</CardTitle>
+            <CardTitle className="text-base">Nutrition plan</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
             <p className="text-sm text-muted-foreground">
-              {data.plan_summary ?? "Calcula as tuas metas com a IA."}
+              {data.plan_summary ?? "Set your goals with AI"}
             </p>
-            <Link href="/onboarding?de=perfil" className={cn(buttonVariants({ variant: "outline", size: "lg" }), "h-11")}>
+            <Link href="/onboarding?from=profile" className={cn(buttonVariants({ variant: "outline", size: "lg" }), "h-11")}>
               <Sparkles aria-hidden />
-              {data.onboarding_done_at && data.sex ? "Refazer o meu plano" : "Calcular o meu plano"}
+              {data.onboarding_done_at && data.sex ? "Redo my plan" : "Calculate my plan"}
             </Link>
           </CardContent>
         </Card>

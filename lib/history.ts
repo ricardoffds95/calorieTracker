@@ -10,7 +10,7 @@ import {
   startOfWeek,
   startOfYear,
 } from "date-fns";
-import { pt } from "date-fns/locale";
+import { enGB } from "date-fns/locale";
 import { addDays, parseDateKey, toDateKey } from "./dates";
 import type { MacroTotals } from "./macros";
 import { roundCalories, roundMacro } from "./nutrition";
@@ -66,9 +66,9 @@ export function periodFor(kind: Exclude<PeriodKind, "custom">, anchor: string): 
 
 /** Message for an invalid custom range, or null when it is fine. */
 export function validateRange(from: string, to: string): string | null {
-  if (!parseDateKey(from) || !parseDateKey(to)) return "Indica as duas datas.";
-  if (to < from) return "A data final tem de ser depois da inicial.";
-  if (spanDays(from, to) > MAX_RANGE_DAYS) return "Máximo 10 anos.";
+  if (!parseDateKey(from) || !parseDateKey(to)) return "Both dates required";
+  if (to < from) return "End date must be after the start";
+  if (spanDays(from, to) > MAX_RANGE_DAYS) return "Max 10 years";
   return null;
 }
 
@@ -114,15 +114,15 @@ export function parsePeriodParams(params: ParamsLike, now: Date): Period {
   return fallback;
 }
 
-/** `/historico` for the current week, otherwise a URL that restores exactly this period. */
+/** `/history` for the current week, otherwise a URL that restores exactly this period. */
 export function periodHref(period: Period, now: Date): string {
-  if (period.kind === "week" && period.from === periodFor("week", toDateKey(now)).from) return "/historico";
-  if (period.kind === "custom") return `/historico?p=custom&from=${period.from}&to=${period.to}`;
-  return `/historico?p=${period.kind}&d=${period.from}`;
+  if (period.kind === "week" && period.from === periodFor("week", toDateKey(now)).from) return "/history";
+  if (period.kind === "custom") return `/history?p=custom&from=${period.from}&to=${period.to}`;
+  return `/history?p=${period.kind}&d=${period.from}`;
 }
 
-const day = (key: string) => format(dateOf(key), "d MMM", { locale: pt });
-const withYear = (key: string) => format(dateOf(key), "d MMM yyyy", { locale: pt });
+const day = (key: string) => format(dateOf(key), "d MMM", { locale: enGB });
+const withYear = (key: string) => format(dateOf(key), "d MMM yyyy", { locale: enGB });
 
 /** "5–11 out", "28 set – 4 out", "outubro 2026", "2026", "3 set – 20 out 2025" (weeks and ranges only show the year when it is not the current one). */
 export function periodLabel(period: Period, now: Date): string {
@@ -130,7 +130,7 @@ export function periodLabel(period: Period, now: Date): string {
   const from = dateOf(period.from);
   const to = dateOf(period.to);
   if (period.kind === "year") return String(from.getFullYear());
-  if (period.kind === "month") return format(from, "MMMM yyyy", { locale: pt });
+  if (period.kind === "month") return format(from, "MMMM yyyy", { locale: enGB });
   const suffix = to.getFullYear() === thisYear && from.getFullYear() === thisYear ? "" : ` ${to.getFullYear()}`;
   if (from.getFullYear() !== to.getFullYear()) return `${withYear(period.from)} – ${withYear(period.to)}`;
   if (period.from === period.to) return `${day(period.from)}${suffix}`;
@@ -142,10 +142,10 @@ export type Metric = "calories" | "protein" | "carbs" | "fat";
 
 /** The four things the History shows, in order, with their unit. */
 export const METRICS: readonly { key: Metric; label: string; unit: string }[] = [
-  { key: "calories", label: "Calorias", unit: "kcal" },
-  { key: "protein", label: "Proteína", unit: "g" },
-  { key: "carbs", label: "Hidratos", unit: "g" },
-  { key: "fat", label: "Gordura", unit: "g" },
+  { key: "calories", label: "Calories", unit: "kcal" },
+  { key: "protein", label: "Protein", unit: "g" },
+  { key: "carbs", label: "Carbs", unit: "g" },
+  { key: "fat", label: "Fat", unit: "g" },
 ];
 
 const DAY_FIELD: Record<Metric, "calories" | "protein_g" | "carbs_g" | "fat_g"> = {
@@ -312,13 +312,13 @@ export function bucketize(days: readonly DayTotals[], period: Period, todayKey?:
 
 /** "ter, 6 out" */
 export function dayLabel(key: string): string {
-  return format(dateOf(key), "EEE, d MMM", { locale: pt });
+  return format(dateOf(key), "EEE, d MMM", { locale: enGB });
 }
 
 /** Short name of a bucket for lists: "ter, 6 out", "5–11 out", "outubro". */
 export function bucketLabel(bucket: Bucket): string {
   if (bucket.granularity === "day") return dayLabel(bucket.from);
-  if (bucket.granularity === "month") return format(dateOf(bucket.from), "MMMM", { locale: pt });
+  if (bucket.granularity === "month") return format(dateOf(bucket.from), "MMMM", { locale: enGB });
   const from = dateOf(bucket.from);
   const to = dateOf(bucket.to);
   return from.getMonth() === to.getMonth() ? `${from.getDate()}–${day(bucket.to)}` : `${day(bucket.from)} – ${day(bucket.to)}`;
@@ -329,15 +329,15 @@ export function axisLabel(bucket: Bucket, index: number, total: number, kind: Pe
   const date = dateOf(bucket.from);
   if (bucket.granularity === "day") {
     // weekday initials for a week (or a short range); the first days of a month still get day numbers
-    if (total <= 7 && kind !== "month") return format(date, "EEEEE", { locale: pt }).toUpperCase();
+    if (total <= 7 && kind !== "month") return format(date, "EEEEE", { locale: enGB }).toUpperCase();
     return index === 0 || date.getDate() % 5 === 0 ? String(date.getDate()) : "";
   }
-  if (bucket.granularity === "month") return format(date, "MMMMM", { locale: pt }).toUpperCase();
+  if (bucket.granularity === "month") return format(date, "MMMMM", { locale: enGB }).toUpperCase();
   const step = Math.ceil(total / 6);
-  return index % step === 0 ? format(date, "d MMM", { locale: pt }) : "";
+  return index % step === 0 ? format(date, "d MMM", { locale: enGB }) : "";
 }
 
-/** Where tapping a bucket leads: a day opens in "Hoje", a week/month drills into that period. */
+/** Where tapping a bucket leads: a day opens in "Today", a week/month drills into that period. */
 export function bucketHref(bucket: Bucket, now: Date): string {
   if (bucket.granularity === "day") return bucket.from === toDateKey(now) ? "/" : `/?d=${bucket.from}`;
   return periodHref(periodFor(bucket.granularity, bucket.from), now);

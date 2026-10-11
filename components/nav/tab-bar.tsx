@@ -7,10 +7,10 @@ import { useKeyboardOpen } from "@/lib/use-keyboard-open";
 import { cn } from "@/lib/utils";
 
 const TABS: { href: string; label: string; icon: LucideIcon }[] = [
-  { href: "/", label: "Hoje", icon: House },
-  { href: "/guardados", label: "Guardados", icon: Bookmark },
-  { href: "/historico", label: "Histórico", icon: ChartColumn },
-  { href: "/perfil", label: "Perfil", icon: User },
+  { href: "/", label: "Today", icon: House },
+  { href: "/saved", label: "Saved", icon: Bookmark },
+  { href: "/history", label: "History", icon: ChartColumn },
+  { href: "/profile", label: "Profile", icon: User },
 ];
 
 function isActive(pathname: string, href: string) {
@@ -23,7 +23,7 @@ export function TabBar() {
 
   return (
     <nav
-      aria-label="Navegação principal"
+      aria-label="Main navigation"
       // Hidden (not removed) while the keyboard is open: on iOS it would float in the middle of the screen.
       className={cn(
         "fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/90 pb-[env(safe-area-inset-bottom)] backdrop-blur",

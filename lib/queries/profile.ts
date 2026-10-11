@@ -25,7 +25,7 @@ export function useProfile(userId: string) {
  * Write-through: always updates the DB. The cache is updated optimistically and rolled back on failure,
  * so nothing is ever shown as saved that the DB does not have.
  */
-export function useUpdateProfile(userId: string, message = "Objetivos guardados") {
+export function useUpdateProfile(userId: string, message = "Goals saved") {
   const queryClient = useQueryClient();
   const key = profileKey(userId);
 

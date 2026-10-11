@@ -37,7 +37,7 @@ export function AddMealSheet({ meal, initialTarget, pending, onClose, onAdd }: A
         </div>
         <SheetFooter>
           <Button type="button" size="lg" className="h-11" disabled={pending || !isValidTarget(target)} onClick={() => onAdd(meal, doses, target)}>
-            {pending ? "A adicionar…" : "Adicionar ao diário"}
+            {pending ? "Adding…" : "Add to diary"}
           </Button>
         </SheetFooter>
       </SheetContent>

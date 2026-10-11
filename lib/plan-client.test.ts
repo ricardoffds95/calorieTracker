@@ -26,7 +26,7 @@ describe("requestPlan", () => {
 
   it("maps the failures", async () => {
     expect(await requestPlan(answers, respond({}, 401))).toMatchObject({ ok: false, reason: "unauthorized" });
-    expect(await requestPlan(answers, respond({ message: "A idade mínima é 14 anos." }, 400))).toEqual({ ok: false, reason: "invalid", message: "A idade mínima é 14 anos." });
+    expect(await requestPlan(answers, respond({ message: "Min age 14" }, 400))).toEqual({ ok: false, reason: "invalid", message: "Min age 14" });
     expect(await requestPlan(answers, respond({}, 500))).toMatchObject({ ok: false, reason: "unavailable" });
     expect(await requestPlan(answers, respond({ plans: { cut: {} }, summary: "x" }, 200))).toMatchObject({ ok: false, reason: "unavailable" });
     expect(await requestPlan(answers, async () => Promise.reject(new TypeError("Failed to fetch")))).toMatchObject({ ok: false, reason: "network" });

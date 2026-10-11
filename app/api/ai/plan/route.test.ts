@@ -38,7 +38,7 @@ describe("POST /api/ai/plan", () => {
     expect((await post("{not json")).status).toBe(400);
     const response = await post({ ...answers, age: 5 });
     expect(response.status).toBe(400);
-    expect(await response.json()).toMatchObject({ error: "invalid_request", message: "A idade mínima é 14 anos." });
+    expect(await response.json()).toMatchObject({ error: "invalid_request", message: "Min age 14" });
     expect(generateNutritionPlan).not.toHaveBeenCalled();
   });
 

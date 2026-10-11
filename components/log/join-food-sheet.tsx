@@ -23,7 +23,7 @@ export function JoinFoodSheet({ food, onJoin, onClose }: { food: FoodSearchResul
           <SheetTitle>{food.name}</SheetTitle>
           <SheetDescription>
             {food.brand ? `${food.brand} · ` : ""}
-            {food.calories_100g} kcal por 100 g
+            {food.calories_100g} kcal per 100 g
           </SheetDescription>
         </SheetHeader>
         <div className="flex flex-col gap-5 px-4">
@@ -32,7 +32,7 @@ export function JoinFoodSheet({ food, onJoin, onClose }: { food: FoodSearchResul
         </div>
         <SheetFooter>
           <Button type="button" size="lg" className="h-11" disabled={!parsed.success} onClick={() => parsed.success && onJoin(parsed.data)}>
-            Juntar à refeição
+            Add to meal
           </Button>
         </SheetFooter>
       </SheetContent>

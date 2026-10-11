@@ -10,7 +10,7 @@ export default async function TodayPage() {
   if (!userId) return null; // the proxy redirects anonymous users to /login
 
   return (
-    <Suspense fallback={<Skeleton className="h-96 w-full" aria-label="A carregar" />}>
+    <Suspense fallback={<Skeleton className="h-96 w-full" aria-label="Loading" />}>
       <TodayScreen userId={userId} />
     </Suspense>
   );

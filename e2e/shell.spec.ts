@@ -2,15 +2,15 @@ import { expect, test } from "@playwright/test";
 import { login } from "./helpers";
 
 const TABS = [
-  { name: "Hoje", url: /\/$/, heading: /^Hoje/ },
-  { name: "Guardados", url: /\/guardados$/, heading: "Guardados" },
-  { name: "Histórico", url: /\/historico$/, heading: "Histórico" },
-  { name: "Perfil", url: /\/perfil$/, heading: "Perfil" },
+  { name: "Today", url: /\/$/, heading: /^Today/ },
+  { name: "Saved", url: /\/saved$/, heading: "Saved" },
+  { name: "History", url: /\/history$/, heading: "History" },
+  { name: "Profile", url: /\/profile$/, heading: "Profile" },
 ];
 
 test("login page has no tab bar", async ({ page }) => {
   await page.goto("/login");
-  await expect(page.getByRole("navigation", { name: "Navegação principal" })).toHaveCount(0);
+  await expect(page.getByRole("navigation", { name: "Main navigation" })).toHaveCount(0);
 });
 
 test("tabs navigate and mark the active one", async ({ page }) => {
@@ -26,17 +26,17 @@ test("tabs navigate and mark the active one", async ({ page }) => {
 
 test("there is no Registar tab: only 4 tabs", async ({ page }) => {
   await login(page, "A");
-  const nav = page.getByRole("navigation", { name: "Navegação principal" });
-  await expect(nav.getByRole("link")).toHaveText(["Hoje", "Guardados", "Histórico", "Perfil"]);
+  const nav = page.getByRole("navigation", { name: "Main navigation" });
+  await expect(nav.getByRole("link")).toHaveText(["Today", "Saved", "History", "Profile"]);
 });
 
 test("page content is not hidden behind the tab bar", async ({ page }) => {
   await login(page, "A");
-  await page.getByRole("link", { name: "Perfil" }).click();
-  await page.getByRole("button", { name: /Gerir perfil/ }).click(); // "Sair" is inside it
-  const button = page.getByRole("button", { name: "Sair" });
+  await page.getByRole("link", { name: "Profile" }).click();
+  await page.getByRole("button", { name: /Manage profile/ }).click(); // "Sign out" is inside it
+  const button = page.getByRole("button", { name: "Sign out" });
   await button.scrollIntoViewIfNeeded();
   const buttonBox = await button.boundingBox();
-  const navBox = await page.getByRole("navigation", { name: "Navegação principal" }).boundingBox();
+  const navBox = await page.getByRole("navigation", { name: "Main navigation" }).boundingBox();
   expect(buttonBox && navBox && buttonBox.y + buttonBox.height <= navBox.y).toBe(true);
 });

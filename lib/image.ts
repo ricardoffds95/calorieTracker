@@ -9,8 +9,8 @@ export const MAX_INPUT_IMAGE_BYTES = 30 * 1024 * 1024;
 export type ImageErrorKind = "unreadable" | "too_large";
 
 export const IMAGE_ERROR_MESSAGES: Record<ImageErrorKind, string> = {
-  unreadable: "Não foi possível abrir esta imagem. Experimenta outra foto.",
-  too_large: "A imagem é demasiado grande. Experimenta outra foto.",
+  unreadable: "Can't open this image",
+  too_large: "Image too large",
 };
 
 export class ImageError extends Error {

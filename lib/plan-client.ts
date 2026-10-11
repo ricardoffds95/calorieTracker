@@ -5,10 +5,10 @@ export type PlanClientResult =
   | { ok: false; reason: "invalid" | "unauthorized" | "network" | "unavailable"; message: string };
 
 const FALLBACK = {
-  invalid: "Não foi possível calcular com estes dados. Confirma-os e tenta novamente.",
-  unauthorized: "Sessão expirada. Entra novamente.",
-  network: "Sem ligação. Verifica a internet e tenta novamente.",
-  unavailable: "Não foi possível calcular agora. Tenta novamente daqui a pouco.",
+  invalid: "Check your details",
+  unauthorized: "Session expired",
+  network: "No connection",
+  unavailable: "Couldn't calculate. Try again",
 } as const;
 
 /** Browser helper for POST /api/ai/plan. Never throws: the UI shows `message`. */

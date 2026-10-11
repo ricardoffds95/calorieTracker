@@ -10,7 +10,7 @@ const ICONS: Record<GoalMode, LucideIcon> = { cut: TrendingDown, maintain: Minus
 export function GoalModePicker({ value, onChange }: { value: GoalMode | null; onChange: (mode: GoalMode) => void }) {
   return (
     <fieldset className="flex flex-col gap-2">
-      <legend className="mb-2 text-sm font-medium">Objetivo</legend>
+      <legend className="mb-2 text-sm font-medium">Goal</legend>
       <div className="grid grid-cols-3 gap-2">
         {GOAL_MODE_OPTIONS.map(({ mode, label, description }) => {
           const Icon = ICONS[mode];

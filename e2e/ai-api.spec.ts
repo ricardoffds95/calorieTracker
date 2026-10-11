@@ -24,11 +24,11 @@ test("with a session, invalid bodies are rejected with 400", async ({ page }) =>
 test.describe("AI call", () => {
   test.skip(hasGeminiKey, "Gemini is configured: covered by the live test below");
 
-  test("without Gemini configured the endpoint answers 503 'IA não disponível'", async ({ page }) => {
+  test("without Gemini configured the endpoint answers 503 'AI unavailable'", async ({ page }) => {
     await login(page, "A");
     const response = await page.request.post(ENDPOINT, { data: { type: "text", text: "200g de arroz" } });
     expect(response.status()).toBe(503);
-    expect(await response.json()).toEqual({ error: "ai_unavailable", message: "Modo IA não disponível de momento." });
+    expect(await response.json()).toEqual({ error: "ai_unavailable", message: "AI unavailable" });
   });
 });
 
@@ -61,7 +61,7 @@ test("the plan endpoint: 401 without a session, 400 for invalid answers", async 
   await login(page, "A");
   const invalid = await page.request.post(PLAN_ENDPOINT, { data: { ...ANSWERS, age: 5 } });
   expect(invalid.status()).toBe(400);
-  expect(await invalid.json()).toMatchObject({ error: "invalid_request", message: "A idade mínima é 14 anos." });
+  expect(await invalid.json()).toMatchObject({ error: "invalid_request", message: "Min age 14" });
 });
 
 test("the plan endpoint always answers with a usable plan, even without the AI", async ({ page }) => {

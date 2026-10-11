@@ -13,9 +13,9 @@ export interface MacroGramInputs {
 }
 
 const COLUMNS = [
-  { key: "protein", label: "Proteína", tone: "text-protein" },
-  { key: "carbs", label: "Hidratos", tone: "text-carbs" },
-  { key: "fat", label: "Gordura", tone: "text-fat" },
+  { key: "protein", label: "Protein", tone: "text-protein" },
+  { key: "carbs", label: "Carbs", tone: "text-carbs" },
+  { key: "fat", label: "Fat", tone: "text-fat" },
 ] as const;
 
 interface MacroGramsProps {
@@ -30,10 +30,10 @@ interface MacroGramsProps {
 /** The daily goals in grams, also editable: changing one updates the calories and the percentages above. */
 export function MacroGrams({ values, onChange, calories, errors }: MacroGramsProps) {
   return (
-    <section aria-label="Metas em gramas" data-testid="goals-preview" className="rounded-md bg-muted p-4">
-      <h3 className="mb-1 text-sm font-medium">Metas em gramas</h3>
+    <section aria-label="Goals in grams" data-testid="goals-preview" className="rounded-md bg-muted p-4">
+      <h3 className="mb-1 text-sm font-medium">Goals in grams</h3>
       <p className="mb-3 text-xs text-muted-foreground">
-        Também podes mudar os gramas: as calorias e as percentagens acompanham.{" "}
+        {" "}
         <span className="tabular-nums">Total: {Number.isFinite(calories) ? calories : "—"} kcal</span>
       </p>
       <div className="grid grid-cols-3 gap-3">
@@ -54,10 +54,10 @@ export function MacroGrams({ values, onChange, calories, errors }: MacroGramsPro
                 className={cn("h-11 min-w-0 text-center text-lg font-semibold tabular-nums", tone)}
               />
               <div className="flex gap-2">
-                <Button type="button" variant="outline" size="icon" className="size-10" aria-label={`Diminuir ${label} (g)`} onClick={() => apply(-GRAMS_STEP)}>
+                <Button type="button" variant="outline" size="icon" className="size-10" aria-label={`Decrease ${label} (g)`} onClick={() => apply(-GRAMS_STEP)}>
                   <Minus aria-hidden />
                 </Button>
-                <Button type="button" variant="outline" size="icon" className="size-10" aria-label={`Aumentar ${label} (g)`} onClick={() => apply(GRAMS_STEP)}>
+                <Button type="button" variant="outline" size="icon" className="size-10" aria-label={`Increase ${label} (g)`} onClick={() => apply(GRAMS_STEP)}>
                   <Plus aria-hidden />
                 </Button>
               </div>

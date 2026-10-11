@@ -16,10 +16,10 @@ import { parseProfileData, toProfileDataUpdate } from "@/lib/profile-data";
 import { useUpdateProfile, type Profile } from "@/lib/queries/profile";
 import { cn } from "@/lib/utils";
 
-/** "Gerir perfil": the account (e-mail, sign out) and the name and personal data of the questionnaire, edited by hand (all optional but the name). */
+/** "Manage profile": the account (e-mail, sign out) and the name and personal data of the questionnaire, edited by hand (all optional but the name). */
 export function ManageProfile({ profile, email }: { profile: Profile; email: string }) {
   const [open, setOpen] = useState(false);
-  const update = useUpdateProfile(profile.user_id, "Dados guardados");
+  const update = useUpdateProfile(profile.user_id, "Data saved");
   const [name, setName] = useState(profile.name);
   const [form, setForm] = useState<AnswersForm>(() => answersFromProfile(profile, { defaults: false }));
   const patch = (changes: Partial<AnswersForm>) => setForm((f) => ({ ...f, ...changes }));
@@ -55,7 +55,7 @@ export function ManageProfile({ profile, email }: { profile: Profile; email: str
       <CardHeader className="px-4">
         <button type="button" aria-expanded={open} aria-controls="manage-profile-content" onClick={() => setOpen((o) => !o)} className="flex min-h-11 items-center justify-between gap-3 text-left">
           <span className="flex min-w-0 flex-col">
-            <CardTitle className="text-sm">Gerir perfil</CardTitle>
+            <CardTitle className="text-sm">Manage profile</CardTitle>
             <span data-testid="profile-summary" className="truncate text-sm text-muted-foreground tabular-nums">
               {profile.name} · {goalLabel} · {profile.goal_calories} kcal
             </span>
@@ -66,14 +66,14 @@ export function ManageProfile({ profile, email }: { profile: Profile; email: str
       {open && (
         <CardContent id="manage-profile-content" className="flex flex-col gap-6 px-4">
           <div className="flex flex-col gap-0.5">
-            <p className="text-sm font-medium">Conta</p>
+            <p className="text-sm font-medium">Account</p>
             <p data-testid="user-email" className="text-sm text-muted-foreground">
               {email}
             </p>
           </div>
           <form id="manage-profile-form" onSubmit={onSubmit} noValidate className="flex flex-col gap-6">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="profile-name">Nome</Label>
+              <Label htmlFor="profile-name">Name</Label>
               <Input id="profile-name" value={name} onChange={(e) => setName(e.target.value)} className="h-11" maxLength={60} autoComplete="given-name" />
             </div>
             <AboutYou form={form} patch={patch} />
@@ -81,9 +81,9 @@ export function ManageProfile({ profile, email }: { profile: Profile; email: str
             <DailyLife form={form} patch={patch} />
             <Activity form={form} patch={patch} />
             {problems.length > 0 && <Hint>{problems.join(" ")}</Hint>}
-            {parsed.success && !dirty && <p className="text-center text-sm text-muted-foreground">Sem alterações.</p>}
+            {parsed.success && !dirty && <p className="text-center text-sm text-muted-foreground">No changes</p>}
             <Button type="submit" size="lg" className="h-11" disabled={!parsed.success || !dirty || update.isPending}>
-              {update.isPending ? "A guardar…" : "Guardar dados"}
+              {update.isPending ? "Saving…" : "Save data"}
             </Button>
           </form>
           <LogoutButton userId={profile.user_id} />

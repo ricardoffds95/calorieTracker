@@ -25,7 +25,7 @@ import {
 import type { SavedMeal } from "@/lib/queries/saved";
 import { cn } from "@/lib/utils";
 
-// Open Food Facts allows few searches per minute: ask once the user stopped typing, or on "Pesquisar".
+// Open Food Facts allows few searches per minute: ask once the user stopped typing, or on "Search".
 const SEARCH_DEBOUNCE_MS = 700;
 /** Scrolling this far with the field focused closes the keyboard (otherwise it covers the results). */
 const SCROLL_BLUR_PX = 24;
@@ -124,15 +124,15 @@ export function FoodSearch({ saved, onPick, onScan, onAi, meals = [], onPickMeal
   const offLoading = off.isFetching && !off.data;
 
   return (
-    <section aria-label="Pesquisar alimento" className="flex flex-col gap-3">
+    <section aria-label="Search food" className="flex flex-col gap-3">
       <form role="search" onSubmit={onSubmit} className="flex gap-2">
         <div className="relative flex-1">
           <Search aria-hidden className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             ref={inputRef}
             type="search"
-            aria-label="Pesquisar alimento"
-            placeholder={onPickMeal ? "Pesquisar alimento ou refeição" : "Pesquisar alimento"}
+            aria-label="Search food"
+            placeholder={onPickMeal ? "Search food or meal" : "Search food"}
             enterKeyHint="search"
             autoComplete="off"
             className="h-11 pl-9"
@@ -146,28 +146,28 @@ export function FoodSearch({ saved, onPick, onScan, onAi, meals = [], onPickMeal
           />
         </div>
         <Button type="submit" className="h-11" disabled={normalizeQuery(query).length < MIN_QUERY_LENGTH}>
-          Pesquisar
+          Search
         </Button>
       </form>
       <div className="grid grid-cols-2 gap-2">
         <Button type="button" variant="outline" className="h-11" onClick={onScan}>
           <ScanBarcode aria-hidden />
-          Código de barras
+          Barcode
         </Button>
         <Button type="button" variant="outline" className="h-11" onClick={onAi}>
           <Sparkles aria-hidden />
-          Com IA
+          With AI
         </Button>
       </div>
 
-      {query.trim().length > 0 && normalizeQuery(query).length < MIN_QUERY_LENGTH && <Hint>Escreve pelo menos {MIN_QUERY_LENGTH} letras para pesquisar.</Hint>}
+      {query.trim().length > 0 && normalizeQuery(query).length < MIN_QUERY_LENGTH && <Hint>Min {MIN_QUERY_LENGTH} letters</Hint>}
 
       {searching ? (
         <div className="flex flex-col gap-2" data-testid="search-results">
-          <div role="group" aria-label="Fonte dos resultados" className="grid grid-cols-2 gap-1 rounded-md bg-muted p-1">
+          <div role="group" aria-label="Result source" className="grid grid-cols-2 gap-1 rounded-md bg-muted p-1">
             {(
               [
-                ["saved", `Guardados · ${savedAll.length}`],
+                ["saved", `Saved · ${savedAll.length}`],
                 ["off", `Open Food Facts · ${offTotal}`],
               ] as const
             ).map(([key, label]) => (
@@ -187,7 +187,7 @@ export function FoodSearch({ saved, onPick, onScan, onAi, meals = [], onPickMeal
           {source === "saved" ? (
             <>
               {savedPage.items.length > 0 ? (
-                <ScrollList aria-label="Resultados da pesquisa">
+                <ScrollList aria-label="Search results">
                   <ul className="flex flex-col">
                     {savedPage.items.map((hit) =>
                       hit.kind === "food" ? (
@@ -199,14 +199,14 @@ export function FoodSearch({ saved, onPick, onScan, onAi, meals = [], onPickMeal
                   </ul>
                 </ScrollList>
               ) : (
-                <p className="text-sm text-muted-foreground">Nenhum dos teus guardados tem esse nome.</p>
+                <p className="text-sm text-muted-foreground">No matches</p>
               )}
               <Pagination page={current.savedPage} pageCount={savedPage.pageCount} onChange={(page) => update({ savedPage: page })} />
             </>
           ) : (
             <div className={cn("flex flex-col gap-1 transition-opacity", off.isPlaceholderData && "opacity-60")}>
               {offLoading && (
-                <div aria-label="A pesquisar" className="flex flex-col gap-2">
+                <div aria-label="Searching" className="flex flex-col gap-2">
                   <Skeleton className="h-11 w-full" />
                   <Skeleton className="h-11 w-full" />
                   <Skeleton className="h-11 w-full" />
@@ -218,12 +218,12 @@ export function FoodSearch({ saved, onPick, onScan, onAi, meals = [], onPickMeal
                     {offError}
                   </p>
                   <Button type="button" variant="outline" className="h-11 shrink-0" disabled={off.isFetching} onClick={() => void off.refetch()}>
-                    Tentar novamente
+                    Try again
                   </Button>
                 </div>
               )}
               {off.data && off.data.results.length > 0 && (
-                <ScrollList aria-label="Resultados do Open Food Facts">
+                <ScrollList aria-label="Open Food Facts results">
                   <ul className="flex flex-col">
                     {off.data.results.map((food) => (
                       <FoodResultRow key={food.id} food={food} onPick={onPick} />
@@ -232,7 +232,7 @@ export function FoodSearch({ saved, onPick, onScan, onAi, meals = [], onPickMeal
                 </ScrollList>
               )}
               {off.data && off.data.results.length === 0 && (
-                <p className="text-sm text-muted-foreground">Sem resultados. Experimenta outro nome ou insere manualmente.</p>
+                <p className="text-sm text-muted-foreground">No results</p>
               )}
               {off.data && <Pagination page={current.offPage} pageCount={off.data.pageCount} disabled={off.isFetching} onChange={(page) => update({ offPage: page })} />}
             </div>

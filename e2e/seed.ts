@@ -58,7 +58,7 @@ const frango = { name: "Frango", quantity_g: 150, calories: 248, protein_g: 46.5
 const arroz = { name: "Arroz", quantity_g: 200, calories: 260, protein_g: 5.4, carbs_g: 56, fat_g: 0.6 };
 
 /**
- * 919 kcal, P 66.2, H 125, G 13.4 (goals 2000/150/200/67 => 1081 kcal left).
+ * 919 kcal, P 66.2, C 125, F 13.4 (goals 2000/150/200/67 => 1081 kcal left).
  * breakfast 331 (Aveia + Banana), lunch 508 (meal), snacks 80.
  */
 export function dataDayRows(date = DAY_DATA): SeedRow[] {
@@ -69,7 +69,7 @@ export function dataDayRows(date = DAY_DATA): SeedRow[] {
       entry_date: date,
       meal: "lunch",
       kind: "meal",
-      name: "Frango com arroz",
+      name: "Chicken and rice",
       calories: 508,
       protein_g: 51.9,
       carbs_g: 56,

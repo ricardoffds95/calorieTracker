@@ -22,14 +22,14 @@ export function CustomRangeForm({ period, now }: { period: Period; now: Date }) 
   }
 
   return (
-    <form onSubmit={onSubmit} noValidate className="flex flex-col gap-3" aria-label="Intervalo de datas">
+    <form onSubmit={onSubmit} noValidate className="flex flex-col gap-3" aria-label="Date range">
       <div className="grid grid-cols-2 gap-3">
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="range-from">De</Label>
+          <Label htmlFor="range-from">From</Label>
           <Input id="range-from" type="date" className="h-11" value={from} onChange={(e) => setFrom(e.target.value)} />
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="range-to">Até</Label>
+          <Label htmlFor="range-to">To</Label>
           <Input id="range-to" type="date" className="h-11" value={to} onChange={(e) => setTo(e.target.value)} />
         </div>
       </div>
@@ -39,7 +39,7 @@ export function CustomRangeForm({ period, now }: { period: Period; now: Date }) 
         </p>
       )}
       <Button type="submit" variant="outline" className="h-11">
-        Ver intervalo
+        View range
       </Button>
     </form>
   );

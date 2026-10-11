@@ -17,10 +17,10 @@ export function dayHref(dateKey: string, now: Date) {
 export function LogHeader({ dateKey, now }: LogHeaderProps) {
   return (
     <header className="flex items-center gap-1">
-      <Link href={dayHref(dateKey, now)} aria-label="Voltar ao dia" className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "-ml-2 size-11")}>
+      <Link href={dayHref(dateKey, now)} aria-label="Back to day" className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "-ml-2 size-11")}>
         <ChevronLeft aria-hidden />
       </Link>
-      <h1 className="text-2xl font-semibold tracking-tight">Registar</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Add meal</h1>
       <span data-testid="log-day" className="ml-auto text-sm text-muted-foreground">
         {formatDayLabel(dateKey, now)}
       </span>

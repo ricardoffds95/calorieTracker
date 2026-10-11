@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { bucketHref, bucketLabel, type Bucket, type Granularity } from "@/lib/history";
 
-const NOUN: Record<Granularity, string> = { day: "dias", week: "semanas", month: "meses" };
+const NOUN: Record<Granularity, string> = { day: "days", week: "weeks", month: "months" };
 
 /** The table view of the charts: every bar with its values and a link to open that day (or drill into that week/month). */
 export function BucketList({ buckets, now }: { buckets: readonly Bucket[]; now: Date }) {
@@ -15,12 +15,12 @@ export function BucketList({ buckets, now }: { buckets: readonly Bucket[]; now: 
   const shown = showAll ? buckets : withData;
 
   return (
-    <section aria-label="Detalhe do período" className="flex flex-col">
+    <section aria-label="Period detail" className="flex flex-col">
       <div className="flex items-center justify-between gap-3 pb-1">
         <h2 className="text-base font-semibold">Detalhe</h2>
         {withData.length < buckets.length && (
           <Button type="button" variant="ghost" className="h-11 px-2 text-sm" aria-pressed={showAll} onClick={() => setShowAll((v) => !v)}>
-            {showAll ? `Só ${noun} com registos` : `Mostrar todos os ${noun}`}
+            {showAll ? `Logged ${noun} only` : `Show all ${noun}`}
           </Button>
         )}
       </div>
@@ -32,8 +32,8 @@ export function BucketList({ buckets, now }: { buckets: readonly Bucket[]; now: 
                 <span className="block truncate first-letter:uppercase">{bucketLabel(bucket)}</span>
                 {bucket.average && (
                   <span className="block truncate text-xs text-muted-foreground tabular-nums">
-                    P {bucket.average.protein} · H {bucket.average.carbs} · G {bucket.average.fat}
-                    {bucket.granularity !== "day" && ` · ${bucket.loggedDays} ${bucket.loggedDays === 1 ? "dia" : "dias"}`}
+                    P {bucket.average.protein} · C {bucket.average.carbs} · F {bucket.average.fat}
+                    {bucket.granularity !== "day" && ` · ${bucket.loggedDays} ${bucket.loggedDays === 1 ? "day" : "days"}`}
                   </span>
                 )}
               </span>

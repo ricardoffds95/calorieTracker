@@ -5,7 +5,7 @@ import { GOALS, type PlansByGoal } from "@/lib/nutrition-plan";
 import { GOAL_MODE_OPTIONS } from "@/lib/profile";
 import { cn } from "@/lib/utils";
 
-const SHORT: Record<GoalMode, string> = { cut: "Perder", maintain: "Manter", bulk: "Ganhar" };
+const SHORT: Record<GoalMode, string> = { cut: "Lose", maintain: "Maintain", bulk: "Gain" };
 
 interface PlanResultProps {
   plans: PlansByGoal;
@@ -26,25 +26,25 @@ interface PlanResultProps {
 export function PlanResult({ plans, shown, onShow, chosen, summary, source, pending, onUse, onAdjust, onBack }: PlanResultProps) {
   const plan = plans[shown];
   const macros = [
-    { label: "Proteína", value: plan.protein_g, tone: "text-protein" },
-    { label: "Hidratos", value: plan.carbs_g, tone: "text-carbs" },
-    { label: "Gordura", value: plan.fat_g, tone: "text-fat" },
+    { label: "Protein", value: plan.protein_g, tone: "text-protein" },
+    { label: "Carbs", value: plan.carbs_g, tone: "text-carbs" },
+    { label: "Fat", value: plan.fat_g, tone: "text-fat" },
   ];
   return (
     <div className="flex flex-col gap-5" data-testid="plan-result">
-      <div role="group" aria-label="Plano por objetivo" className="grid grid-cols-3 gap-1 rounded-md bg-muted p-1">
+      <div role="group" aria-label="Plan by goal" className="grid grid-cols-3 gap-1 rounded-md bg-muted p-1">
         {GOALS.map((goal) => (
           <Button
             key={goal}
             type="button"
             variant="ghost"
             aria-pressed={shown === goal}
-            aria-label={`${GOAL_MODE_OPTIONS.find((o) => o.mode === goal)?.label}${goal === chosen ? " (o teu objetivo)" : ""}`}
+            aria-label={`${GOAL_MODE_OPTIONS.find((o) => o.mode === goal)?.label}${goal === chosen ? " (your goal)" : ""}`}
             className={cn("h-11 flex-col gap-0 text-muted-foreground aria-pressed:bg-card aria-pressed:text-foreground dark:aria-pressed:bg-background")}
             onClick={() => onShow(goal)}
           >
             <span>{SHORT[goal]}</span>
-            {goal === chosen && <span className="text-[10px] leading-none text-primary">o teu objetivo</span>}
+            {goal === chosen && <span className="text-[10px] leading-none text-primary">your goal</span>}
           </Button>
         ))}
       </div>
@@ -52,7 +52,7 @@ export function PlanResult({ plans, shown, onShow, chosen, summary, source, pend
         <p className="text-5xl font-semibold tabular-nums" data-testid="plan-calories">
           {plan.calories}
         </p>
-        <p className="text-sm text-muted-foreground">kcal por dia</p>
+        <p className="text-sm text-muted-foreground">kcal per day</p>
       </div>
       <dl className="grid grid-cols-3 gap-3 rounded-md bg-muted p-4 text-center">
         {macros.map(({ label, value, tone }) => (
@@ -63,17 +63,17 @@ export function PlanResult({ plans, shown, onShow, chosen, summary, source, pend
         ))}
       </dl>
       {summary && <p className="text-sm">{summary}</p>}
-      {source === "standard" && <Hint>Cálculo padrão (a IA não respondeu bem).</Hint>}
-      <p className="text-xs text-muted-foreground">Os três planos ficam guardados: mudas de objetivo no Perfil. Estimativa, não aconselhamento médico.</p>
+      {source === "standard" && <Hint>Standard calculation</Hint>}
+      <p className="text-xs text-muted-foreground">All 3 plans are saved</p>
       <div className="flex flex-col gap-2">
         <Button type="button" size="lg" className="h-11" disabled={pending} onClick={onUse}>
-          {pending ? "A guardar…" : "Usar este plano"}
+          {pending ? "Saving…" : "Use this plan"}
         </Button>
         <Button type="button" variant="outline" size="lg" className="h-11" disabled={pending} onClick={onAdjust}>
-          Usar e ajustar
+          Use and adjust
         </Button>
         <Button type="button" variant="ghost" className="h-11" disabled={pending} onClick={onBack}>
-          Mudar respostas
+          Edit answers
         </Button>
       </div>
     </div>

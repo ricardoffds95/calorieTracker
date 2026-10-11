@@ -10,7 +10,7 @@ import { DAILY_ACTIVITIES, INTENSITIES, MAX_NOTES_LENGTH, type DailyActivity, ty
 import { parseDecimalInput } from "@/lib/numbers";
 import type { Profile } from "@/lib/queries/profile";
 
-/** What the questionnaire asks (and "Gerir perfil" edits), as the texts of the fields. */
+/** What the questionnaire asks (and "Manage profile" edits), as the texts of the fields. */
 export interface AnswersForm {
   sex: "male" | "female" | null;
   age: string;
@@ -61,12 +61,12 @@ export function AboutYou({ form, patch }: { form: AnswersForm; patch: Patch }) {
   return (
     <div className="flex flex-col gap-4">
       <fieldset className="flex flex-col gap-2">
-        <legend className="mb-1 text-sm font-medium">Sexo</legend>
+        <legend className="mb-1 text-sm font-medium">Sex</legend>
         <div className="grid grid-cols-2 gap-2">
           {(
             [
-              ["male", "Masculino"],
-              ["female", "Feminino"],
+              ["male", "Male"],
+              ["female", "Female"],
             ] as const
           ).map(([value, label]) => (
             <Button
@@ -82,13 +82,13 @@ export function AboutYou({ form, patch }: { form: AnswersForm; patch: Patch }) {
           ))}
         </div>
       </fieldset>
-      <Field id="onb-age" label="Idade">
+      <Field id="onb-age" label="Age">
         <Input id="onb-age" inputMode="numeric" className="h-11" value={form.age} onChange={(e) => patch({ age: e.target.value })} />
       </Field>
-      <Field id="onb-height" label="Altura (cm)">
+      <Field id="onb-height" label="Height (cm)">
         <Input id="onb-height" inputMode="numeric" className="h-11" value={form.height} onChange={(e) => patch({ height: e.target.value })} />
       </Field>
-      <Field id="onb-weight" label="Peso (kg)">
+      <Field id="onb-weight" label="Weight (kg)">
         <Input id="onb-weight" inputMode="decimal" className="h-11" value={form.weight} onChange={(e) => patch({ weight: e.target.value })} />
       </Field>
     </div>
@@ -106,10 +106,10 @@ export function BodyComposition({ form, patch }: { form: AnswersForm; patch: Pat
   };
   return (
     <div className="grid grid-cols-2 gap-3">
-      <Field id="onb-fat" label="% massa gorda">
+      <Field id="onb-fat" label="Body fat %">
         <Input id="onb-fat" inputMode="decimal" className="h-11" value={form.fat} onChange={(e) => fromFat(e.target.value)} />
       </Field>
-      <Field id="onb-lean" label="% massa magra">
+      <Field id="onb-lean" label="Lean mass %">
         <Input id="onb-lean" inputMode="decimal" className="h-11" value={form.lean} onChange={(e) => fromLean(e.target.value)} />
       </Field>
     </div>
@@ -119,7 +119,7 @@ export function BodyComposition({ form, patch }: { form: AnswersForm; patch: Pat
 export function DailyLife({ form, patch }: { form: AnswersForm; patch: Patch }) {
   return (
     <fieldset className="flex flex-col gap-3">
-      <legend className="mb-1 text-sm font-medium">Quão ativo é o teu dia a dia?</legend>
+      <legend className="mb-1 text-sm font-medium">Daily activity</legend>
       {DAILY_ACTIVITIES.map(({ key, label, description }) => (
         <Button
           key={key}
@@ -141,17 +141,17 @@ export function Activity({ form, patch }: { form: AnswersForm; patch: Patch }) {
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-2">
-        <Label>Treinos aeróbicos por semana</Label>
-        <NumberStepper label="Treinos aeróbicos por semana" value={form.aerobic} onChange={(aerobic) => patch({ aerobic })} step={1} min={0} max={14} unit="x" fallback={0} />
-        <p className="text-xs text-muted-foreground">Corrida, ciclismo, natação, ténis…</p>
+        <Label>Aerobic sessions per week</Label>
+        <NumberStepper label="Aerobic sessions per week" value={form.aerobic} onChange={(aerobic) => patch({ aerobic })} step={1} min={0} max={14} unit="x" fallback={0} />
+        <p className="text-xs text-muted-foreground">Running, cycling, swimming…</p>
       </div>
       <div className="flex flex-col gap-2">
-        <Label>Treinos anaeróbicos por semana</Label>
-        <NumberStepper label="Treinos anaeróbicos por semana" value={form.anaerobic} onChange={(anaerobic) => patch({ anaerobic })} step={1} min={0} max={14} unit="x" fallback={0} />
-        <p className="text-xs text-muted-foreground">Musculação, força, HIIT…</p>
+        <Label>Anaerobic sessions per week</Label>
+        <NumberStepper label="Anaerobic sessions per week" value={form.anaerobic} onChange={(anaerobic) => patch({ anaerobic })} step={1} min={0} max={14} unit="x" fallback={0} />
+        <p className="text-xs text-muted-foreground">Weights, HIIT…</p>
       </div>
       <fieldset className="flex flex-col gap-2">
-        <legend className="mb-1 text-sm font-medium">Intensidade dos treinos</legend>
+        <legend className="mb-1 text-sm font-medium">Intensity</legend>
         <div className="grid grid-cols-3 gap-2">
           {INTENSITIES.map(({ key, label, description }) => (
             <Button
@@ -168,12 +168,12 @@ export function Activity({ form, patch }: { form: AnswersForm; patch: Patch }) {
           ))}
         </div>
       </fieldset>
-      <Field id="onb-notes" label="Notas sobre os treinos (opcional)">
+      <Field id="onb-notes" label="Training notes (optional)">
         <Textarea
           id="onb-notes"
           className="min-h-28 text-base"
           maxLength={MAX_NOTES_LENGTH}
-          placeholder="Ex: musculação 4x por semana, 1h; corrida de 5 km ao sábado"
+          placeholder="e.g. weights 4x a week, 1h; 5 km run on Saturdays"
           value={form.notes}
           onChange={(e) => patch({ notes: e.target.value })}
         />

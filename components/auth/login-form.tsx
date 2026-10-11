@@ -56,11 +56,11 @@ export function LoginForm({ initialInfo = null }: { initialInfo?: string | null 
         else {
           setMode("signin");
           setPassword("");
-          setInfo(`Conta criada. Enviámos um email de confirmação para ${credentials.email}: abre o link e depois entra aqui.`);
+          setInfo(`Check your email to confirm`);
         }
       }
     } catch {
-      setError("Sem ligação. Verifica a internet e tenta novamente.");
+      setError("No connection");
     }
     setLoading(false);
   }
@@ -68,7 +68,7 @@ export function LoginForm({ initialInfo = null }: { initialInfo?: string | null 
   return (
     <Card className="w-full max-w-sm">
       <CardHeader>
-        <CardTitle className="text-xl">{mode === "signin" ? "Entrar" : "Criar conta"}</CardTitle>
+        <CardTitle className="text-xl">{mode === "signin" ? "Sign in" : "Create account"}</CardTitle>
         <CardDescription>CalorieTracker</CardDescription>
       </CardHeader>
       <CardContent>
@@ -121,10 +121,10 @@ export function LoginForm({ initialInfo = null }: { initialInfo?: string | null 
             </p>
           )}
           <Button type="submit" size="lg" disabled={loading}>
-            {loading ? "Aguarda…" : mode === "signin" ? "Entrar" : "Criar conta"}
+            {loading ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}
           </Button>
           <Button type="button" variant="ghost" disabled={loading} onClick={switchMode}>
-            {mode === "signin" ? "Ainda não tenho conta" : "Já tenho conta"}
+            {mode === "signin" ? "Create an account" : "I have an account"}
           </Button>
         </form>
       </CardContent>

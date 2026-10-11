@@ -25,7 +25,7 @@ export function MetricChart({ metric, label, unit, buckets, kind, selected, onSe
   const top = niceMax(Math.max(0, ...buckets.map((b) => valueOf(b, metric) ?? 0)) * 1.05);
 
   return (
-    <div className="flex gap-2" role={accessible ? "group" : undefined} aria-label={accessible ? `${label} por dia registado` : undefined} aria-hidden={accessible ? undefined : true}>
+    <div className="flex gap-2" role={accessible ? "group" : undefined} aria-label={accessible ? `${label} per logged day` : undefined} aria-hidden={accessible ? undefined : true}>
       <div aria-hidden className={cn("flex w-9 shrink-0 flex-col justify-between text-right text-xs text-muted-foreground tabular-nums", tall ? "h-40" : "h-28")}>
         <span>{top}</span>
         <span>0</span>
@@ -40,7 +40,7 @@ export function MetricChart({ metric, label, unit, buckets, kind, selected, onSe
                   key={bucket.key}
                   type="button"
                   tabIndex={accessible ? 0 : -1}
-                  aria-label={accessible ? `${label}: ${value > 0 ? `${value} ${unit}` : "sem registos"}` : undefined}
+                  aria-label={accessible ? `${label}: ${value > 0 ? `${value} ${unit}` : "none"}` : undefined}
                   aria-pressed={accessible ? selected === bucket.key : undefined}
                   data-testid={metric === "calories" ? "kcal-bar" : "macro-bar"}
                   data-metric={metric}

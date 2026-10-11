@@ -36,7 +36,7 @@ interface AiPanelProps {
 
 type Result = { name: string; kind: "food" | "meal"; items: FoodItem[] };
 
-export function AiPanel({ userId, initialTarget, now, onClose, onAdded, onUse, onFood, useLabels = { food: "Usar", meal: "Usar" }, mealNote }: AiPanelProps) {
+export function AiPanel({ userId, initialTarget, now, onClose, onAdded, onUse, onFood, useLabels = { food: "Use", meal: "Use" }, mealNote }: AiPanelProps) {
   const [text, setText] = useState("");
   const [photo, setPhoto] = useState<AiImage | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -68,13 +68,13 @@ export function AiPanel({ userId, initialTarget, now, onClose, onAdded, onUse, o
     <Sheet open onOpenChange={(open) => !open && onClose()}>
       <SheetContent side="bottom" className="mx-auto max-h-[90dvh] max-w-md overflow-y-auto rounded-t-lg pb-[max(1rem,env(safe-area-inset-bottom))]">
         <SheetHeader>
-          <SheetTitle>{result && !editing ? result.name : onUse ? "Procurar com IA" : "Registar com IA"}</SheetTitle>
+          <SheetTitle>{result && !editing ? result.name : onUse ? "Search with AI" : "Add with AI"}</SheetTitle>
           <SheetDescription>
             {editing
-              ? "Corrige o nome, as quantidades ou remove itens."
+              ? "Edit items"
               : result
-                ? `${result.kind === "food" ? "Alimento" : `Refeição com ${result.items.length} ${result.items.length === 1 ? "alimento" : "alimentos"}`} · estimativa da IA: confirma os valores.`
-                : "Descreve o que comeste ou tira uma foto do prato."}
+                ? result.kind === "food" ? "Food" : `Meal · ${result.items.length} ${result.items.length === 1 ? "food" : "foods"}`
+                : "Describe or photograph your meal"}
           </SheetDescription>
         </SheetHeader>
 
@@ -83,10 +83,10 @@ export function AiPanel({ userId, initialTarget, now, onClose, onAdded, onUse, o
             <>
               {!photo && (
                 <div className="flex flex-col gap-2">
-                  <Label htmlFor="ai-text">O que comeste?</Label>
+                  <Label htmlFor="ai-text">What did you eat?</Label>
                   <Textarea
                     id="ai-text"
-                    placeholder="ex: 150 g de frango grelhado com arroz e salada"
+                    placeholder="e.g. 150 g grilled chicken with rice and salad"
                     maxLength={AI_MAX_TEXT_LENGTH}
                     className="min-h-24 text-base"
                     value={text}
@@ -100,9 +100,9 @@ export function AiPanel({ userId, initialTarget, now, onClose, onAdded, onUse, o
                   {error}
                 </p>
               )}
-              {!analyzing && !photo && !text.trim() && <Hint>Escreve o que comeste, ou tira uma foto ao prato, para analisar.</Hint>}
+              {!analyzing && !photo && !text.trim() && <Hint>Add text or a photo</Hint>}
               <Button type="button" size="lg" className="h-11" disabled={analyzing || (!photo && !text.trim())} onClick={analyze}>
-                {analyzing ? "A analisar…" : "Analisar"}
+                {analyzing ? "Analyzing…" : "Analisar"}
               </Button>
             </>
           )}
@@ -127,10 +127,10 @@ export function AiPanel({ userId, initialTarget, now, onClose, onAdded, onUse, o
                     {useLabels[result.kind]}
                   </Button>
                   <Button type="button" variant="outline" size="lg" className="h-11" onClick={() => setEditing({ name: result.name, rows: toEditable(result.items) })}>
-                    Editar quantidades
+                    Edit amounts
                   </Button>
                   <Button type="button" variant="ghost" className="h-11" onClick={() => setResult(null)}>
-                    Tentar outra vez
+                    Try again
                   </Button>
                 </>
               ) : (
@@ -151,13 +151,13 @@ export function AiPanel({ userId, initialTarget, now, onClose, onAdded, onUse, o
           {editing && (
             <>
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="ai-meal-name">Nome da refeição</Label>
+                <Label htmlFor="ai-meal-name">Meal name</Label>
                 <Input id="ai-meal-name" className="h-11" value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} />
               </div>
               <ItemsEditor rows={editing.rows} onChange={(rows) => setEditing({ ...editing, rows })} />
               {(!editedName || !editedItems) && (
                 <Hint>
-                  {!editedName ? "Indica o nome da refeição." : "Corrige os alimentos: cada um precisa de nome e de uma quantidade maior que 0."}
+                  {!editedName ? "Meal name required" : "Each food needs a name and an amount above 0"}
                 </Hint>
               )}
               <Button
@@ -171,10 +171,10 @@ export function AiPanel({ userId, initialTarget, now, onClose, onAdded, onUse, o
                   setEditing(null);
                 }}
               >
-                Concluir
+                Done
               </Button>
               <Button type="button" variant="ghost" className="h-11" onClick={() => setEditing(null)}>
-                Cancelar
+                Cancel
               </Button>
             </>
           )}

@@ -18,7 +18,7 @@ test("data is cached in IndexedDB and falls back to the DB when the cache is emp
   await page.route("**/rest/v1/profiles*", (route) => route.abort());
   await page.reload();
   // supabase-js retries failed GETs with backoff and TanStack retries once: the error takes ~16s.
-  await expect(page.getByRole("alert").filter({ hasText: "perfil" })).toBeVisible({ timeout: 40_000 });
+  await expect(page.getByRole("alert").filter({ hasText: "profile" })).toBeVisible({ timeout: 40_000 });
   await page.unroute("**/rest/v1/profiles*");
   await page.reload();
   await expect(page.getByTestId("profile-summary")).toContainText("kcal");

@@ -10,7 +10,7 @@ interface MetricBlockProps {
   label: string;
   unit: string;
   stats: MetricStats;
-  /** "41% das kcal" for the macros. */
+  /** "41% of kcal" for the macros. */
   note?: string;
   buckets: readonly Bucket[];
   kind: PeriodKind;
@@ -21,9 +21,9 @@ interface MetricBlockProps {
 /** One metric: its average per logged day, the highest and lowest day, and its chart. */
 export function MetricBlock({ metric, label, unit, stats, note, buckets, kind, selected, onSelect }: MetricBlockProps) {
   const items = [
-    { key: "avg", name: "Média", icon: null, value: stats.average, day: null },
-    { key: "max", name: "Máx", icon: ArrowUp, value: stats.max.value, day: stats.max.date },
-    { key: "min", name: "Mín", icon: ArrowDown, value: stats.min.value, day: stats.min.date },
+    { key: "avg", name: "Avg", icon: null, value: stats.average, day: null },
+    { key: "max", name: "Max", icon: ArrowUp, value: stats.max.value, day: stats.max.date },
+    { key: "min", name: "Min", icon: ArrowDown, value: stats.min.value, day: stats.min.date },
   ] as const;
 
   return (

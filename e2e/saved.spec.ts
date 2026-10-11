@@ -8,9 +8,9 @@ test.beforeEach(clearAll);
 test.afterAll(clearAll);
 
 async function openSaved(page: Page) {
-  await page.getByRole("link", { name: "Guardados", exact: true }).click();
-  await expect(page).toHaveURL(/\/guardados$/);
-  await expect(page.getByRole("heading", { level: 1, name: "Guardados" })).toBeVisible();
+  await page.getByRole("link", { name: "Saved", exact: true }).click();
+  await expect(page).toHaveURL(/\/saved$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Saved" })).toBeVisible();
   await page.waitForLoadState("networkidle");
 }
 
@@ -26,26 +26,26 @@ test("lists foods and meals with counts and usage, and filters them without acce
   await login(page, "A");
   await openSaved(page);
 
-  await expect(page.getByRole("button", { name: "Alimentos · 2" })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByRole("button", { name: "Refeições · 1" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Foods · 2" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "Meals · 1" })).toBeVisible();
   const rows = page.getByTestId("saved-foods").getByRole("listitem");
   await expect(rows.first()).toContainText("Iogurte grego");
-  await expect(rows.first()).toContainText("usado 3×"); // most used first
+  await expect(rows.first()).toContainText("used 3×"); // most used first
   await expect(rows.first()).toContainText("97 kcal/100 g");
-  await expect(rows.nth(1)).toContainText("nunca usado");
+  await expect(rows.nth(1)).toContainText("never used");
 
-  await page.getByRole("searchbox", { name: "Pesquisar nos guardados" }).fill("CAFE");
+  await page.getByRole("searchbox", { name: "Search saved" }).fill("CAFE");
   await expect(rows).toHaveCount(1);
-  await page.getByRole("searchbox", { name: "Pesquisar nos guardados" }).fill("zzz");
-  await expect(page.getByText("Nada com esse nome.")).toBeVisible();
+  await page.getByRole("searchbox", { name: "Search saved" }).fill("zzz");
+  await expect(page.getByText("No matches")).toBeVisible();
 
-  await page.getByRole("searchbox", { name: "Pesquisar nos guardados" }).fill("");
-  await page.getByRole("button", { name: "Refeições · 1" }).click();
+  await page.getByRole("searchbox", { name: "Search saved" }).fill("");
+  await page.getByRole("button", { name: "Meals · 1" }).click();
   const meal = page.getByTestId("saved-meals").getByRole("listitem");
   await expect(meal).toContainText("Papas de aveia");
   await expect(meal).toContainText("343 kcal");
-  await expect(meal).toContainText("2 alimentos");
-  await expect(meal).toContainText("usado 2×");
+  await expect(meal).toContainText("2 foods");
+  await expect(meal).toContainText("used 2×");
 });
 
 test("editing from the tab can update the whole diary history", async ({ page }) => {
@@ -60,13 +60,13 @@ test("editing from the tab can update the whole diary history", async ({ page })
   await login(page, "A");
   await openSaved(page);
 
-  await page.getByRole("button", { name: "Abrir Pão E2E com sementes de girassol linhaça e abóbora muito longo" }).click();
-  await page.getByRole("button", { name: "Editar", exact: true }).click();
-  await page.getByLabel("Calorias").fill("200");
-  await page.getByRole("button", { name: "Guardar" }).click();
-  await expect(page.getByText("Está em 2 entradas do diário")).toBeVisible();
-  await page.getByRole("button", { name: /Todo o histórico/ }).click();
-  await expect(page.getByText("Guardado e 2 entradas atualizadas")).toBeVisible();
+  await page.getByRole("button", { name: "Open Pão E2E com sementes de girassol linhaça e abóbora muito longo" }).click();
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await page.getByLabel("Calories").fill("200");
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByText("Used in 2 entries")).toBeVisible();
+  await page.getByRole("button", { name: /All history/ }).click();
+  await expect(page.getByText("Saved, 2 entries updated")).toBeVisible();
 
   expect((await fetchDiary("A", today))[0]).toMatchObject({ calories: 100 });
   expect((await fetchDiary("A", yesterday))[0]).toMatchObject({ calories: 100 });
@@ -81,28 +81,28 @@ test("deleting a saved food keeps the diary entries, just unlinked", async ({ pa
   await login(page, "A");
   await openSaved(page);
 
-  await page.getByRole("button", { name: "Abrir Apagar E2E" }).click();
-  await page.getByRole("button", { name: "Apagar" }).click();
-  await expect(page.getByText("As entradas do diário mantêm-se como estão.")).toBeVisible();
-  await page.getByRole("button", { name: "Apagar" }).click(); // confirm
-  await expect(page.getByText("Removido dos guardados")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Abrir Apagar E2E" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Open Apagar E2E" }).click();
+  await page.getByRole("button", { name: "Delete" }).click();
+  await expect(page.getByText("Diary entries stay")).toBeVisible();
+  await page.getByRole("button", { name: "Delete" }).click(); // confirm
+  await expect(page.getByText("Removed")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Open Apagar E2E" })).toHaveCount(0);
 
   expect(await fetchSavedFoods("A")).toHaveLength(0);
   expect((await fetchDiary("A", "2026-01-20"))[0]).toMatchObject({ name: "Apagar E2E", calories: 100, saved_food_id: null });
 });
 
-test("tapping a saved item offers Adicionar ao diário, Editar and Apagar, without opening the keyboard", async ({ page }) => {
+test("tapping a saved item offers Add to diary, Edit and Apagar, without opening the keyboard", async ({ page }) => {
   await seedSavedFood("A", { name: "Ovo E2E", calories_100g: 155, protein_100g: 13, carbs_100g: 1.1, fat_100g: 11 });
   await login(page, "A");
   await openSaved(page);
 
-  await page.getByRole("button", { name: "Abrir Ovo E2E" }).click();
-  for (const name of ["Adicionar ao diário", "Editar", "Apagar"]) {
+  await page.getByRole("button", { name: "Open Ovo E2E" }).click();
+  for (const name of ["Add to diary", "Edit", "Delete"]) {
     await expect(page.getByRole("button", { name, exact: true })).toBeVisible();
   }
-  await page.getByRole("button", { name: "Editar", exact: true }).click();
-  await expect(page.getByLabel("Nome", { exact: true })).toHaveValue("Ovo E2E");
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await expect(page.getByLabel("Name", { exact: true })).toHaveValue("Ovo E2E");
   expect(await page.evaluate(() => ["INPUT", "TEXTAREA"].includes(document.activeElement?.tagName ?? ""))).toBe(false);
 });
 
@@ -111,20 +111,20 @@ test("a saved food is added to the diary from here, choosing grams, day and meal
   await login(page, "A");
   await openSaved(page);
 
-  await page.getByRole("button", { name: "Abrir Ovo E2E" }).click();
-  await page.getByRole("button", { name: "Adicionar ao diário" }).click();
-  const meal = (name: string) => page.getByRole("group", { name: "Refeição", exact: true }).getByRole("button", { name, exact: true });
-  await expect(meal("Lanches")).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByLabel("Data")).toHaveValue(toDateKey(new Date()));
-  await page.getByRole("button", { name: "Mais 10 g" }).click(); // 100 → 110 g
-  await meal("Almoço").click();
-  await page.getByLabel("Data").fill("2026-01-21");
-  await page.getByRole("button", { name: "Adicionar ao diário" }).click();
-  await expect(page.getByText(/Ovo E2E adicionado a almoço/)).toBeVisible();
+  await page.getByRole("button", { name: "Open Ovo E2E" }).click();
+  await page.getByRole("button", { name: "Add to diary" }).click();
+  const meal = (name: string) => page.getByRole("group", { name: "Meal", exact: true }).getByRole("button", { name, exact: true });
+  await expect(meal("Snacks")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByLabel("Date")).toHaveValue(toDateKey(new Date()));
+  await page.getByRole("button", { name: "Plus 10 g" }).click(); // 100 → 110 g
+  await meal("Lunch").click();
+  await page.getByLabel("Date").fill("2026-01-21");
+  await page.getByRole("button", { name: "Add to diary" }).click();
+  await expect(page.getByText(/Ovo E2E added to lunch/)).toBeVisible();
 
   const [row] = await fetchDiary("A", "2026-01-21");
   expect(row).toMatchObject({ meal: "lunch", kind: "food", quantity_g: 110, calories: 171, saved_food_id: food.id });
-  await expect(page.getByTestId("saved-foods")).toContainText("usado 1×");
+  await expect(page.getByTestId("saved-foods")).toContainText("used 1×");
 });
 
 test("a saved meal is added to the diary from here, in portions", async ({ page }) => {
@@ -132,14 +132,14 @@ test("a saved meal is added to the diary from here, in portions", async ({ page 
   await login(page, "A");
   await openSaved(page);
 
-  await page.getByRole("button", { name: "Refeições · 1" }).click();
-  await page.getByRole("button", { name: "Abrir Papas de aveia" }).click();
-  await page.getByRole("button", { name: "Adicionar ao diário" }).click();
-  await page.getByRole("button", { name: "Usar 2 porções" }).click();
-  await expect(page.getByRole("status", { name: "Porções" })).toHaveText("2 porções");
-  await page.getByRole("group", { name: "Refeição", exact: true }).getByRole("button", { name: "Pequeno-almoço", exact: true }).click();
-  await page.getByRole("button", { name: "Adicionar ao diário" }).click();
-  await expect(page.getByText(/Papas de aveia adicionado a pequeno-almoço/)).toBeVisible();
+  await page.getByRole("button", { name: "Meals · 1" }).click();
+  await page.getByRole("button", { name: "Open Papas de aveia" }).click();
+  await page.getByRole("button", { name: "Add to diary" }).click();
+  await page.getByRole("button", { name: "Use 2 portions" }).click();
+  await expect(page.getByRole("status", { name: "Portions" })).toHaveText("2 portions");
+  await page.getByRole("group", { name: "Meal", exact: true }).getByRole("button", { name: "Breakfast", exact: true }).click();
+  await page.getByRole("button", { name: "Add to diary" }).click();
+  await expect(page.getByText(/Papas de aveia added to breakfast/)).toBeVisible();
 
   const [row] = await fetchDiary("A", toDateKey(new Date()));
   expect(row).toMatchObject({ meal: "breakfast", kind: "meal", doses: 2, calories: 686, saved_meal_id: saved.id });
@@ -149,40 +149,40 @@ test("creates a food by hand (per 100 g) and explains a duplicate name", async (
   await login(page, "A");
   await openSaved(page);
 
-  await page.getByRole("button", { name: "Novo alimento" }).click();
-  await page.getByRole("button", { name: "Guardar" }).click();
-  await expect(page.getByRole("alert").filter({ hasText: "Indica um nome." })).toBeVisible();
+  await page.getByRole("button", { name: "New food" }).click();
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "Name required" })).toBeVisible();
 
-  await page.getByLabel("Nome", { exact: true }).fill("Barra E2E");
-  await page.getByLabel("Marca (opcional)").fill("Marca Y");
-  await page.getByLabel("Calorias (kcal)").fill("410,6");
-  await page.getByLabel("Proteína (g)").fill("20");
-  await page.getByRole("button", { name: "Guardar" }).click();
-  await expect(page.getByText("Alimento guardado")).toBeVisible();
+  await page.getByLabel("Name", { exact: true }).fill("Barra E2E");
+  await page.getByLabel("Brand (optional)").fill("Marca Y");
+  await page.getByLabel("Calories (kcal)").fill("410,6");
+  await page.getByLabel("Protein (g)").fill("20");
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByText("Food saved")).toBeVisible();
   await expect(page.getByTestId("saved-foods")).toContainText("Barra E2E");
   expect((await fetchSavedFoods("A"))[0]).toMatchObject({ name: "Barra E2E", brand: "Marca Y", calories_100g: 411, protein_100g: 20, times_used: 0 });
 
-  await page.getByRole("button", { name: "Novo alimento" }).click();
-  await page.getByLabel("Nome", { exact: true }).fill("barra e2e");
-  await page.getByLabel("Calorias (kcal)").fill("100");
-  await page.getByRole("button", { name: "Guardar" }).click();
-  await expect(page.getByRole("alert").filter({ hasText: "Já tens um alimento guardado com este nome" })).toBeVisible();
+  await page.getByRole("button", { name: "New food" }).click();
+  await page.getByLabel("Name", { exact: true }).fill("barra e2e");
+  await page.getByLabel("Calories (kcal)").fill("100");
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "Food name already saved" })).toBeVisible();
   expect(await fetchSavedFoods("A")).toHaveLength(1);
 });
 
-test("creates a meal without logging it: only 'Guardar', nothing in the diary", async ({ page }) => {
+test("creates a meal without logging it: only 'Save', nothing in the diary", async ({ page }) => {
   await login(page, "A");
   await openSaved(page);
 
-  await page.getByRole("button", { name: "Refeições · 0" }).click();
-  await page.getByRole("button", { name: "Nova refeição" }).click();
-  await page.getByRole("button", { name: "Valores por porção" }).click();
-  await page.getByLabel("Nome da refeição").fill("Sopa E2E");
-  await page.getByLabel("Calorias (kcal)").fill("180");
-  await expect(page.getByRole("button", { name: /adicionar ao diário/i })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Mais porções" })).toHaveCount(0);
-  await page.getByRole("button", { name: "Guardar nas refeições" }).click();
-  await expect(page.getByRole("button", { name: "Guardada" })).toBeDisabled();
+  await page.getByRole("button", { name: "Meals · 0" }).click();
+  await page.getByRole("button", { name: "New meal" }).click();
+  await page.getByRole("button", { name: "Per portion" }).click();
+  await page.getByLabel("Meal name").fill("Sopa E2E");
+  await page.getByLabel("Calories (kcal)").fill("180");
+  await expect(page.getByRole("button", { name: /add to diary/i })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "More portions" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Save meal" }).click();
+  await expect(page.getByRole("button", { name: "Saved" })).toBeDisabled();
 
   const [meal] = await fetchSavedMeals("A");
   expect(meal).toMatchObject({ name: "Sopa E2E", total_calories: 180, times_used: 0 });
@@ -196,9 +196,9 @@ test("saved items are private to each user", async ({ page }) => {
   await seedSavedMeal("A", { name: "Refeição do A", items: ITEMS, total_calories: 343, total_protein: 16.2, total_carbs: 48, total_fat: 8.2 });
   await login(page, "B");
   await openSaved(page);
-  await expect(page.getByText("Ainda sem alimentos guardados")).toBeVisible();
-  await page.getByRole("button", { name: "Refeições · 0" }).click();
-  await expect(page.getByText("Ainda sem refeições guardadas")).toBeVisible();
+  await expect(page.getByText("No saved foods")).toBeVisible();
+  await page.getByRole("button", { name: "Meals · 0" }).click();
+  await expect(page.getByText("No saved meals")).toBeVisible();
 });
 
 test("new food: the search fills the form, the values can be changed before saving", async ({ page }) => {
@@ -216,20 +216,20 @@ test("new food: the search fills the form, the values can be changed before savi
   await login(page, "A");
   await openSaved(page);
 
-  await page.getByRole("button", { name: "Novo alimento" }).click();
-  await page.getByRole("dialog").getByRole("searchbox", { name: "Pesquisar alimento" }).fill("pao e2e");
+  await page.getByRole("button", { name: "New food" }).click();
+  await page.getByRole("dialog").getByRole("searchbox", { name: "Search food" }).fill("pao e2e");
   await page.getByRole("button", { name: /^Open Food Facts · / }).click();
   // the keyboard closes by itself once the search ran, and the dialog never grows wider than the screen
-  await expect(page.getByRole("button", { name: "Escolher Pão E2E com sementes de girassol linhaça e abóbora muito longo" })).toBeVisible();
-  await expect(page.getByRole("dialog").getByRole("searchbox", { name: "Pesquisar alimento" })).not.toBeFocused();
+  await expect(page.getByRole("button", { name: "Choose Pão E2E com sementes de girassol linhaça e abóbora muito longo" })).toBeVisible();
+  await expect(page.getByRole("dialog").getByRole("searchbox", { name: "Search food" })).not.toBeFocused();
   expect(await page.getByRole("dialog").evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
-  await page.getByRole("button", { name: "Escolher Pão E2E com sementes de girassol linhaça e abóbora muito longo" }).click();
+  await page.getByRole("button", { name: "Choose Pão E2E com sementes de girassol linhaça e abóbora muito longo" }).click();
 
-  await expect(page.getByLabel("Nome", { exact: true })).toHaveValue("Pão E2E com sementes de girassol linhaça e abóbora muito longo");
-  await expect(page.getByLabel("Marca (opcional)")).toHaveValue("Padaria");
-  await expect(page.getByLabel("Calorias (kcal)")).toHaveValue("265");
-  await page.getByLabel("Calorias (kcal)").fill("270");
-  await page.getByRole("button", { name: "Guardar" }).click();
+  await expect(page.getByLabel("Name", { exact: true })).toHaveValue("Pão E2E com sementes de girassol linhaça e abóbora muito longo");
+  await expect(page.getByLabel("Brand (optional)")).toHaveValue("Padaria");
+  await expect(page.getByLabel("Calories (kcal)")).toHaveValue("265");
+  await page.getByLabel("Calories (kcal)").fill("270");
+  await page.getByRole("button", { name: "Save" }).click();
   await expect(page.getByTestId("saved-foods")).toContainText("Pão E2E com sementes de girassol linhaça e abóbora muito longo");
   expect(await fetchSavedFoods("A")).toMatchObject([{ name: "Pão E2E com sementes de girassol linhaça e abóbora muito longo", brand: "Padaria", calories_100g: 270, protein_100g: 9, carbs_100g: 49, fat_100g: 3.2 }]);
 });
@@ -238,7 +238,7 @@ test("new food: the AI fills the form per 100 g of the total weight", async ({ p
   await page.route("**/api/ai/parse", (route) =>
     route.fulfill({
       json: {
-        name: "Frango com arroz",
+        name: "Chicken and rice",
         items: [
           { name: "Frango", quantity_g: 100, calories: 165, protein_g: 31, carbs_g: 0, fat_g: 3.6 },
           { name: "Arroz", quantity_g: 100, calories: 130, protein_g: 2.7, carbs_g: 28, fat_g: 0.3 },
@@ -249,32 +249,32 @@ test("new food: the AI fills the form per 100 g of the total weight", async ({ p
   await login(page, "A");
   await openSaved(page);
 
-  await page.getByRole("button", { name: "Novo alimento" }).click();
-  await page.getByRole("dialog").getByRole("button", { name: "Com IA" }).click();
-  await page.getByLabel("O que comeste?").fill("frango com arroz");
+  await page.getByRole("button", { name: "New food" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "With AI" }).click();
+  await page.getByLabel("What did you eat?").fill("frango com arroz");
   await page.getByRole("button", { name: "Analisar" }).click();
-  await expect(page.getByText("Isto é uma refeição com vários alimentos")).toBeVisible();
-  await page.getByRole("button", { name: "Usar na mesma" }).click();
+  await expect(page.getByText("This is a meal, not one food")).toBeVisible();
+  await page.getByRole("button", { name: "Use anyway" }).click();
 
-  await expect(page.getByLabel("Nome", { exact: true })).toHaveValue("Frango com arroz");
-  await expect(page.getByLabel("Calorias (kcal)")).toHaveValue("148"); // 295 kcal / 200 g
-  await expect(page.getByLabel("Proteína (g)")).toHaveValue("16.9");
+  await expect(page.getByLabel("Name", { exact: true })).toHaveValue("Chicken and rice");
+  await expect(page.getByLabel("Calories (kcal)")).toHaveValue("148"); // 295 kcal / 200 g
+  await expect(page.getByLabel("Protein (g)")).toHaveValue("16.9");
 });
 
 test("editing a saved meal explains problems in Portuguese words", async ({ page }) => {
   await seedSavedMeal("A", { name: "Papas de aveia", items: ITEMS, total_calories: 343, total_protein: 16.2, total_carbs: 48, total_fat: 8.2 });
   await login(page, "A");
   await openSaved(page);
-  await page.getByRole("button", { name: "Refeições · 1" }).click();
-  await page.getByRole("button", { name: "Abrir Papas de aveia" }).click();
-  await page.getByRole("button", { name: "Editar" }).click();
+  await page.getByRole("button", { name: "Meals · 1" }).click();
+  await page.getByRole("button", { name: "Open Papas de aveia" }).click();
+  await page.getByRole("button", { name: "Edit" }).click();
 
-  await page.getByLabel("Quantidade de Aveia (g)").fill("0");
-  const alert = page.getByRole("alert").filter({ hasText: "Corrige os alimentos" });
-  await expect(alert).toHaveText("Corrige os alimentos: cada um precisa de nome e de uma quantidade maior que 0.");
-  await expect(page.getByRole("button", { name: "Guardar", exact: true })).toBeDisabled();
-  await page.getByLabel("Quantidade de Aveia (g)").fill("60");
-  await page.getByLabel("Nome", { exact: true }).fill("");
-  await expect(page.getByRole("alert").filter({ hasText: "Indica um nome." })).toBeVisible();
+  await page.getByLabel("Amount of Aveia (g)").fill("0");
+  const alert = page.getByRole("alert").filter({ hasText: "Each food needs a name" });
+  await expect(alert).toHaveText("Each food needs a name and an amount above 0");
+  await expect(page.getByRole("button", { name: "Save", exact: true })).toBeDisabled();
+  await page.getByLabel("Amount of Aveia (g)").fill("60");
+  await page.getByLabel("Name", { exact: true }).fill("");
+  await expect(page.getByRole("alert").filter({ hasText: "Name required" })).toBeVisible();
   await expect(page.getByText(/expected array|Invalid input/)).toHaveCount(0);
 });

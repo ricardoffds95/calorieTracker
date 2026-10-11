@@ -23,10 +23,10 @@ interface EditSavedDialogProps {
 }
 
 const PER100 = [
-  ["calories_100g", "Calorias"],
-  ["protein_100g", "Proteína (g)"],
-  ["carbs_100g", "Hidratos (g)"],
-  ["fat_100g", "Gordura (g)"],
+  ["calories_100g", "Calories"],
+  ["protein_100g", "Protein (g)"],
+  ["carbs_100g", "Carbs (g)"],
+  ["fat_100g", "Fat (g)"],
 ] as const;
 
 export function EditSavedDialog({ userId, target, todayKey, onClose }: EditSavedDialogProps) {
@@ -56,10 +56,10 @@ export function EditSavedDialog({ userId, target, todayKey, onClose }: EditSaved
   // zod's own wording is for developers: say it in words
   const problem = (() => {
     if (valid) return null;
-    if (isFood) return food?.error?.issues[0]?.message ?? "Valores inválidos.";
-    if (!name.trim()) return "Indica um nome.";
-    if (totals) return parseDecimalInput(totals.calories) === null ? "Indica as calorias (um número)." : "Os valores têm de ser números (0 ou mais).";
-    return rows.length === 0 ? "Falta juntar pelo menos um alimento." : "Corrige os alimentos: cada um precisa de nome e de uma quantidade maior que 0.";
+    if (isFood) return food?.error?.issues[0]?.message ?? "Invalid values";
+    if (!name.trim()) return "Name required";
+    if (totals) return parseDecimalInput(totals.calories) === null ? "Calories required" : "Invalid values";
+    return rows.length === 0 ? "Add at least one food" : "Each food needs a name and an amount above 0";
   })();
 
   function save(scope: PropagationScope) {
@@ -77,7 +77,7 @@ export function EditSavedDialog({ userId, target, todayKey, onClose }: EditSaved
       setLinked(counts);
       setStep("propagate");
     } catch {
-      setError("Sem ligação. Verifica a internet e tenta novamente.");
+      setError("No connection");
     }
   }
 
@@ -85,14 +85,14 @@ export function EditSavedDialog({ userId, target, todayKey, onClose }: EditSaved
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-h-[90dvh] max-w-sm overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Editar {isFood ? "alimento" : "refeição"} guardado</DialogTitle>
-          <DialogDescription>{isFood ? "Valores por 100 g." : isPortion ? "Valores de 1 porção." : "1 porção é a soma dos itens."}</DialogDescription>
+          <DialogTitle>Edit saved {isFood ? "food" : "meal"}</DialogTitle>
+          <DialogDescription>{isFood ? "Per 100 g" : isPortion ? "Per portion" : "Sum of items"}</DialogDescription>
         </DialogHeader>
 
         {step === "edit" && (
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="saved-name">Nome</Label>
+              <Label htmlFor="saved-name">Name</Label>
               <Input id="saved-name" className="h-11" value={name} onChange={(e) => setName(e.target.value)} />
             </div>
             {isFood ? (
@@ -121,10 +121,10 @@ export function EditSavedDialog({ userId, target, todayKey, onClose }: EditSaved
             )}
             <DialogFooter className="gap-2">
               <Button type="button" variant="outline" size="lg" onClick={onClose}>
-                Cancelar
+                Cancel
               </Button>
               <Button type="button" size="lg" disabled={!valid || pending} onClick={onSave}>
-                Guardar
+                Save
               </Button>
             </DialogFooter>
           </div>

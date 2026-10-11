@@ -17,11 +17,11 @@ import { parseIntegerInput } from "@/lib/profile";
 import { useProfile, useSaveOnboarding, type Profile } from "@/lib/queries/profile";
 
 const STEPS = [
-  { title: "Sobre ti", fields: ["sex", "age", "height_cm", "weight_kg"] },
-  { title: "Composição corporal", fields: ["body_fat_pct"] },
-  { title: "Objetivo", fields: ["goal"] },
-  { title: "O teu dia a dia", fields: ["daily_activity"] },
-  { title: "Treino", fields: ["aerobic_sessions", "anaerobic_sessions", "intensity", "notes"] },
+  { title: "About you", fields: ["sex", "age", "height_cm", "weight_kg"] },
+  { title: "Body composition", fields: ["body_fat_pct"] },
+  { title: "Goal", fields: ["goal"] },
+  { title: "Daily activity", fields: ["daily_activity"] },
+  { title: "Training", fields: ["aerobic_sessions", "anaerobic_sessions", "intensity", "notes"] },
 ] as const;
 
 interface Form extends AnswersForm {
@@ -66,11 +66,11 @@ export function OnboardingScreen({ userId, fromProfile }: { userId: string; from
   if (profile.isError && !profile.data) {
     return (
       <p role="alert" className="text-sm text-destructive">
-        Não foi possível carregar o perfil. Tenta novamente.
+        Couldn’t load profile
       </p>
     );
   }
-  if (!profile.data) return <Skeleton className="h-96 w-full" aria-label="A carregar" />;
+  if (!profile.data) return <Skeleton className="h-96 w-full" aria-label="Loading" />;
   return <Flow userId={userId} profile={profile.data} fromProfile={fromProfile} />;
 }
 
@@ -87,7 +87,7 @@ function Flow({ userId, profile, fromProfile }: { userId: string; profile: Profi
   const [shown, setShown] = useState<GoalMode>("maintain"); // the plan on screen: the chosen goal first
 
   const patch = (changes: Partial<Form>) => setForm((f) => ({ ...f, ...changes }));
-  const leave = () => router.replace(fromProfile ? "/perfil" : "/");
+  const leave = () => router.replace(fromProfile ? "/profile" : "/");
   const missing = result ? [] : problems(form, step);
 
   function skip() {
@@ -133,7 +133,7 @@ function Flow({ userId, profile, fromProfile }: { userId: string; profile: Profi
         training_intensity: a.intensity,
         training_notes: a.notes === "" ? null : a.notes,
         plan_summary: result.summary,
-        toast: "Plano guardado nos teus objetivos",
+        toast: "Plan saved",
       },
       { onSuccess: then },
     );
@@ -143,16 +143,16 @@ function Flow({ userId, profile, fromProfile }: { userId: string; profile: Profi
     <div className="flex flex-col gap-6">
       <header className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Plano nutricional</h1>
-          <p className="text-sm text-muted-foreground">{result ? "O teu plano" : `Passo ${step + 1} de ${STEPS.length} · ${STEPS[step]!.title}`}</p>
+          <h1 className="text-2xl font-semibold tracking-tight">Nutrition plan</h1>
+          <p className="text-sm text-muted-foreground">{result ? "Your plan" : `Step ${step + 1} of ${STEPS.length} · ${STEPS[step]!.title}`}</p>
         </div>
         <Button type="button" variant="ghost" className="h-11 shrink-0 text-muted-foreground" disabled={save.isPending} onClick={skip}>
-          {fromProfile ? "Cancelar" : "Saltar por agora"}
+          {fromProfile ? "Cancel" : "Skip"}
         </Button>
       </header>
 
       {!result && (
-        <div role="progressbar" aria-label="Progresso" aria-valuemin={1} aria-valuemax={STEPS.length} aria-valuenow={step + 1} className="h-1.5 overflow-hidden rounded-full bg-muted">
+        <div role="progressbar" aria-label="Progress" aria-valuemin={1} aria-valuemax={STEPS.length} aria-valuenow={step + 1} className="h-1.5 overflow-hidden rounded-full bg-muted">
           <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${((step + 1) / STEPS.length) * 100}%` }} />
         </div>
       )}
@@ -160,7 +160,7 @@ function Flow({ userId, profile, fromProfile }: { userId: string; profile: Profi
       {!result && step === 0 && <AboutYou form={form} patch={patch} />}
       {!result && step === 1 && (
         <div className="flex flex-col gap-3">
-          <p className="text-sm text-muted-foreground">Opcional. Deixa em branco se não souberes.</p>
+          <p className="text-sm text-muted-foreground">Optional</p>
           <BodyComposition form={form} patch={patch} />
         </div>
       )}
@@ -178,7 +178,7 @@ function Flow({ userId, profile, fromProfile }: { userId: string; profile: Profi
           source={result.source}
           pending={save.isPending}
           onUse={() => apply(leave)}
-          onAdjust={() => apply(() => router.replace("/perfil"))}
+          onAdjust={() => apply(() => router.replace("/profile"))}
           onBack={() => setResult(null)}
         />
       )}
@@ -194,16 +194,16 @@ function Flow({ userId, profile, fromProfile }: { userId: string; profile: Profi
         <div className="flex gap-2">
           {step > 0 && (
             <Button type="button" variant="outline" size="lg" className="h-11 flex-1" disabled={calculating} onClick={() => setStep(step - 1)}>
-              Voltar
+              Back
             </Button>
           )}
           {step < STEPS.length - 1 ? (
             <Button type="button" size="lg" className="h-11 flex-1" disabled={missing.length > 0} onClick={() => setStep(step + 1)}>
-              Seguinte
+              Next
             </Button>
           ) : (
             <Button type="button" size="lg" className="h-11 flex-1" disabled={missing.length > 0 || calculating} onClick={calculate}>
-              {calculating ? "A calcular…" : "Calcular o meu plano"}
+              {calculating ? "Calculating…" : "Calculate my plan"}
             </Button>
           )}
         </div>

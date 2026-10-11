@@ -11,9 +11,9 @@ export interface MacroPercentInputs {
 }
 
 const ROWS = [
-  { key: "protein", label: "Proteína", dot: "bg-protein" },
-  { key: "carbs", label: "Hidratos", dot: "bg-carbs" },
-  { key: "fat", label: "Gordura", dot: "bg-fat" },
+  { key: "protein", label: "Protein", dot: "bg-protein" },
+  { key: "carbs", label: "Carbs", dot: "bg-carbs" },
+  { key: "fat", label: "Fat", dot: "bg-fat" },
 ] as const;
 
 interface MacroSplitProps {
@@ -26,7 +26,7 @@ export function MacroSplit({ values, onChange, total }: MacroSplitProps) {
   const ok = total === 100;
   return (
     <fieldset className="flex flex-col gap-3">
-      <legend className="mb-1 text-sm font-medium">Distribuição de macros</legend>
+      <legend className="mb-1 text-sm font-medium">Macro split</legend>
       {ROWS.map(({ key, label, dot }) => (
         <div key={key} className="flex items-center gap-3">
           <span className={cn("size-2.5 shrink-0 rounded-full", dot)} aria-hidden />
@@ -46,7 +46,7 @@ export function MacroSplit({ values, onChange, total }: MacroSplitProps) {
         </div>
       ))}
       <p data-testid="macro-total" role={ok ? undefined : "alert"} className={cn("text-sm tabular-nums", ok ? "text-muted-foreground" : "text-destructive")}>
-        Total: {total}% {ok ? "" : "· A soma tem de ser 100%."}
+        Total: {total}% {ok ? "" : "· Must total 100%"}
       </p>
     </fieldset>
   );

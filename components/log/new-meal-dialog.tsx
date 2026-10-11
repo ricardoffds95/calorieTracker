@@ -48,16 +48,16 @@ export function NewMealDialog({ userId, initialTarget, now, foods, onClose, onAd
   const trimmed = name.trim();
   const items = mode === "foods" ? fromEditable(rows) : portionItems(trimmed, totals);
 
-  // What is still needed before the meal can be saved, in words.
+  // What is still needed before the meal can be saved.
   const missing = (() => {
     const needs: string[] = [];
-    if (!trimmed) needs.push("indicar o nome da refeição");
+    if (!trimmed) needs.push("name");
     if (mode === "foods") {
-      if (rows.length === 0) needs.push("juntar pelo menos um alimento");
-      else if (!items) return `${needs.length ? `Falta ${needs.join(" e ")}. ` : ""}Corrige os alimentos: cada um precisa de nome e de uma quantidade maior que 0.`;
-    } else if (parseDecimalInput(totals.calories) === null) needs.push(needs.length ? "as calorias" : "indicar as calorias");
-    else if (!items && trimmed) return "Os valores têm de ser números (0 ou mais).";
-    return needs.length ? `Falta ${needs.join(" e ")} para poderes guardar.` : "";
+      if (rows.length === 0) needs.push("a food");
+      else if (!items) return "Each food needs a name and an amount above 0";
+    } else if (parseDecimalInput(totals.calories) === null) needs.push("calories");
+    else if (!items && trimmed) return "Invalid values";
+    return needs.length ? `Missing: ${needs.join(", ")}` : "";
   })();
 
   // A food from the search or the scanner asks its quantity first; the AI brings its own grams.
@@ -87,8 +87,8 @@ export function NewMealDialog({ userId, initialTarget, now, foods, onClose, onAd
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent ref={contentRef} className="max-h-[90dvh] max-w-sm overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Nova refeição</DialogTitle>
-          <DialogDescription>Uma porção é a soma dos alimentos, ou os valores que indicares.</DialogDescription>
+          <DialogTitle>New meal</DialogTitle>
+          <DialogDescription>Portion = sum of foods</DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-4">
@@ -102,28 +102,28 @@ export function NewMealDialog({ userId, initialTarget, now, foods, onClose, onAd
                 className="h-9 text-muted-foreground aria-pressed:bg-card aria-pressed:text-foreground dark:aria-pressed:bg-background"
                 onClick={() => setMode(m)}
               >
-                {m === "foods" ? "Juntar alimentos" : "Valores por porção"}
+                {m === "foods" ? "Add foods" : "Per portion"}
               </Button>
             ))}
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="new-meal-name">Nome da refeição</Label>
-            <Input id="new-meal-name" className="h-11" placeholder="ex: Frango com arroz" value={name} onChange={(e) => setName(e.target.value)} />
+            <Label htmlFor="new-meal-name">Meal name</Label>
+            <Input id="new-meal-name" className="h-11" placeholder="e.g. Chicken and rice" value={name} onChange={(e) => setName(e.target.value)} />
           </div>
 
           {mode === "foods" ? (
             <>
               <Button type="button" variant="outline" className="h-11" disabled={foods.length === 0} onClick={() => setPanel("saved")}>
                 <ListChecks aria-hidden />
-                Escolher dos meus alimentos · {foods.length}
+                Pick from my foods · {foods.length}
               </Button>
               <FoodSearch key={searchKey} saved={foods} onPick={(food) => setPicked(food)} onScan={() => setPanel("scan")} onAi={() => setPanel("ai")} onSearchingChange={setSearching} />
               {!searching &&
                 (rows.length > 0 ? (
                   <ItemsEditor rows={rows} onChange={setRows} allowEmpty />
                 ) : (
-                  <p className="text-sm text-muted-foreground">Ainda sem alimentos. Procura acima, lê um código de barras ou usa a IA (100 g por omissão).</p>
+                  <p className="text-sm text-muted-foreground">No foods yet</p>
                 ))}
             </>
           ) : (
@@ -151,7 +151,7 @@ export function NewMealDialog({ userId, initialTarget, now, foods, onClose, onAd
       {panel === "saved" && <PickSavedFoodsSheet foods={foods} onJoin={joinSaved} onClose={() => setPanel(null)} />}
       {picked && <JoinFoodSheet food={picked} onJoin={(grams) => joinFood(picked, grams)} onClose={() => setPicked(null)} />}
       {panel === "ai" && (
-        <AiPanel userId={userId} onClose={() => setPanel(null)} onUse={addAiItems} useLabels={{ food: "Juntar alimento", meal: "Usar refeição completa" }} />
+        <AiPanel userId={userId} onClose={() => setPanel(null)} onUse={addAiItems} useLabels={{ food: "Add food", meal: "Use whole meal" }} />
       )}
     </Dialog>
   );

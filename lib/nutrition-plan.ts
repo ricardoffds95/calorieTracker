@@ -2,17 +2,17 @@ import { z } from "zod";
 import { CALORIE_PER_GRAM, type GoalMode } from "./macros";
 
 export const INTENSITIES = [
-  { key: "low", label: "Leve", description: "Conversa fácil" },
-  { key: "moderate", label: "Moderada", description: "A suar" },
-  { key: "high", label: "Intensa", description: "Perto do limite" },
+  { key: "low", label: "Light", description: "Can chat" },
+  { key: "moderate", label: "Moderate", description: "Sweating" },
+  { key: "high", label: "Hard", description: "Near your limit" },
 ] as const;
 export type Intensity = (typeof INTENSITIES)[number]["key"];
 
 export const DAILY_ACTIVITIES = [
-  { key: "sedentary", label: "Sedentário", description: "Sentado quase todo o dia" },
-  { key: "light", label: "Pouco ativo", description: "Algum movimento" },
-  { key: "active", label: "Ativo", description: "Em pé ou a andar" },
-  { key: "very_active", label: "Muito ativo", description: "Trabalho físico (obras, campo)" },
+  { key: "sedentary", label: "Sedentary", description: "Mostly sitting" },
+  { key: "light", label: "Lightly active", description: "Some movement" },
+  { key: "active", label: "Active", description: "On your feet" },
+  { key: "very_active", label: "Very active", description: "Physical work" },
 ] as const;
 export type DailyActivity = (typeof DAILY_ACTIVITIES)[number]["key"];
 
@@ -20,17 +20,17 @@ export const MAX_NOTES_LENGTH = 2000;
 
 /** What the questionnaire asks. Body fat is optional; the lean mass is 100 − fat. */
 export const planAnswersSchema = z.object({
-  sex: z.enum(["male", "female"], { error: "Indica o sexo." }),
-  age: z.number({ error: "Indica a idade." }).int("Usa números inteiros.").min(14, "A idade mínima é 14 anos.").max(100, "A idade máxima é 100 anos."),
-  height_cm: z.number({ error: "Indica a altura." }).int("Usa números inteiros.").min(100, "A altura mínima é 100 cm.").max(250, "A altura máxima é 250 cm."),
-  weight_kg: z.number({ error: "Indica o peso." }).min(30, "O peso mínimo é 30 kg.").max(300, "O peso máximo é 300 kg."),
-  body_fat_pct: z.number({ error: "Valor inválido." }).min(3, "Mínimo 3 %.").max(60, "Máximo 60 %.").nullable(),
-  goal: z.enum(["cut", "maintain", "bulk"], { error: "Escolhe um objetivo." }),
-  daily_activity: z.enum(["sedentary", "light", "active", "very_active"], { error: "Indica como é o teu dia a dia." }),
-  aerobic_sessions: z.number({ error: "Indica os treinos aeróbicos por semana." }).int("Usa números inteiros.").min(0, "Mínimo 0 treinos.").max(14, "Máximo 14 treinos."),
-  anaerobic_sessions: z.number({ error: "Indica os treinos anaeróbicos por semana." }).int("Usa números inteiros.").min(0, "Mínimo 0 treinos.").max(14, "Máximo 14 treinos."),
-  intensity: z.enum(["low", "moderate", "high"], { error: "Escolhe a intensidade." }),
-  notes: z.string().trim().max(MAX_NOTES_LENGTH, `As notas podem ter no máximo ${MAX_NOTES_LENGTH} caracteres.`),
+  sex: z.enum(["male", "female"], { error: "Sex required" }),
+  age: z.number({ error: "Age required" }).int("Whole numbers only").min(14, "Min age 14").max(100, "Max age 100"),
+  height_cm: z.number({ error: "Height required" }).int("Whole numbers only").min(100, "Min 100 cm").max(250, "Max 250 cm"),
+  weight_kg: z.number({ error: "Weight required" }).min(30, "Min 30 kg").max(300, "Max 300 kg"),
+  body_fat_pct: z.number({ error: "Invalid value" }).min(3, "Min 3%").max(60, "Max 60%").nullable(),
+  goal: z.enum(["cut", "maintain", "bulk"], { error: "Pick a goal" }),
+  daily_activity: z.enum(["sedentary", "light", "active", "very_active"], { error: "Pick daily activity" }),
+  aerobic_sessions: z.number({ error: "Aerobic sessions required" }).int("Whole numbers only").min(0, "Min 0").max(14, "Max 14"),
+  anaerobic_sessions: z.number({ error: "Anaerobic sessions required" }).int("Whole numbers only").min(0, "Min 0").max(14, "Max 14"),
+  intensity: z.enum(["low", "moderate", "high"], { error: "Pick an intensity" }),
+  notes: z.string().trim().max(MAX_NOTES_LENGTH, `Max ${MAX_NOTES_LENGTH} characters`),
 });
 export type PlanAnswers = z.infer<typeof planAnswersSchema>;
 
@@ -147,6 +147,6 @@ export function reconcilePlans(ai: PlansByGoal, answers: PlanAnswers): { plans: 
 }
 
 /** The explanation shown with the standard plans. */
-export function referenceSummary(a: PlanAnswers): string {
-  return `Cálculo padrão: ${a.weight_kg} kg, ${a.aerobic_sessions + a.anaerobic_sessions} treinos por semana.`;
+export function referenceSummary(): string {
+  return "Standard calculation";
 }

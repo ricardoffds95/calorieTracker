@@ -1,10 +1,10 @@
 import { Suspense } from "react";
-import { HistoryScreen } from "@/components/history/history-screen";
 import { PageHeader } from "@/components/page-header";
+import { SavedScreen } from "@/components/saved/saved-screen";
 import { Skeleton } from "@/components/ui/skeleton";
 import { createClient } from "@/lib/supabase/server";
 
-export default async function HistoryPage() {
+export default async function SavedPage() {
   const supabase = await createClient();
   const { data } = await supabase.auth.getClaims();
   const userId = data?.claims?.sub;
@@ -12,9 +12,9 @@ export default async function HistoryPage() {
 
   return (
     <>
-      <PageHeader title="Histórico" />
-      <Suspense fallback={<Skeleton className="h-96 w-full" aria-label="A carregar" />}>
-        <HistoryScreen userId={userId} />
+      <PageHeader title="Saved" />
+      <Suspense fallback={<Skeleton className="h-96 w-full" aria-label="Loading" />}>
+        <SavedScreen userId={userId} />
       </Suspense>
     </>
   );

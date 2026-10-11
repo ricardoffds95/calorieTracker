@@ -23,7 +23,7 @@ export function mealFromParam(param: string | null | undefined): MealType {
   return (MEAL_TYPES as readonly string[]).includes(param ?? "") ? (param as MealType) : DEFAULT_MEAL;
 }
 
-/** "lanches, hoje, 10 out": where an entry was added. */
+/** "snacks (today, 10 Oct)": where an entry was added. */
 export function describeTarget(target: LogTarget, now: Date): string {
   return `${mealLabel(target.meal).toLowerCase()} (${formatDayLabel(target.entry_date, now).toLowerCase()})`;
 }
@@ -35,13 +35,13 @@ export function isValidTarget(target: LogTarget): boolean {
 
 export const MAX_QUANTITY_G = 5000;
 export const quantitySchema = z
-  .number({ error: "Quantidade inválida." })
-  .gt(0, "Tem de ser maior que 0.")
-  .max(MAX_QUANTITY_G, "Valor demasiado alto.");
+  .number({ error: "Invalid amount" })
+  .gt(0, "Must be above 0")
+  .max(MAX_QUANTITY_G, "Too high");
 
-/** "1 porção", "1.5 porções" (meals are counted in portions; the DB column is `doses`). */
+/** "1 portion", "1.5 portions" (meals are counted in portions; the DB column is `doses`). */
 export function portionsLabel(portions: number): string {
-  return `${portions} ${portions === 1 ? "porção" : "porções"}`;
+  return `${portions} ${portions === 1 ? "portion" : "portions"}`;
 }
 
 /** Portions move 0.1 at a time (a bit of a meal), with shortcuts for the usual amounts. */
@@ -72,7 +72,7 @@ export function foodEntryRow(
 
 /**
  * A meal entry for `doses` portions; doses are stored so later edits of the saved meal re-apply them.
- * `id` null: a meal that is not saved (e.g. "Só adicionar ao diário" from the AI).
+ * `id` null: a meal that is not saved (e.g. "Add only" from the AI).
  */
 export function mealEntryRow(
   target: LogTarget,
@@ -126,9 +126,9 @@ export function servingPresets(servingSize: string | undefined): QuantityPreset[
   return presets;
 }
 
-const name = z.string().trim().min(1, "Indica um nome.").max(200, "Nome demasiado longo.");
+const name = z.string().trim().min(1, "Name required").max(200, "Name too long");
 const per100 = (max: number) =>
-  z.number({ error: "Valor inválido." }).min(0, "Não pode ser negativo.").max(max, `Máximo ${max} por 100 g.`);
+  z.number({ error: "Invalid value" }).min(0, "Can't be negative").max(max, `Max ${max} per 100 g`);
 
 /** A saved food, values per 100 g. */
 export const savedFoodSchema = z.object({

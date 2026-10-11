@@ -10,7 +10,7 @@ export default async function ProfilePage() {
 
   return (
     <>
-      <PageHeader title="Perfil" />
+      <PageHeader title="Profile" />
       <div className="flex flex-col gap-8">
         <ProfileScreen userId={claims.sub} email={claims.email ?? ""} />
       </div>

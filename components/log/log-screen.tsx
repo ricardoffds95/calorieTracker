@@ -25,7 +25,7 @@ import { ensureSavedFood, useSaveFoodOnly, useSavedFoods, useSavedMeals, type Sa
 
 export function LogScreen({ userId }: { userId: string }) {
   // "Today" depends on the browser's clock, so nothing date-based renders on the server.
-  if (!useMounted()) return <Skeleton className="h-96 w-full" aria-label="A carregar" />;
+  if (!useMounted()) return <Skeleton className="h-96 w-full" aria-label="Loading" />;
   return <LogDay userId={userId} />;
 }
 
@@ -48,11 +48,11 @@ function LogDay({ userId }: { userId: string }) {
 
   function showAdded(message: string, day = dateKey) {
     setPanel(null);
-    toast.success(message, { action: { label: "Ver dia", onClick: () => router.push(dayHref(day, now)) } });
+    toast.success(message, { action: { label: "View day", onClick: () => router.push(dayHref(day, now)) } });
   }
 
   function addRows(rows: NewDiaryEntry[] | (() => Promise<NewDiaryEntry[]>), what: string, target: LogTarget) {
-    add.mutate({ rows }, { onSuccess: () => showAdded(`${what} adicionado a ${describeTarget(target, now)}`, target.entry_date) });
+    add.mutate({ rows }, { onSuccess: () => showAdded(`${what} added to ${describeTarget(target, now)}`, target.entry_date) });
   }
 
   return (
@@ -80,11 +80,11 @@ function LogDay({ userId }: { userId: string }) {
       <div className="grid grid-cols-2 gap-2">
         <Button type="button" variant="outline" className="h-11" onClick={() => setPanel({ kind: "newMeal" })}>
           <Plus aria-hidden />
-          Criar refeição
+          New meal
         </Button>
         <Button type="button" variant="outline" className="h-11" onClick={() => setPanel({ kind: "manual" })}>
           <Plus aria-hidden />
-          Inserir manualmente
+          Add manually
         </Button>
       </div>
 

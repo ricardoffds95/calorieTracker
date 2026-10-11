@@ -15,18 +15,18 @@ interface ManualEntryDialogProps {
   initialTarget: LogTarget;
   pending: boolean;
   onClose: () => void;
-  /** `saveAs`: the same food per 100 g, when "Guardar nos meus alimentos" is checked. */
+  /** `saveAs`: the same food per 100 g, when "Save to my foods" is checked. */
   onAdd: (item: FoodEditValues, saveAs: SavedFoodValues | null, target: LogTarget) => void;
 }
 
 const asNumber = (text: string) => parseDecimalInput(text) ?? Number.NaN;
 const FIELDS = [
-  ["name", "Nome", false],
-  ["quantity_g", "Quantidade (g)", true],
-  ["calories", "Calorias (kcal)", true],
-  ["protein_g", "Proteína (g)", true],
-  ["carbs_g", "Hidratos (g)", true],
-  ["fat_g", "Gordura (g)", true],
+  ["name", "Name", false],
+  ["quantity_g", "Amount (g)", true],
+  ["calories", "Calories (kcal)", true],
+  ["protein_g", "Protein (g)", true],
+  ["carbs_g", "Carbs (g)", true],
+  ["fat_g", "Fat (g)", true],
 ] as const;
 type Field = (typeof FIELDS)[number][0];
 
@@ -56,7 +56,7 @@ export function ManualEntryDialog({ initialTarget, pending, onClose, onAdd }: Ma
         fat_100g: (parsed.data.fat_g / parsed.data.quantity_g) * 100,
       })
     : null;
-  const saveError = save && per100 && !per100.success ? "Estes valores dão mais do que é possível por 100 g. Confirma a quantidade." : null;
+  const saveError = save && per100 && !per100.success ? "Too much for 100 g" : null;
 
   function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -69,8 +69,8 @@ export function ManualEntryDialog({ initialTarget, pending, onClose, onAdd }: Ma
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Inserir manualmente</DialogTitle>
-          <DialogDescription>Valores para a quantidade indicada.</DialogDescription>
+          <DialogTitle>Add manually</DialogTitle>
+          <DialogDescription>For this amount</DialogDescription>
         </DialogHeader>
         <form onSubmit={onSubmit} noValidate className="grid grid-cols-2 gap-3">
           {FIELDS.map(([key, label, numeric]) => (
@@ -93,7 +93,7 @@ export function ManualEntryDialog({ initialTarget, pending, onClose, onAdd }: Ma
           ))}
           <label className="col-span-2 flex min-h-11 items-center gap-3 text-sm">
             <input type="checkbox" className="size-5 accent-primary" checked={save} onChange={(e) => setSave(e.target.checked)} />
-            Guardar nos meus alimentos
+            Save to my foods
           </label>
           {touched && saveError && (
             <p role="alert" className="col-span-2 text-xs text-destructive">
@@ -105,10 +105,10 @@ export function ManualEntryDialog({ initialTarget, pending, onClose, onAdd }: Ma
           </div>
           <DialogFooter className="col-span-2 gap-2">
             <Button type="button" variant="outline" size="lg" onClick={onClose}>
-              Cancelar
+              Cancel
             </Button>
             <Button type="submit" size="lg" disabled={pending}>
-              {pending ? "A adicionar…" : "Adicionar ao diário"}
+              {pending ? "Adding…" : "Add to diary"}
             </Button>
           </DialogFooter>
         </form>

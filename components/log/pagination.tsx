@@ -13,8 +13,8 @@ interface PaginationProps {
 export function Pagination({ page, pageCount, onChange, disabled = false }: PaginationProps) {
   if (pageCount <= 1) return null;
   return (
-    <nav aria-label="Páginas de resultados" className="flex items-center justify-center gap-1 pt-2">
-      <Button type="button" variant="ghost" size="icon" className="size-11" aria-label="Página anterior" disabled={disabled || page <= 1} onClick={() => onChange(page - 1)}>
+    <nav aria-label="Result pages" className="flex items-center justify-center gap-1 pt-2">
+      <Button type="button" variant="ghost" size="icon" className="size-11" aria-label="Previous page" disabled={disabled || page <= 1} onClick={() => onChange(page - 1)}>
         <ChevronLeft aria-hidden />
       </Button>
       {pageWindow(page, pageCount).map((entry, i) =>
@@ -28,7 +28,7 @@ export function Pagination({ page, pageCount, onChange, disabled = false }: Pagi
             type="button"
             variant={entry === page ? "default" : "ghost"}
             className="size-11 px-0 tabular-nums"
-            aria-label={`Página ${entry}`}
+            aria-label={`Page ${entry}`}
             aria-current={entry === page ? "page" : undefined}
             disabled={disabled}
             onClick={() => onChange(entry)}
@@ -37,7 +37,7 @@ export function Pagination({ page, pageCount, onChange, disabled = false }: Pagi
           </Button>
         ),
       )}
-      <Button type="button" variant="ghost" size="icon" className="size-11" aria-label="Página seguinte" disabled={disabled || page >= pageCount} onClick={() => onChange(page + 1)}>
+      <Button type="button" variant="ghost" size="icon" className="size-11" aria-label="Next page" disabled={disabled || page >= pageCount} onClick={() => onChange(page + 1)}>
         <ChevronRight aria-hidden />
       </Button>
     </nav>

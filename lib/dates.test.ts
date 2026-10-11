@@ -56,17 +56,17 @@ describe("isToday", () => {
 });
 
 describe("formatDayLabel", () => {
-  it("uses Hoje / Ontem / Amanhã for neighbouring days", () => {
-    expect(formatDayLabel("2026-10-10", now)).toBe("Hoje, 10 out");
-    expect(formatDayLabel("2026-10-09", now)).toBe("Ontem, 9 out");
-    expect(formatDayLabel("2026-10-11", now)).toBe("Amanhã, 11 out");
+  it("uses Today / Yesterday / Tomorrow for neighbouring days", () => {
+    expect(formatDayLabel("2026-10-10", now)).toBe("Today, 10 Oct");
+    expect(formatDayLabel("2026-10-09", now)).toBe("Yesterday, 9 Oct");
+    expect(formatDayLabel("2026-10-11", now)).toBe("Tomorrow, 11 Oct");
   });
   it("uses the weekday for other days", () => {
-    expect(formatDayLabel("2026-10-03", now)).toBe("sáb, 3 out");
-    expect(formatDayLabel("2026-01-15", now)).toBe("qui, 15 jan");
+    expect(formatDayLabel("2026-10-03", now)).toBe("Sat, 3 Oct");
+    expect(formatDayLabel("2026-01-15", now)).toBe("Thu, 15 Jan");
   });
   it("works across a month boundary", () => {
-    expect(formatDayLabel("2026-09-30", new Date(2026, 9, 1, 8))).toBe("Ontem, 30 set");
+    expect(formatDayLabel("2026-09-30", new Date(2026, 9, 1, 8))).toBe("Yesterday, 30 Sep");
   });
   it("returns the key itself when invalid", () => {
     expect(formatDayLabel("garbage", now)).toBe("garbage");

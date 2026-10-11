@@ -51,13 +51,13 @@ describe("profile data", () => {
   });
 
   it.each([
-    [{ age: "13" }, "A idade mínima é 14 anos."],
-    [{ age: "abc" }, "Indica a idade."],
-    [{ height: "300" }, "A altura máxima é 250 cm."],
-    [{ weight: "12" }, "O peso mínimo é 30 kg."],
-    [{ fat: "70" }, "Máximo 60 %."],
-    [{ aerobic: "20" }, "Máximo 14 treinos."],
-    [{ notes: "x".repeat(2001) }, "As notas podem ter no máximo 2000 caracteres."],
+    [{ age: "13" }, "Min age 14"],
+    [{ age: "abc" }, "Age required"],
+    [{ height: "300" }, "Max 250 cm"],
+    [{ weight: "12" }, "Min 30 kg"],
+    [{ fat: "70" }, "Max 60%"],
+    [{ aerobic: "20" }, "Max 14"],
+    [{ notes: "x".repeat(2001) }, "Max 2000 characters"],
   ] as const)("%j → %s", (patch, message) => {
     const result = parse(patch);
     expect(result.success).toBe(false);

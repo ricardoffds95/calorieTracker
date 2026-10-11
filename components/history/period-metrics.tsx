@@ -11,10 +11,10 @@ interface PeriodMetricsProps {
 }
 
 function readout(bucket: Bucket): string {
-  if (!bucket.average) return `${bucketLabel(bucket)}: sem registos`;
+  if (!bucket.average) return `${bucketLabel(bucket)}: none`;
   const { calories, protein, carbs, fat } = bucket.average;
-  const per = bucket.granularity === "day" ? "" : " por dia";
-  return `${bucketLabel(bucket)}: ${calories} kcal${per} · P ${protein} · H ${carbs} · G ${fat}`;
+  const per = bucket.granularity === "day" ? "" : " per day";
+  return `${bucketLabel(bucket)}: ${calories} kcal${per} · P ${protein} · C ${carbs} · F ${fat}`;
 }
 
 /** Calories and the three macros, each with its stats and its chart. Selecting a day in one chart selects it in all. */
@@ -27,7 +27,7 @@ export function PeriodMetrics({ summary, buckets, kind }: PeriodMetricsProps) {
   return (
     <div className="flex flex-col gap-6">
       <p aria-live="polite" data-testid="chart-readout" className="min-h-10 text-sm text-muted-foreground tabular-nums">
-        {chosen ? readout(chosen) : "Toca numa barra para ver os valores desse dia nos quatro gráficos."}
+        {chosen ? readout(chosen) : "Tap a bar"}
       </p>
       {METRICS.map(({ key, label, unit }) => (
         <MetricBlock
@@ -36,7 +36,7 @@ export function PeriodMetrics({ summary, buckets, kind }: PeriodMetricsProps) {
           label={label}
           unit={unit}
           stats={summary.stats![key]}
-          note={key === "calories" ? undefined : `${split[key]}% das kcal`}
+          note={key === "calories" ? undefined : `${split[key]}% of kcal`}
           buckets={buckets}
           kind={kind}
           selected={selected}

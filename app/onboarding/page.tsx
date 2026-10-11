@@ -10,7 +10,7 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
   const params = await searchParams;
   return (
     <main className="mx-auto w-full max-w-md px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))]">
-      <OnboardingScreen userId={userId} fromProfile={params.de === "perfil"} />
+      <OnboardingScreen userId={userId} fromProfile={params.from === "profile"} />
     </main>
   );
 }

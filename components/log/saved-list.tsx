@@ -33,14 +33,14 @@ export function SavedList({ foods, meals, onPickFood, onPickMeal, onEditFood, on
   }, [foods, meals]);
 
   return (
-    <section aria-label="Guardados" className="flex flex-col gap-2">
-      <h2 className="text-sm font-medium text-muted-foreground">Os teus guardados</h2>
-      {!entries && <Skeleton className="h-32 w-full" aria-label="A carregar guardados" />}
+    <section aria-label="Saved" className="flex flex-col gap-2">
+      <h2 className="text-sm font-medium text-muted-foreground">Saved</h2>
+      {!entries && <Skeleton className="h-32 w-full" aria-label="Loading saved" />}
       {entries && entries.length === 0 && (
-        <p className="py-2 text-sm text-muted-foreground">Ainda sem alimentos nem refeições guardados. Os que adicionares pela pesquisa ficam aqui.</p>
+        <p className="py-2 text-sm text-muted-foreground">Nothing saved yet</p>
       )}
       {entries && entries.length > 0 && (
-        <ScrollList aria-label="Lista de guardados">
+        <ScrollList aria-label="Saved list">
           <ul data-testid="saved-all">
             {entries.slice(0, limit).map((entry) =>
               entry.kind === "food" ? (
@@ -56,7 +56,7 @@ export function SavedList({ foods, meals, onPickFood, onPickMeal, onEditFood, on
                   key={`m-${entry.item.id}`}
                   name={entry.item.name}
                   detail={`${entry.item.total_calories} kcal`}
-                  tag="Refeição"
+                  tag="Meal"
                   onPick={() => onPickMeal(entry.item)}
                   onEdit={() => onEditMeal(entry.item)}
                 />
@@ -67,11 +67,11 @@ export function SavedList({ foods, meals, onPickFood, onPickMeal, onEditFood, on
       )}
       {entries && entries.length > limit && (
         <Button type="button" variant="ghost" className="h-11" onClick={() => setLimit((n) => n + PAGE)}>
-          Ver mais
+          Show more
         </Button>
       )}
-      <Link href="/guardados" className={cn(buttonVariants({ variant: "link" }), "h-11 self-start px-1 text-muted-foreground")}>
-        Gerir alimentos e refeições
+      <Link href="/saved" className={cn(buttonVariants({ variant: "link" }), "h-11 self-start px-1 text-muted-foreground")}>
+        Manage saved
       </Link>
     </section>
   );
@@ -80,14 +80,14 @@ export function SavedList({ foods, meals, onPickFood, onPickMeal, onEditFood, on
 function SavedRow({ name, detail, tag, onPick, onEdit }: { name: string; detail: string; tag?: string; onPick: () => void; onEdit: () => void }) {
   return (
     <li className="flex items-center gap-1">
-      <button type="button" aria-label={`Escolher ${name}`} onClick={onPick} className="flex min-h-11 min-w-0 flex-1 items-center justify-between gap-3 rounded-sm px-1 text-left">
+      <button type="button" aria-label={`Choose ${name}`} onClick={onPick} className="flex min-h-11 min-w-0 flex-1 items-center justify-between gap-3 rounded-sm px-1 text-left">
         <span className="flex min-w-0 items-center gap-2">
           <span className="truncate">{name}</span>
           {tag && <span className="shrink-0 rounded-sm bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">{tag}</span>}
         </span>
         <span className="shrink-0 text-sm text-muted-foreground tabular-nums">{detail}</span>
       </button>
-      <Button type="button" variant="ghost" size="icon" className="size-11 shrink-0 text-muted-foreground" aria-label={`Editar guardado ${name}`} onClick={onEdit}>
+      <Button type="button" variant="ghost" size="icon" className="size-11 shrink-0 text-muted-foreground" aria-label={`Edit saved ${name}`} onClick={onEdit}>
         <Pencil aria-hidden />
       </Button>
     </li>

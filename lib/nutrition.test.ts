@@ -97,15 +97,15 @@ describe("propagateSavedFoodEdit", () => {
 });
 
 describe("propagateSavedMealEdit", () => {
-  const entry = { name: "Almoço", items: [chicken], calories: 165, protein_g: 31, carbs_g: 0, fat_g: 3.6 };
+  const entry = { name: "Lunch", items: [chicken], calories: 165, protein_g: 31, carbs_g: 0, fat_g: 3.6 };
 
   it("replaces name, items and totals", () => {
-    const result = propagateSavedMealEdit(entry, { name: "Almoço novo", items: [chicken, rice] });
-    expect(result).toMatchObject({ name: "Almoço novo", calories: 425, protein_g: 36.4, carbs_g: 56, fat_g: 4.2 });
+    const result = propagateSavedMealEdit(entry, { name: "Lunch novo", items: [chicken, rice] });
+    expect(result).toMatchObject({ name: "Lunch novo", calories: 425, protein_g: 36.4, carbs_g: 56, fat_g: 4.2 });
     expect(result.items).toHaveLength(2);
   });
   it("applies the doses used when the meal was logged", () => {
-    const result = propagateSavedMealEdit(entry, { name: "Almoço", items: [chicken] }, 2);
+    const result = propagateSavedMealEdit(entry, { name: "Lunch", items: [chicken] }, 2);
     expect(result.calories).toBe(330);
     expect(result.items[0]?.quantity_g).toBe(200);
   });

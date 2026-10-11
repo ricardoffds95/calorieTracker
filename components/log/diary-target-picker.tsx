@@ -16,13 +16,13 @@ interface DiaryTargetPickerProps {
 /** Where an entry goes: the day and the meal. The meal is chosen here, not in a menu of the screen. */
 export function DiaryTargetPicker({ value, onChange }: DiaryTargetPickerProps) {
   return (
-    <div className="flex flex-col gap-3" role="group" aria-label="Onde adicionar">
+    <div className="flex flex-col gap-3" role="group" aria-label="Where to add">
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="target-date">Data</Label>
+        <Label htmlFor="target-date">Date</Label>
         <Input id="target-date" type="date" className="block h-11 w-full min-w-0 max-w-full appearance-none" value={value.entry_date} onChange={(e) => onChange({ ...value, entry_date: e.target.value })} />
       </div>
-      {!isValidTarget(value) && <Hint>Escolhe uma data para poderes adicionar ao diário.</Hint>}
-      <div role="group" aria-label="Refeição" className="grid grid-cols-4 gap-1">
+      {!isValidTarget(value) && <Hint>Pick a date</Hint>}
+      <div role="group" aria-label="Meal" className="grid grid-cols-4 gap-1">
         {MEAL_TYPES.map((meal) => (
           <Button
             key={meal}

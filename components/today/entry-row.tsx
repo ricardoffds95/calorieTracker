@@ -14,7 +14,7 @@ export function EntryRow({ entry, onEdit, onDelete }: EntryRowProps) {
     <li className={ROW_GRID} data-testid="entry-row">
       <button
         type="button"
-        aria-label={`Editar ${entry.name}`}
+        aria-label={`Edit ${entry.name}`}
         onClick={() => onEdit(entry)}
         className="grid min-h-11 min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-sm px-1 text-left"
       >
@@ -28,7 +28,7 @@ export function EntryRow({ entry, onEdit, onDelete }: EntryRowProps) {
         <span data-testid="row-kcal" className={KCAL}>{entry.calories} kcal</span>
       </button>
       <span aria-hidden />
-      <Button type="button" variant="ghost" size="icon" className="size-11 text-muted-foreground" aria-label={`Remover ${entry.name}`} onClick={() => onDelete(entry)}>
+      <Button type="button" variant="ghost" size="icon" className="size-11 text-muted-foreground" aria-label={`Remove ${entry.name}`} onClick={() => onDelete(entry)}>
         <X aria-hidden />
       </Button>
     </li>

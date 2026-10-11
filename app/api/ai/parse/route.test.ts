@@ -73,13 +73,13 @@ describe("POST /api/ai/parse", () => {
   });
 
   it.each(["not_configured", "auth", "quota", "server", "timeout", "network"] as const)(
-    "answers 503 'IA não disponível' when the AI is unavailable (%s) without leaking the reason",
+    "answers 503 'AI unavailable' when the AI is unavailable (%s) without leaking the reason",
     async (reason) => {
       vi.mocked(parseFoodText).mockRejectedValue(new AiUnavailableError(reason));
       const response = await post({ type: "text", text: "arroz" });
       expect(response.status).toBe(503);
       const text = await response.text();
-      expect(JSON.parse(text)).toEqual({ error: "ai_unavailable", message: "Modo IA não disponível de momento." });
+      expect(JSON.parse(text)).toEqual({ error: "ai_unavailable", message: "AI unavailable" });
       expect(text).not.toContain(reason === "auth" ? "auth" : "__never__");
     },
   );

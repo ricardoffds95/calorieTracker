@@ -29,7 +29,7 @@ export function PhotoPicker({ onChange, disabled = false }: PhotoPickerProps) {
       setPhoto(prepared);
       onChange(prepared);
     } catch (e) {
-      setError(e instanceof ImageError ? e.message : "Não foi possível abrir esta imagem. Experimenta outra foto.");
+      setError(e instanceof ImageError ? e.message : "Can't open this image");
     } finally {
       setProcessing(false);
     }
@@ -52,13 +52,13 @@ export function PhotoPicker({ onChange, disabled = false }: PhotoPickerProps) {
         <div className="relative overflow-hidden rounded-md border border-border">
           {/* A small local data URL: next/image optimization does not apply. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={`data:${photo.mimeType};base64,${photo.image}`} alt="Foto selecionada" className="max-h-72 w-full object-cover" />
+          <img src={`data:${photo.mimeType};base64,${photo.image}`} alt="Selected photo" className="max-h-72 w-full object-cover" />
           <Button
             type="button"
             variant="secondary"
             size="icon"
             className="absolute top-2 right-2 size-11"
-            aria-label="Remover foto"
+            aria-label="Remove photo"
             disabled={busy}
             onClick={remove}
           >
@@ -69,18 +69,18 @@ export function PhotoPicker({ onChange, disabled = false }: PhotoPickerProps) {
         <div className="grid grid-cols-2 gap-2">
           <Button type="button" variant="outline" className="h-11" disabled={busy} onClick={() => cameraInput.current?.click()}>
             <Camera aria-hidden />
-            Tirar foto
+            Take photo
           </Button>
           <Button type="button" variant="outline" className="h-11" disabled={busy} onClick={() => galleryInput.current?.click()}>
             <ImageIcon aria-hidden />
-            Galeria
+            Gallery
           </Button>
         </div>
       )}
 
       {processing && (
         <p aria-live="polite" className="text-sm text-muted-foreground">
-          A preparar a foto…
+          Preparing photo…
         </p>
       )}
       {error && (

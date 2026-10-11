@@ -10,9 +10,9 @@ export const MAX_GRAMS = 2000;
 export const DEFAULT_NAME = "Utilizador";
 
 export const GOAL_MODE_OPTIONS: readonly { mode: GoalMode; label: string; description: string }[] = [
-  { mode: "cut", label: "Perder peso", description: "Défice calórico" },
-  { mode: "maintain", label: "Manter peso", description: "Calorias de manutenção" },
-  { mode: "bulk", label: "Ganhar massa", description: "Excedente calórico" },
+  { mode: "cut", label: "Lose weight", description: "Deficit" },
+  { mode: "maintain", label: "Maintain weight", description: "Maintenance" },
+  { mode: "bulk", label: "Gain muscle", description: "Surplus" },
 ];
 
 export interface MacroPercentages {
@@ -58,17 +58,17 @@ export function gramsFromPercentages(calories: number, pct: MacroPercentages): M
   return { protein: goals.protein, carbs: goals.carbs, fat: goals.fat };
 }
 
-const grams = z.number({ error: "Usa um número inteiro de gramas." }).int("Usa números inteiros.").min(0, "Mínimo 0 g.").max(MAX_GRAMS, `Máximo ${MAX_GRAMS} g.`);
-const percent = z.number({ error: "Valor inválido." }).int("Usa números inteiros.").min(0, "Mínimo 0%.").max(100, "Máximo 100%.");
+const grams = z.number({ error: "Whole grams only" }).int("Whole numbers only").min(0, "Min 0 g").max(MAX_GRAMS, `Max ${MAX_GRAMS} g`);
+const percent = z.number({ error: "Invalid value" }).int("Whole numbers only").min(0, "Min 0%").max(100, "Max 100%");
 
 export const profileFormSchema = z
   .object({
     mode: z.enum(["cut", "maintain", "bulk"]),
     calories: z
-      .number({ error: "Insere um valor de calorias válido." })
-      .int("Usa números inteiros.")
-      .min(MIN_CALORIES, `Mínimo ${MIN_CALORIES} kcal.`)
-      .max(MAX_CALORIES, `Máximo ${MAX_CALORIES} kcal.`),
+      .number({ error: "Invalid calories" })
+      .int("Whole numbers only")
+      .min(MIN_CALORIES, `Min ${MIN_CALORIES} kcal`)
+      .max(MAX_CALORIES, `Max ${MAX_CALORIES} kcal`),
     proteinPct: percent,
     carbsPct: percent,
     fatPct: percent,
@@ -78,7 +78,7 @@ export const profileFormSchema = z
   })
   .refine((v) => v.proteinPct + v.carbsPct + v.fatPct === 100, {
     path: ["total"],
-    message: "A soma tem de ser 100%.",
+    message: "Must total 100%",
   });
 
 export type ProfileFormValues = z.input<typeof profileFormSchema>;

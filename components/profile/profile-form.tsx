@@ -148,13 +148,13 @@ export function ProfileForm({ profile }: { profile: Profile }) {
     <form onSubmit={onSubmit} className="flex flex-col gap-6" noValidate>
       <div className="flex flex-col gap-2">
         <GoalModePicker value={mode} onChange={selectMode} />
-        {savedPlans && <p className="text-xs text-muted-foreground">Cada objetivo usa o teu plano guardado.</p>}
+        {savedPlans && <p className="text-xs text-muted-foreground"></p>}
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label>Calorias diárias</Label>
+        <Label>Daily calories</Label>
         <NumberStepper
-          label="Calorias diárias"
+          label="Daily calories"
           value={calories}
           onChange={changeCalories}
           step={CALORIE_STEP}
@@ -175,9 +175,9 @@ export function ProfileForm({ profile }: { profile: Profile }) {
 
       <MacroGrams values={grams} onChange={changeGrams} calories={values.calories} errors={gramsErrors} />
 
-      {parsed.success && !dirty && <p className="text-center text-sm text-muted-foreground">Sem alterações para guardar.</p>}
+      {parsed.success && !dirty && <p className="text-center text-sm text-muted-foreground">No changes</p>}
       <Button type="submit" size="lg" disabled={!parsed.success || !dirty || update.isPending}>
-        {update.isPending ? "A guardar…" : "Guardar objetivos"}
+        {update.isPending ? "Saving…" : "Save goals"}
       </Button>
     </form>
   );

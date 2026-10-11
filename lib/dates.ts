@@ -1,5 +1,5 @@
 import { addDays as addDaysFns, differenceInCalendarDays, format, isValid, parse } from "date-fns";
-import { pt } from "date-fns/locale";
+import { enGB } from "date-fns/locale";
 
 const KEY_FORMAT = "yyyy-MM-dd";
 
@@ -25,16 +25,16 @@ export function isToday(key: string, now: Date): boolean {
   return key === toDateKey(now);
 }
 
-/** "Hoje, 10 out" / "Ontem, 9 out" / "Amanhã, 11 out" / "sáb, 3 out". */
+/** "Today, 10 Oct" / "Yesterday, 9 Oct" / "Tomorrow, 11 Oct" / "Sat, 3 Oct". */
 export function formatDayLabel(key: string, now: Date): string {
   const date = parseDateKey(key);
   if (!date) return key;
   const diff = differenceInCalendarDays(date, now);
-  const short = format(date, "d MMM", { locale: pt });
-  if (diff === 0) return `Hoje, ${short}`;
-  if (diff === -1) return `Ontem, ${short}`;
-  if (diff === 1) return `Amanhã, ${short}`;
-  return `${format(date, "EEE", { locale: pt })}, ${short}`;
+  const short = format(date, "d MMM", { locale: enGB });
+  if (diff === 0) return `Today, ${short}`;
+  if (diff === -1) return `Yesterday, ${short}`;
+  if (diff === 1) return `Tomorrow, ${short}`;
+  return `${format(date, "EEE", { locale: enGB })}, ${short}`;
 }
 
 /** A valid key from user input (e.g. the `?d=` param), or today's key. */

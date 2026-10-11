@@ -7,6 +7,6 @@ export function isNetworkError(error: { message?: string } | null | undefined): 
 
 export function toastSaveError(error: { message?: string } | null | undefined) {
   toast.error(
-    isNetworkError(error) ? "Sem ligação. As alterações não foram guardadas." : "Não foi possível guardar. Tenta novamente.",
+    isNetworkError(error) ? "No connection. Not saved" : "Couldn't save",
   );
 }

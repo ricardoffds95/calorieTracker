@@ -26,7 +26,7 @@ const items = [
   { name: "Frango", quantity_g: 150, calories: 248, protein_g: 46.5, carbs_g: 0, fat_g: 5.4 },
   { name: "Arroz", quantity_g: 200, calories: 260, protein_g: 5.4, carbs_g: 56, fat_g: 0.6 },
 ];
-const meal: DiaryEntry = { ...food, id: "e2", kind: "meal", meal: "lunch", name: "Frango com arroz", quantity_g: null, items, calories: 508, protein_g: 51.9, carbs_g: 56, fat_g: 6, saved_food_id: null, saved_meal_id: "sm1" };
+const meal: DiaryEntry = { ...food, id: "e2", kind: "meal", meal: "lunch", name: "Chicken and rice", quantity_g: null, items, calories: 508, protein_g: 51.9, carbs_g: 56, fat_g: 6, saved_food_id: null, saved_meal_id: "sm1" };
 
 describe("foodEditSchema / mealEditSchema", () => {
   const ok = { name: "Aveia", quantity_g: 60, calories: 224, protein_g: 8, carbs_g: 35, fat_g: 4 };

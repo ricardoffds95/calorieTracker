@@ -69,13 +69,13 @@ export async function ensureSavedFood(food: FoodSearchResult): Promise<string> {
   return data;
 }
 
-/** Saves a search/scan result in "Guardados" without logging it. */
+/** Saves a search/scan result in "Saved" without logging it. */
 export function useSaveFoodOnly(userId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (food: FoodSearchResult) => ensureSavedFood(food),
     onError: (error: { message?: string }) => toastSaveError(error),
-    onSuccess: () => toast.success("Guardado nos alimentos"),
+    onSuccess: () => toast.success("Saved to foods"),
     onSettled: () => queryClient.invalidateQueries({ queryKey: savedFoodsKey(userId) }),
   });
 }
@@ -121,7 +121,7 @@ function useSavedMutation<V>(
     },
     onError: (error: { message?: string }) => toastSaveError(error),
     onSuccess: (updated) =>
-      toast.success(updated > 0 ? `Guardado e ${updated} ${updated === 1 ? "entrada atualizada" : "entradas atualizadas"}` : "Guardado"),
+      toast.success(updated > 0 ? `Saved, ${updated} ${updated === 1 ? "entry" : "entries"} updated` : "Saved"),
     onSettled: () =>
       Promise.all([
         queryClient.invalidateQueries({ queryKey: kind === "food" ? savedFoodsKey(userId) : savedMealsKey(userId) }),
@@ -191,7 +191,7 @@ export function useCreateSavedFood(userId: string) {
     onError: (error: { message?: string; code?: string }) => {
       if (error.code !== DUPLICATE_NAME) toastSaveError(error);
     },
-    onSuccess: () => toast.success("Alimento guardado"),
+    onSuccess: () => toast.success("Food saved"),
     onSettled: () => queryClient.invalidateQueries({ queryKey: savedFoodsKey(userId) }),
   });
 }
@@ -207,7 +207,7 @@ export function useDeleteSaved(userId: string) {
       assertTouched(data);
     },
     onError: (error: { message?: string }) => toastSaveError(error),
-    onSuccess: () => toast("Removido dos guardados"),
+    onSuccess: () => toast("Removed"),
     onSettled: (_data, _error, { kind }) =>
       queryClient.invalidateQueries({ queryKey: kind === "food" ? savedFoodsKey(userId) : savedMealsKey(userId) }),
   });

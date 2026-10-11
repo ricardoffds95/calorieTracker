@@ -32,8 +32,8 @@ export function MealSection({ meal, entries, calories, dateKey, onEdit, onDelete
         </h2>
         <span aria-hidden />
         <Link
-          href={`/registar?meal=${meal}&d=${dateKey}`}
-          aria-label={`Adicionar a ${label}`}
+          href={`/add?meal=${meal}&d=${dateKey}`}
+          aria-label={`Add to ${label}`}
           className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "size-11 text-primary")}
         >
           <Plus aria-hidden />

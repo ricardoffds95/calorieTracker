@@ -73,14 +73,14 @@ describe("validateRange", () => {
     expect(validateRange("2026-10-01", "2026-10-01")).toBeNull();
   });
   it("explains what is wrong", () => {
-    expect(validateRange("", "2026-10-10")).toBe("Indica as duas datas.");
-    expect(validateRange("2026-02-30", "2026-03-10")).toBe("Indica as duas datas.");
-    expect(validateRange("2026-10-10", "2026-10-01")).toBe("A data final tem de ser depois da inicial.");
-    expect(validateRange("2010-01-01", "2026-10-10")).toBe("Máximo 10 anos.");
+    expect(validateRange("", "2026-10-10")).toBe("Both dates required");
+    expect(validateRange("2026-02-30", "2026-03-10")).toBe("Both dates required");
+    expect(validateRange("2026-10-10", "2026-10-01")).toBe("End date must be after the start");
+    expect(validateRange("2010-01-01", "2026-10-10")).toBe("Max 10 years");
   });
   it("allows exactly the maximum and rejects one more day", () => {
     expect(validateRange("2016-01-01", "2025-12-31")).toBeNull(); // 3653 days
-    expect(validateRange("2016-01-01", "2026-01-08")).toBe("Máximo 10 anos."); // 3661 days
+    expect(validateRange("2016-01-01", "2026-01-08")).toBe("Max 10 years"); // 3661 days
   });
 });
 
@@ -103,7 +103,7 @@ describe("parsePeriodParams / periodHref", () => {
     }
   });
   it("builds URLs that restore the same period", () => {
-    expect(periodHref(currentWeek, now)).toBe("/historico");
+    expect(periodHref(currentWeek, now)).toBe("/history");
     for (const period of [periodFor("week", "2026-09-01"), periodFor("month", "2026-09-01"), periodFor("year", "2025-01-01"), custom("2026-10-01", "2026-10-10")]) {
       const url = new URL(periodHref(period, now), "http://localhost");
       expect(parsePeriodParams(url.searchParams, now)).toEqual(period);
@@ -113,15 +113,15 @@ describe("parsePeriodParams / periodHref", () => {
 
 describe("periodLabel", () => {
   it("is short and only shows the year when it is not the current one", () => {
-    expect(periodLabel(periodFor("week", "2026-10-10"), now)).toBe("5–11 out");
-    expect(periodLabel(periodFor("week", "2026-10-01"), now)).toBe("28 set – 4 out");
-    expect(periodLabel(periodFor("week", "2025-10-10"), now)).toBe("6–12 out 2025");
-    expect(periodLabel(periodFor("month", "2026-10-10"), now)).toBe("outubro 2026");
+    expect(periodLabel(periodFor("week", "2026-10-10"), now)).toBe("5–11 Oct");
+    expect(periodLabel(periodFor("week", "2026-10-01"), now)).toBe("28 Sep – 4 Oct");
+    expect(periodLabel(periodFor("week", "2025-10-10"), now)).toBe("6–12 Oct 2025");
+    expect(periodLabel(periodFor("month", "2026-10-10"), now)).toBe("October 2026");
     expect(periodLabel(periodFor("year", "2026-10-10"), now)).toBe("2026");
-    expect(periodLabel(custom("2026-09-03", "2026-10-20"), now)).toBe("3 set – 20 out");
-    expect(periodLabel(custom("2025-09-03", "2025-10-20"), now)).toBe("3 set – 20 out 2025");
-    expect(periodLabel(custom("2025-12-29", "2026-01-04"), now)).toBe("29 dez 2025 – 4 jan 2026");
-    expect(periodLabel(custom("2026-10-10", "2026-10-10"), now)).toBe("10 out");
+    expect(periodLabel(custom("2026-09-03", "2026-10-20"), now)).toBe("3 Sep – 20 Oct");
+    expect(periodLabel(custom("2025-09-03", "2025-10-20"), now)).toBe("3 Sep – 20 Oct 2025");
+    expect(periodLabel(custom("2025-12-29", "2026-01-04"), now)).toBe("29 Dec 2025 – 4 Jan 2026");
+    expect(periodLabel(custom("2026-10-10", "2026-10-10"), now)).toBe("10 Oct");
   });
 });
 
@@ -286,8 +286,8 @@ describe("labels and links", () => {
   const week = periodFor("week", "2026-10-10");
   it("labels buckets and axis ticks", () => {
     const days = bucketize([], week);
-    expect(bucketLabel(days[0]!)).toBe("seg, 5 out");
-    expect(days.map((b, i) => axisLabel(b, i, days.length, "week"))).toEqual(["S", "T", "Q", "Q", "S", "S", "D"]);
+    expect(bucketLabel(days[0]!)).toBe("Mon, 5 Oct");
+    expect(days.map((b, i) => axisLabel(b, i, days.length, "week"))).toEqual(["M", "T", "W", "T", "F", "S", "S"]);
     const month = bucketize([], periodFor("month", "2026-10-10"));
     const ticks = month.map((b, i) => axisLabel(b, i, month.length, "month")).filter(Boolean);
     expect(ticks).toEqual(["1", "5", "10", "15", "20", "25", "30"]);
@@ -296,15 +296,15 @@ describe("labels and links", () => {
     // the first days of a month are numbered, not turned into weekday letters
     const early = bucketize([], periodFor("month", "2026-10-10"), "2026-10-04");
     expect(early.map((b, i) => axisLabel(b, i, early.length, "month")).filter(Boolean)).toEqual(["1"]);
-    expect(bucketLabel(year[9]!)).toBe("outubro");
+    expect(bucketLabel(year[9]!)).toBe("October");
   });
   it("opens a day in Hoje and drills weeks and months into their own period", () => {
     const days = bucketize([], week);
     expect(bucketHref(days[0]!, now)).toBe("/?d=2026-10-05");
     expect(bucketHref(days[5]!, now)).toBe("/"); // today
     const year = bucketize([], periodFor("year", "2026-10-10"));
-    expect(bucketHref(year[2]!, now)).toBe("/historico?p=month&d=2026-03-01");
+    expect(bucketHref(year[2]!, now)).toBe("/history?p=month&d=2026-03-01");
     const weeks = bucketize([], custom("2026-01-15", "2026-03-10"));
-    expect(bucketHref(weeks[1]!, now)).toBe("/historico?p=week&d=2026-01-19");
+    expect(bucketHref(weeks[1]!, now)).toBe("/history?p=week&d=2026-01-19");
   });
 });

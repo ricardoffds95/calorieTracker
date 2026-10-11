@@ -109,7 +109,7 @@ Migração de uma app React Native (Expo) de contagem de calorias e macros para 
 - Esperar pela hidratação (`networkidle`) antes de interagir com formulários; a primeira compilação em dev é lenta (timeouts largos no config).
 
 ## Convenções
-- Idioma da UI: português (PT). Código, nomes e commits em inglês.
+- Idioma da UI: inglês (mudou de português em 2026-10-10). Textos e mensagens de validação/erro o mais curtos possível, sem frases no meio do ecrã. Código, nomes e commits em inglês.
 - Componentes pequenos (idealmente <200 linhas). O ecrã de Registar deve ser dividido em componentes e hooks, não replicar o monólito.
 - Lógica pura em `lib/`, sem dependência de React, com testes Vitest ao lado: `macros.ts` (metas e presets), `nutrition.ts` (arredondamentos, escala por 100g, doses, totais, propagação de edições de guardados), `diary.ts` (agrupar e somar entradas do diário), `schemas.ts` (zod), `food-search.ts` (+ `food-search-cache.ts`, só browser), `ai.ts` (**só servidor**, `server-only`) e `ai-client.ts`.
 - Arredondamentos: calorias inteiras e macros com 1 casa decimal em TODO o lado (itens, totais de refeição e do dia); a app antiga arredondava os totais de refeição a 1 casa e isso foi corrigido. Usar sempre `roundCalories`/`roundMacro` de `lib/nutrition.ts`.

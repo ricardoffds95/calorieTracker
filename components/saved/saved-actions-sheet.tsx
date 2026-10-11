@@ -22,21 +22,21 @@ export function SavedActionsSheet({ userId, target, onClose, onEdit, onAddToDiar
   const { item } = target;
   const description =
     target.kind === "food"
-      ? `${target.item.calories_100g} kcal por 100 g`
-      : `${target.item.total_calories} kcal por porção`;
+      ? `${target.item.calories_100g} kcal per 100 g`
+      : `${target.item.total_calories} kcal per portion`;
 
   return (
     <Sheet open onOpenChange={(open) => !open && onClose()}>
       <SheetContent side="bottom" className="mx-auto max-w-md rounded-t-lg pb-[max(1rem,env(safe-area-inset-bottom))]">
         <SheetHeader>
           <SheetTitle>{item.name}</SheetTitle>
-          <SheetDescription>{confirming ? "As entradas do diário mantêm-se como estão." : description}</SheetDescription>
+          <SheetDescription>{confirming ? "Diary entries stay" : description}</SheetDescription>
         </SheetHeader>
         <SheetFooter>
           {confirming ? (
             <>
               <p className="text-sm">
-                Apagar <strong>{item.name}</strong> dos guardados?
+                Delete <strong>{item.name}</strong>?
               </p>
               <Button
                 type="button"
@@ -46,25 +46,25 @@ export function SavedActionsSheet({ userId, target, onClose, onEdit, onAddToDiar
                 disabled={remove.isPending}
                 onClick={() => remove.mutate({ kind: target.kind, id: item.id }, { onSuccess: onClose })}
               >
-                {remove.isPending ? "A apagar…" : "Apagar"}
+                {remove.isPending ? "Deleting…" : "Delete"}
               </Button>
               <Button type="button" variant="outline" size="lg" className="h-11" onClick={() => setConfirming(false)}>
-                Cancelar
+                Cancel
               </Button>
             </>
           ) : (
             <>
               <Button type="button" size="lg" className="h-11" onClick={onAddToDiary}>
                 <CalendarPlus aria-hidden />
-                Adicionar ao diário
+                Add to diary
               </Button>
               <Button type="button" variant="outline" size="lg" className="h-11" onClick={onEdit}>
                 <Pencil aria-hidden />
-                Editar
+                Edit
               </Button>
               <Button type="button" variant="ghost" size="lg" className="h-11 text-destructive" onClick={() => setConfirming(true)}>
                 <Trash2 aria-hidden />
-                Apagar
+                Delete
               </Button>
             </>
           )}

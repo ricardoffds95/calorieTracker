@@ -4,13 +4,13 @@ export type AuthMode = "signin" | "signup";
 
 export const MIN_PASSWORD_LENGTH = 8;
 
-const email = z.string().trim().min(1, "Indica o email.").pipe(z.email("Email inválido. Ex: nome@exemplo.com"));
+const email = z.string().trim().min(1, "Email required").pipe(z.email("Invalid email"));
 
 const credentialsSchemas: Record<AuthMode, z.ZodType<{ email: string; password: string }>> = {
-  signin: z.object({ email, password: z.string().min(1, "Indica a password.") }),
+  signin: z.object({ email, password: z.string().min(1, "Password required") }),
   signup: z.object({
     email,
-    password: z.string().min(MIN_PASSWORD_LENGTH, `A password tem de ter pelo menos ${MIN_PASSWORD_LENGTH} caracteres.`),
+    password: z.string().min(MIN_PASSWORD_LENGTH, `Min ${MIN_PASSWORD_LENGTH} characters`),
   }),
 };
 
@@ -43,27 +43,27 @@ export interface AuthErrorLike {
 export function authErrorMessage(error: AuthErrorLike, mode: AuthMode): string {
   switch (error.code) {
     case "invalid_credentials":
-      return "Email ou password incorretos.";
+      return "Wrong email or password";
     case "email_not_confirmed":
-      return "Email ainda não confirmado. Abre o link que te enviámos por email e tenta novamente.";
+      return "Confirm your email first";
     case "over_email_send_rate_limit":
-      return "Foram enviados demasiados emails. Espera um pouco e tenta novamente.";
+      return "Too many emails. Wait a bit";
     case "over_request_rate_limit":
-      return "Demasiadas tentativas. Espera um pouco e tenta novamente.";
+      return "Too many attempts. Wait a bit";
     case "user_already_exists":
     case "email_exists":
-      return "Já existe uma conta com este email. Entra com a tua password.";
+      return "Account already exists";
     case "weak_password":
-      return "Password demasiado fraca. Usa uma mais longa ou com mais variedade.";
+      return "Password too weak";
     case "email_address_invalid":
-      return "Email inválido. Ex: nome@exemplo.com";
+      return "Invalid email";
     case "signup_disabled":
-      return "O registo de novas contas está desativado.";
+      return "Sign-ups are off";
   }
   // fetch failures surface as AuthRetryableFetchError with status 0
   if (error.name === "AuthRetryableFetchError" || error.status === 0) {
-    return "Sem ligação. Verifica a internet e tenta novamente.";
+    return "No connection";
   }
-  if (mode === "signin" && error.status === 400) return "Email ou password incorretos.";
-  return "Ocorreu um erro. Tenta novamente.";
+  if (mode === "signin" && error.status === 400) return "Wrong email or password";
+  return "Something went wrong";
 }

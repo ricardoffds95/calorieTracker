@@ -5,10 +5,10 @@ export type AiClientResult =
   | { ok: false; reason: "unavailable" | "invalid" | "unauthorized" | "network"; message: string };
 
 const FALLBACK: Record<"unavailable" | "invalid" | "unauthorized" | "network", string> = {
-  unavailable: "Modo IA não disponível de momento.",
-  invalid: "Não foi possível interpretar a resposta. Tenta reformular.",
-  unauthorized: "Sessão expirada. Entra novamente.",
-  network: "Sem ligação. Verifica a internet e tenta novamente.",
+  unavailable: "AI unavailable",
+  invalid: "Couldn't read that. Rephrase",
+  unauthorized: "Session expired",
+  network: "No connection",
 };
 
 /** Browser helper for POST /api/ai/parse. Never throws: the UI shows `message` in an alert. */
@@ -27,7 +27,7 @@ export async function requestAiParse(input: AiRequest, fetchFn: typeof fetch = f
   const body = (await response.json().catch(() => null)) as { name?: string; kind?: string; items?: AiFoodItem[]; message?: string } | null;
   if (response.ok && body?.items) {
     const kind = body.kind === "food" && body.items.length === 1 ? "food" : "meal";
-    return { ok: true, name: body.name?.trim() || "Refeição", kind, items: body.items };
+    return { ok: true, name: body.name?.trim() || "Meal", kind, items: body.items };
   }
 
   if (response.status === 401) return { ok: false, reason: "unauthorized", message: FALLBACK.unauthorized };

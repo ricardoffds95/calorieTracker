@@ -33,8 +33,8 @@ export function PickSavedFoodsSheet({ foods, onJoin, onClose }: PickSavedFoodsSh
     <Sheet open onOpenChange={(open) => !open && onClose()}>
       <SheetContent side="bottom" className="mx-auto max-h-[92dvh] max-w-md overflow-y-auto rounded-t-lg pb-[max(1rem,env(safe-area-inset-bottom))]">
         <SheetHeader>
-          <SheetTitle>Os teus alimentos</SheetTitle>
-          <SheetDescription>Marca os que fazem parte da refeição. Entram com 100 g, que ajustas depois.</SheetDescription>
+          <SheetTitle>My foods</SheetTitle>
+          <SheetDescription>Pick foods</SheetDescription>
         </SheetHeader>
         <div className="flex flex-col gap-3 px-4">
           {foods.length > 0 && (
@@ -42,8 +42,8 @@ export function PickSavedFoodsSheet({ foods, onJoin, onClose }: PickSavedFoodsSh
               <Search aria-hidden className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 type="search"
-                aria-label="Filtrar alimentos"
-                placeholder="Filtrar alimentos"
+                aria-label="Filter foods"
+                placeholder="Filter foods"
                 autoComplete="off"
                 enterKeyHint="search"
                 className="h-11 pl-9"
@@ -53,11 +53,11 @@ export function PickSavedFoodsSheet({ foods, onJoin, onClose }: PickSavedFoodsSh
             </div>
           )}
           {foods.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Ainda sem alimentos guardados. Os que adicionares pela pesquisa ficam aqui.</p>
+            <p className="text-sm text-muted-foreground">No saved foods</p>
           ) : shown.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nenhum alimento com esse nome.</p>
+            <p className="text-sm text-muted-foreground">No matches</p>
           ) : (
-            <ScrollList aria-label="Alimentos guardados" className="max-h-[45dvh]">
+            <ScrollList aria-label="Saved foods" className="max-h-[45dvh]">
               <ul className="flex flex-col">
                 {shown.map((food) => {
                   const on = selected.has(food.id);
@@ -91,7 +91,7 @@ export function PickSavedFoodsSheet({ foods, onJoin, onClose }: PickSavedFoodsSh
           )}
         </div>
         <SheetFooter>
-          {foods.length > 0 && selected.size === 0 && <Hint className="mx-0">Marca pelo menos um alimento para o juntar à refeição.</Hint>}
+          {foods.length > 0 && selected.size === 0 && <Hint className="mx-0">Pick at least one food</Hint>}
           <Button
             type="button"
             size="lg"
@@ -100,7 +100,7 @@ export function PickSavedFoodsSheet({ foods, onJoin, onClose }: PickSavedFoodsSh
             // in the order of the list, not of the ticks
             onClick={() => onJoin(foods.filter((f) => selected.has(f.id)))}
           >
-            {selected.size === 0 ? "Juntar à refeição" : `Juntar ${selected.size} ${selected.size === 1 ? "alimento" : "alimentos"}`}
+            {selected.size === 0 ? "Add to meal" : `Add ${selected.size} ${selected.size === 1 ? "food" : "foods"}`}
           </Button>
         </SheetFooter>
       </SheetContent>

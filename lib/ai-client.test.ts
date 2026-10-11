@@ -16,7 +16,7 @@ describe("requestAiParse", () => {
   });
 
   it("names the meal when the server sends no name", async () => {
-    expect(await requestAiParse(input, respond({ items }, 200))).toEqual({ ok: true, name: "Refeição", kind: "meal", items });
+    expect(await requestAiParse(input, respond({ items }, 200))).toEqual({ ok: true, name: "Meal", kind: "meal", items });
   });
 
   it("passes 'food' through only for a single item", async () => {
@@ -24,9 +24,9 @@ describe("requestAiParse", () => {
     expect(await requestAiParse(input, respond({ name: "Arroz", kind: "food", items: [...items, ...items] }, 200))).toMatchObject({ kind: "meal" });
   });
 
-  it("maps 503 to unavailable with the 'IA não disponível' message", async () => {
+  it("maps 503 to unavailable with the 'AI unavailable' message", async () => {
     const result = await requestAiParse(input, respond({ error: "ai_unavailable", message: "x" }, 503));
-    expect(result).toEqual({ ok: false, reason: "unavailable", message: "Modo IA não disponível de momento." });
+    expect(result).toEqual({ ok: false, reason: "unavailable", message: "AI unavailable" });
   });
 
   it("maps 401 to unauthorized", async () => {
@@ -34,10 +34,10 @@ describe("requestAiParse", () => {
   });
 
   it("maps 400 and 502 to invalid, keeping the server message", async () => {
-    expect(await requestAiParse(input, respond({ message: "Texto demasiado longo." }, 400))).toEqual({
+    expect(await requestAiParse(input, respond({ message: "Text too long" }, 400))).toEqual({
       ok: false,
       reason: "invalid",
-      message: "Texto demasiado longo.",
+      message: "Text too long",
     });
     expect(await requestAiParse(input, respond({}, 502))).toMatchObject({ ok: false, reason: "invalid" });
   });

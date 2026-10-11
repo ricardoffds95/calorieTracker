@@ -3,7 +3,7 @@ import { AiInvalidResponseError, AiUnavailableError, analyzeFoodImage, parseFood
 import { aiRequestSchema } from "@/lib/schemas";
 import { createClient } from "@/lib/supabase/server";
 
-export const AI_UNAVAILABLE_MESSAGE = "Modo IA não disponível de momento.";
+export const AI_UNAVAILABLE_MESSAGE = "AI unavailable";
 
 function jsonError(status: number, error: string, message: string) {
   return NextResponse.json({ error, message }, { status });
@@ -12,18 +12,18 @@ function jsonError(status: number, error: string, message: string) {
 export async function POST(request: Request) {
   const supabase = await createClient();
   const { data } = await supabase.auth.getClaims();
-  if (!data?.claims) return jsonError(401, "unauthorized", "Sessão expirada. Entra novamente.");
+  if (!data?.claims) return jsonError(401, "unauthorized", "Session expired");
 
   let body: unknown;
   try {
     body = await request.json();
   } catch {
-    return jsonError(400, "invalid_request", "Pedido inválido.");
+    return jsonError(400, "invalid_request", "Invalid request");
   }
 
   const parsed = aiRequestSchema.safeParse(body);
   if (!parsed.success) {
-    return jsonError(400, "invalid_request", parsed.error.issues[0]?.message ?? "Pedido inválido.");
+    return jsonError(400, "invalid_request", parsed.error.issues[0]?.message ?? "Invalid request");
   }
 
   try {
@@ -38,8 +38,8 @@ export async function POST(request: Request) {
       return jsonError(503, "ai_unavailable", AI_UNAVAILABLE_MESSAGE);
     }
     if (error instanceof AiInvalidResponseError) {
-      return jsonError(502, "ai_invalid", "Não foi possível interpretar a resposta. Tenta reformular.");
+      return jsonError(502, "ai_invalid", "Couldn't read that. Rephrase");
     }
-    return jsonError(500, "internal", "Erro inesperado.");
+    return jsonError(500, "internal", "Unexpected error");
   }
 }

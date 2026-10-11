@@ -40,10 +40,10 @@ export function MealEntryRow({ entry, onEdit, onDelete, onRemoveItem }: MealEntr
           </span>
           <span data-testid="row-kcal" className={KCAL}>{entry.calories} kcal</span>
         </button>
-        <Button type="button" variant="ghost" size="icon" className="size-11 text-muted-foreground" aria-label={`Editar ${entry.name}`} onClick={() => onEdit(entry)}>
+        <Button type="button" variant="ghost" size="icon" className="size-11 text-muted-foreground" aria-label={`Edit ${entry.name}`} onClick={() => onEdit(entry)}>
           <Pencil aria-hidden />
         </Button>
-        <Button type="button" variant="ghost" size="icon" className="size-11 text-muted-foreground" aria-label={`Remover ${entry.name}`} onClick={() => onDelete(entry)}>
+        <Button type="button" variant="ghost" size="icon" className="size-11 text-muted-foreground" aria-label={`Remove ${entry.name}`} onClick={() => onDelete(entry)}>
           <X aria-hidden />
         </Button>
       </div>
@@ -67,7 +67,7 @@ export function MealEntryRow({ entry, onEdit, onDelete, onRemoveItem }: MealEntr
                   variant="ghost"
                   size="icon"
                   className="size-11 text-muted-foreground"
-                  aria-label={`Remover ${item.name} de ${entry.name}`}
+                  aria-label={`Remove ${item.name} from ${entry.name}`}
                   onClick={() => onRemoveItem(entry, index)}
                 >
                   <X aria-hidden />

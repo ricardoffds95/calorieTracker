@@ -19,8 +19,8 @@ export function BarcodeScannerDialog({ open, onOpenChange, onFound }: BarcodeSca
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Ler código de barras</DialogTitle>
-          <DialogDescription>Aponta a câmara para o código de barras do produto.</DialogDescription>
+          <DialogTitle>Scan barcode</DialogTitle>
+          <DialogDescription>Point at a barcode</DialogDescription>
         </DialogHeader>
         {/* Mounted only while open, so closing the dialog always releases the camera. */}
         {open && (
@@ -43,13 +43,13 @@ type ScanState =
   | { phase: "error"; message: string };
 
 const STATUS: Record<"starting" | "scanning" | "looking_up", string> = {
-  starting: "A iniciar a câmara…",
-  scanning: "À procura de um código…",
-  looking_up: "A procurar produto…",
+  starting: "Starting camera…",
+  scanning: "Looking for a code…",
+  looking_up: "Finding product…",
 };
 
-const NOT_FOUND = "Produto não encontrado. Tenta pesquisar pelo nome.";
-const UNEXPECTED = "Erro ao procurar produto. Tenta novamente.";
+const NOT_FOUND = "Product not found";
+const UNEXPECTED = "Lookup failed";
 
 function ScannerView({ onFound, onRetry }: { onFound: (result: FoodSearchResult) => void; onRetry: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -105,7 +105,7 @@ function ScannerView({ onFound, onRetry }: { onFound: (result: FoodSearchResult)
             {state.message}
           </p>
           <Button type="button" variant="outline" className="h-11" onClick={onRetry}>
-            Tentar novamente
+            Try again
           </Button>
         </>
       ) : (

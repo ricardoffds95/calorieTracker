@@ -3,13 +3,13 @@ import type { Json, TablesInsert } from "@/lib/supabase/database.types";
 import type { DiaryEntry } from "./diary";
 import { removeItemFromMeal, roundCalories, roundMacro, scaleFromPer100g, type FoodItem } from "./nutrition";
 
-const name = z.string().trim().min(1, "Indica um nome.").max(200, "Nome demasiado longo.");
-const calories = z.number({ error: "Calorias inválidas." }).min(0, "Não pode ser negativo.").max(100_000, "Valor demasiado alto.");
-const macro = z.number({ error: "Valor inválido." }).min(0, "Não pode ser negativo.").max(10_000, "Valor demasiado alto.");
+const name = z.string().trim().min(1, "Name required").max(200, "Name too long");
+const calories = z.number({ error: "Invalid value" }).min(0, "Can't be negative").max(100_000, "Too high");
+const macro = z.number({ error: "Invalid value" }).min(0, "Can't be negative").max(10_000, "Too high");
 
 export const foodEditSchema = z.object({
   name,
-  quantity_g: z.number({ error: "Quantidade inválida." }).gt(0, "Tem de ser maior que 0.").max(100_000, "Valor demasiado alto."),
+  quantity_g: z.number({ error: "Invalid amount" }).gt(0, "Must be above 0").max(100_000, "Too high"),
   calories,
   protein_g: macro,
   carbs_g: macro,

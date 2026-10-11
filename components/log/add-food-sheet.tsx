@@ -18,9 +18,9 @@ interface AddFoodSheetProps {
   initialTarget: LogTarget;
   pending: boolean;
   onClose: () => void;
-  /** `save`: also keep the food in "Guardados" (always true for a food that is already saved). */
+  /** `save`: also keep the food in "Saved" (always true for a food that is already saved). */
   onAdd: (food: FoodSearchResult, quantity_g: number, target: LogTarget, save: boolean) => void;
-  /** Save the food in "Guardados" without logging it (only offered for foods that are not saved yet). */
+  /** Save the food in "Saved" without logging it (only offered for foods that are not saved yet). */
   onSaveOnly?: (food: FoodSearchResult) => void;
 }
 
@@ -39,7 +39,7 @@ export function AddFoodSheet({ food, initialGrams, initialTarget, pending, onClo
           <SheetTitle>{food.name}</SheetTitle>
           <SheetDescription>
             {food.brand ? `${food.brand} · ` : ""}
-            {food.calories_100g} kcal por 100 g
+            {food.calories_100g} kcal per 100 g
           </SheetDescription>
         </SheetHeader>
         <div className="flex flex-col gap-5 px-4">
@@ -49,15 +49,15 @@ export function AddFoodSheet({ food, initialGrams, initialTarget, pending, onClo
         </div>
         <SheetFooter>
           <Button type="button" size="lg" className="h-11" disabled={!ready || pending} onClick={() => parsed.success && onAdd(food, parsed.data, target, true)}>
-            {pending ? "A adicionar…" : isNew ? "Guardar e adicionar ao diário" : "Adicionar ao diário"}
+            {pending ? "Adding…" : isNew ? "Save and add" : "Add to diary"}
           </Button>
           {isNew && (
             <>
               <Button type="button" variant="outline" size="lg" className="h-11" disabled={!ready || pending} onClick={() => parsed.success && onAdd(food, parsed.data, target, false)}>
-                Só adicionar ao diário
+                Add only
               </Button>
               <Button type="button" variant="outline" size="lg" className="h-11" disabled={pending} onClick={() => onSaveOnly(food)}>
-                Só guardar nos alimentos
+                Save only
               </Button>
             </>
           )}

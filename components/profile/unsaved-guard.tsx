@@ -101,19 +101,19 @@ export function UnsavedGuard({ children }: { children: ReactNode }) {
       <Dialog open={target !== null} onOpenChange={(open) => !open && !saving && setTarget(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Guardar alterações?</DialogTitle>
-            <DialogDescription>Tens alterações por guardar.</DialogDescription>
+            <DialogTitle>Save changes?</DialogTitle>
+            <DialogDescription>Unsaved changes</DialogDescription>
           </DialogHeader>
-          {target && !target.canSave && <Hint>Corrige os erros do formulário para guardar.</Hint>}
+          {target && !target.canSave && <Hint>Fix the errors to save</Hint>}
           <DialogFooter className="flex-col gap-2 sm:flex-col">
             <Button type="button" size="lg" className="h-11" disabled={!target?.canSave || saving} onClick={saveAndGo}>
-              {saving ? "A guardar…" : "Guardar"}
+              {saving ? "Saving…" : "Save"}
             </Button>
             <Button type="button" variant="outline" size="lg" className="h-11" disabled={saving} onClick={go}>
-              Descartar
+              Discard
             </Button>
             <Button type="button" variant="ghost" className="h-11" disabled={saving} onClick={() => setTarget(null)}>
-              Continuar a editar
+              Keep editing
             </Button>
           </DialogFooter>
         </DialogContent>

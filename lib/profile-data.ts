@@ -9,7 +9,7 @@ export const profileDataSchema = z.object({
   name: z
     .string()
     .trim()
-    .max(50, "O nome pode ter no máximo 50 caracteres.")
+    .max(50, "Max 50 characters")
     .transform((value) => (value === "" ? DEFAULT_NAME : value)),
   sex: shape.sex.nullable(),
   age: shape.age.nullable(),

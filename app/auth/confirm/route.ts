@@ -18,5 +18,5 @@ export async function GET(request: Request) {
   }
   // an expired or already used link comes with an error and no code
   const failed = searchParams.has("error") || searchParams.has("error_description");
-  return NextResponse.redirect(`${origin}/login?${failed ? "link=invalido" : "confirmado=1"}`);
+  return NextResponse.redirect(`${origin}/login?${failed ? "link=invalid" : "confirmed=1"}`);
 }

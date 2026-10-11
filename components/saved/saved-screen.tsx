@@ -27,7 +27,7 @@ export function SavedScreen({ userId }: { userId: string }) {
   const [tab, setTab] = useState<Tab>("foods");
   const [query, setQuery] = useState("");
   const [limit, setLimit] = useState(PAGE);
-  const [actions, setActions] = useState<SavedTarget | null>(null); // the sheet with Editar / Adicionar / Apagar
+  const [actions, setActions] = useState<SavedTarget | null>(null); // the sheet with Edit / Add / Delete
   const [editing, setEditing] = useState<SavedTarget | null>(null);
   const [adding, setAdding] = useState<SavedTarget | null>(null);
   const [creating, setCreating] = useState<Tab | null>(null);
@@ -38,7 +38,7 @@ export function SavedScreen({ userId }: { userId: string }) {
 
   function added(what: string, target: LogTarget) {
     setAdding(null);
-    toast.success(`${what} adicionado a ${describeTarget(target, now)}`);
+    toast.success(`${what} added to ${describeTarget(target, now)}`);
   }
 
   const foods = useSavedFoods(userId);
@@ -57,7 +57,7 @@ export function SavedScreen({ userId }: { userId: string }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div role="group" aria-label="Tipo de guardado" className="grid grid-cols-2 gap-1 rounded-md bg-muted p-1">
+      <div role="group" aria-label="Saved type" className="grid grid-cols-2 gap-1 rounded-md bg-muted p-1">
         {(["foods", "meals"] as const).map((t) => (
           <Button
             key={t}
@@ -67,7 +67,7 @@ export function SavedScreen({ userId }: { userId: string }) {
             className="h-10 text-muted-foreground aria-pressed:bg-card aria-pressed:text-foreground dark:aria-pressed:bg-background"
             onClick={() => select(t)}
           >
-            {t === "foods" ? `Alimentos · ${foods.data?.length ?? 0}` : `Refeições · ${meals.data?.length ?? 0}`}
+            {t === "foods" ? `Foods · ${foods.data?.length ?? 0}` : `Meals · ${meals.data?.length ?? 0}`}
           </Button>
         ))}
       </div>
@@ -76,8 +76,8 @@ export function SavedScreen({ userId }: { userId: string }) {
         <Search aria-hidden className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           type="search"
-          aria-label="Pesquisar nos guardados"
-          placeholder="Pesquisar nos guardados"
+          aria-label="Search saved"
+          placeholder="Search saved"
           autoComplete="off"
           className="h-11 pl-9"
           value={query}
@@ -90,27 +90,27 @@ export function SavedScreen({ userId }: { userId: string }) {
 
       <Button type="button" variant="outline" className="h-11" onClick={() => setCreating(tab)}>
         <Plus aria-hidden />
-        {tab === "foods" ? "Novo alimento" : "Nova refeição"}
+        {tab === "foods" ? "New food" : "New meal"}
       </Button>
 
-      {loading && <Skeleton className="h-64 w-full" aria-label="A carregar guardados" />}
+      {loading && <Skeleton className="h-64 w-full" aria-label="Loading saved" />}
       {failed && (
         <p role="alert" className="text-sm text-destructive">
-          Não foi possível carregar os guardados.
+          Couldn’t load saved
         </p>
       )}
       {!loading && !failed && total === 0 && (
         <p className="text-sm text-muted-foreground">
           {query.trim()
-            ? "Nada com esse nome."
+            ? "No matches"
             : tab === "foods"
-              ? "Ainda sem alimentos guardados. Os que adicionares pela pesquisa ficam aqui."
-              : "Ainda sem refeições guardadas. Cria uma acima ou a partir do registo com IA."}
+              ? "No saved foods"
+              : "No saved meals"}
         </p>
       )}
 
       {!loading && total > 0 && (
-        <ScrollList aria-label="Lista de guardados" className="max-h-[60dvh]">
+        <ScrollList aria-label="Saved list" className="max-h-[60dvh]">
           <ul data-testid={`saved-${tab}`}>
             {tab === "foods"
               ? foodRows.slice(0, limit).map((food) => (
@@ -119,7 +119,7 @@ export function SavedScreen({ userId }: { userId: string }) {
                     name={food.name}
                     subtitle={food.brand ?? undefined}
                     energy={`${food.calories_100g} kcal/100 g`}
-                    macros={`P ${food.protein_100g} · H ${food.carbs_100g} · G ${food.fat_100g}`}
+                    macros={`P ${food.protein_100g} · C ${food.carbs_100g} · F ${food.fat_100g}`}
                     timesUsed={food.times_used}
                     onEdit={() => setActions({ kind: "food", item: food })}
                   />
@@ -128,9 +128,9 @@ export function SavedScreen({ userId }: { userId: string }) {
                   <SavedRow
                     key={meal.id}
                     name={meal.name}
-                    subtitle={meal.items.length > 1 ? `${meal.items.length} alimentos` : undefined}
+                    subtitle={meal.items.length > 1 ? `${meal.items.length} foods` : undefined}
                     energy={`${meal.total_calories} kcal`}
-                    macros={`P ${meal.total_protein} · H ${meal.total_carbs} · G ${meal.total_fat}`}
+                    macros={`P ${meal.total_protein} · C ${meal.total_carbs} · F ${meal.total_fat}`}
                     timesUsed={meal.times_used}
                     onEdit={() => setActions({ kind: "meal", item: meal })}
                   />
@@ -140,7 +140,7 @@ export function SavedScreen({ userId }: { userId: string }) {
       )}
       {total > limit && (
         <Button type="button" variant="ghost" className="h-11" onClick={() => setLimit((n) => n + PAGE)}>
-          Ver mais
+          Show more
         </Button>
       )}
 

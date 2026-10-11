@@ -32,7 +32,7 @@ export async function updateSession(request: NextRequest) {
   const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
 
   if (!isAuthenticated && pathname.startsWith("/api/")) {
-    return NextResponse.json({ error: "unauthorized", message: "Sessão expirada. Entra novamente." }, { status: 401 });
+    return NextResponse.json({ error: "unauthorized", message: "Session expired" }, { status: 401 });
   }
 
   if (!isAuthenticated && !isPublic) {

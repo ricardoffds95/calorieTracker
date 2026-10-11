@@ -137,10 +137,10 @@ async function getJson(url: string, { fetch: fetchFn = fetch, signal }: FetchOpt
     response = await fetchFn(url, { signal: combined });
   } catch (error) {
     if (signal?.aborted) throw error; // caller cancelled (e.g. new keystroke): not an error to show
-    if (timeout.aborted) throw new FoodSearchError("A pesquisa demorou demasiado. Tenta novamente.", "timeout");
-    throw new FoodSearchError("Sem ligação. Verifica a internet e tenta novamente.", "network");
+    if (timeout.aborted) throw new FoodSearchError("Search timed out", "timeout");
+    throw new FoodSearchError("No connection", "network");
   }
-  if (!response.ok) throw new FoodSearchError(`Erro ao pesquisar alimento (${response.status}).`, "http");
+  if (!response.ok) throw new FoodSearchError(`Search failed (${response.status})`, "http");
   return response.json();
 }
 
@@ -153,11 +153,11 @@ const SEARCH_ENDPOINT = "/api/food-search";
 const SEARCH_TIMEOUT_MS = 20_000;
 
 export const FOOD_SEARCH_MESSAGES: Record<"network" | "timeout" | "unavailable" | "unauthorized" | "http", string> = {
-  network: "Sem ligação. Verifica a internet e tenta novamente.",
-  timeout: "A pesquisa demorou demasiado. Tenta novamente.",
-  unavailable: "O Open Food Facts não respondeu. Tenta daqui a pouco ou insere manualmente.",
-  unauthorized: "Sessão expirada. Entra novamente.",
-  http: "Erro ao pesquisar alimento. Tenta novamente.",
+  network: "No connection",
+  timeout: "Search timed out",
+  unavailable: "Open Food Facts not responding",
+  unauthorized: "Session expired",
+  http: "Search failed",
 };
 
 /** Searches Open Food Facts through our server (`/api/food-search`), which retries on failures. Nothing is cached. */
