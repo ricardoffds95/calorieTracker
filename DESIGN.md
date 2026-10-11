@@ -3,7 +3,7 @@
 Single source of truth for visual decisions. Tokens live in [app/globals.css](app/globals.css); never use literal colors, sizes or shadows outside them.
 
 ## Direction
-Neutral monochrome + **one accent**. Mobile-first (iPhone PWA), light and dark following the system (`prefers-color-scheme`). Borders instead of shadows. Numbers are the hero: `tabular-nums`, large, high contrast.
+Neutral monochrome + **one accent**. Mobile-first (iPhone, Safari), light and dark following the system (`prefers-color-scheme`). Borders instead of shadows. Numbers are the hero: `tabular-nums`, large, high contrast.
 
 ## Tokens
 | Token | Light | Dark | Use |
@@ -25,25 +25,28 @@ Rules:
 - Safe areas: tab bar and page padding use `env(safe-area-inset-*)`; tab bar height is `--tab-bar-height`.
 - Only shadcn/ui primitives in `components/ui/`; new components go in `components/` and reuse tokens.
 
-## "Hoje" screen (direction B: compact numbers panel)
+## Today screen (compact numbers panel)
 ```
-◀  Hoje, 10 out  ▶
+◀  Today, 10 Oct  ▶
 
 580
-kcal restantes
-1 420 / 2 000  ▓▓▓▓▓▓▓░░░
+kcal left
+1420 / 2000  ▓▓▓▓▓▓▓░░░
 
-P 98   │ H 120  │ G 40
-/150g  │ /200g  │ /65g
-▓▓▓▓░  │ ▓▓▓░░  │ ▓▓▓▓░
+Protein  │ Carbs   │ Fat
+98 /150g │ 120 /200g│ 40 /65g
+▓▓▓▓░    │ ▓▓▓░░   │ ▓▓▓▓░
 
-Pequeno-almoço   420    +
-  Aveia 60g           210
-  Banana               90
-Almoço            650    +
-Jantar              —    +
-Snacks              —    +
+[ + Add meal ]
+
+Breakfast    420 kcal   +
+  Oats 60 g  210 kcal
+  Banana      90 kcal
+Lunch        650 kcal   +
+Dinner           —      +
+Snacks           —      +
 ```
-- "kcal restantes" is the focal number; it turns `destructive` and reads "kcal acima" when the goal is exceeded.
+- "kcal left" is the focal number; it turns `destructive` and reads "kcal over" when the goal is exceeded.
 - Macro columns use the macro tokens for the mini bars; over-goal bars switch to `destructive`.
-- Each meal row has a `+` action (accent) to add food; entries are tappable to edit.
+- Every row shares the same three columns (main part, edit slot, remove slot); the calories end at the same place in every row.
+- A meal heading is a button: it minimizes the meal to just its total. Each meal has a `+` (accent) to add food; entries are tappable to edit (including moving them to another meal).
