@@ -16,14 +16,13 @@ export function BucketList({ buckets, now }: { buckets: readonly Bucket[]; now: 
 
   return (
     <section aria-label="Period detail" className="flex flex-col">
-      <div className="flex items-center justify-between gap-3 pb-1">
-        <h2 className="text-base font-semibold">Detalhe</h2>
-        {withData.length < buckets.length && (
+      {withData.length < buckets.length && (
+        <div className="flex justify-end pb-1">
           <Button type="button" variant="ghost" className="h-11 px-2 text-sm" aria-pressed={showAll} onClick={() => setShowAll((v) => !v)}>
             {showAll ? `Logged ${noun} only` : `Show all ${noun}`}
           </Button>
-        )}
-      </div>
+        </div>
+      )}
       <ul data-testid="bucket-list">
         {shown.map((bucket) => (
           <li key={bucket.key} className="border-t border-border">

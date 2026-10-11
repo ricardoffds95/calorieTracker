@@ -265,6 +265,23 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      diary_meal_totals: {
+        Args: { p_from: string; p_to: string }
+        Returns: {
+          calories: number
+          entries: number
+          meal: string
+        }[]
+      }
+      diary_top_items: {
+        Args: { p_from: string; p_limit?: number; p_order: string; p_to: string }
+        Returns: {
+          kind: string
+          name: string
+          times: number
+          total_calories: number
+        }[]
+      }
       delete_my_account: {
         Args: Record<PropertyKey, never>
         Returns: undefined

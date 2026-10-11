@@ -138,6 +138,18 @@ export async function dailyTotalsAs(user: TestUser, from: string, to: string) {
   return supabase.rpc("diary_daily_totals", { p_from: from, p_to: to });
 }
 
+/** Calls diary_top_items as `user` (RLS applies). */
+export async function topItemsAs(user: TestUser, from: string, to: string, order: "times" | "calories", limit = 5) {
+  const supabase = await clientFor(user);
+  return supabase.rpc("diary_top_items", { p_from: from, p_to: to, p_order: order, p_limit: limit });
+}
+
+/** Calls diary_meal_totals as `user` (RLS applies). */
+export async function mealTotalsAs(user: TestUser, from: string, to: string) {
+  const supabase = await clientFor(user);
+  return supabase.rpc("diary_meal_totals", { p_from: from, p_to: to });
+}
+
 /** The profile row of a test user (RLS: only their own). */
 export async function fetchProfile(user: TestUser) {
   const supabase = await clientFor(user);

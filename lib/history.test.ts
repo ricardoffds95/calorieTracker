@@ -8,7 +8,11 @@ import {
   elapsedDays,
   granularityFor,
   macroSplit,
+  mealShares,
   niceMax,
+  percentChange,
+  previousPeriod,
+  wholePercents,
   valueOf,
   parsePeriodParams,
   periodFor,
@@ -306,5 +310,63 @@ describe("labels and links", () => {
     expect(bucketHref(year[2]!, now)).toBe("/history?p=month&d=2026-03-01");
     const weeks = bucketize([], custom("2026-01-15", "2026-03-10"));
     expect(bucketHref(weeks[1]!, now)).toBe("/history?p=week&d=2026-01-19");
+  });
+});
+
+describe("percentChange", () => {
+  it("is the whole-number change against the previous value", () => {
+    expect(percentChange(2120, 2000)).toBe(6);
+    expect(percentChange(1940, 2000)).toBe(-3);
+    expect(percentChange(2000, 2000)).toBe(0);
+    expect(percentChange(1, 3)).toBe(-67);
+  });
+  it("is null when there is nothing to compare with", () => {
+    expect(percentChange(2000, null)).toBeNull();
+    expect(percentChange(2000, undefined)).toBeNull();
+    expect(percentChange(2000, 0)).toBeNull();
+  });
+});
+
+describe("previousPeriod", () => {
+  it("is the period right before, of the same kind", () => {
+    expect(previousPeriod(periodFor("week", "2026-10-10"))).toEqual(periodFor("week", "2026-10-03"));
+    expect(previousPeriod(periodFor("month", "2026-10-10"))).toEqual(periodFor("month", "2026-09-10"));
+    expect(previousPeriod(periodFor("year", "2026-10-10"))).toEqual(periodFor("year", "2025-10-10"));
+  });
+  it("is the same number of days before a range", () => {
+    expect(previousPeriod({ kind: "custom", from: "2026-10-05", to: "2026-10-11" })).toEqual({ kind: "custom", from: "2026-09-28", to: "2026-10-04" });
+    expect(previousPeriod({ kind: "custom", from: "2026-10-10", to: "2026-10-10" })).toEqual({ kind: "custom", from: "2026-10-09", to: "2026-10-09" });
+  });
+});
+
+describe("wholePercents / mealShares", () => {
+  it("makes whole percentages that add up to exactly 100", () => {
+    expect(wholePercents([1, 1, 1])).toEqual([34, 33, 33]);
+    expect(wholePercents([0, 0])).toEqual([0, 0]);
+    expect(wholePercents([]).length).toBe(0);
+    const p = wholePercents([333, 333, 334, 1]);
+    expect(p.reduce((a, b) => a + b, 0)).toBe(100);
+  });
+  it("macroSplit still adds up to 100", () => {
+    const split = macroSplit({ protein: 150, carbs: 200, fat: 67 });
+    expect(split.protein + split.carbs + split.fat).toBe(100);
+  });
+  it("splits the calories between the four meals in the order of the day", () => {
+    const shares = mealShares(
+      [
+        { meal: "lunch", calories: 1200 },
+        { meal: "breakfast", calories: 400 },
+        { meal: "lunch", calories: 400 },
+        { meal: "snacks", calories: 400 },
+      ],
+      2,
+    );
+    expect(shares.map((s) => s.meal)).toEqual(["breakfast", "lunch", "dinner", "snacks"]);
+    expect(shares.map((s) => s.percent)).toEqual([17, 66, 0, 17]);
+    expect(shares.reduce((a, s) => a + s.percent, 0)).toBe(100);
+    expect(shares.map((s) => s.perDay)).toEqual([200, 800, 0, 200]);
+  });
+  it("is all zeros when nothing was logged", () => {
+    expect(mealShares([], 0).every((s) => s.percent === 0 && s.perDay === 0)).toBe(true);
   });
 });

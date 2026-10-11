@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { toDateKey } from "../lib/dates";
 import { elapsedDays, periodFor, periodLabel, shiftPeriod } from "../lib/history";
 import { login } from "./helpers";
-import { clearDiary, clearSaved, dailyTotalsAs, seedDiary, seedSavedFood } from "./seed";
+import { clearDiary, clearSaved, dailyTotalsAs, mealTotalsAs, seedDiary, seedSavedFood, topItemsAs } from "./seed";
 
 const clearAll = () => Promise.all([clearDiary("A"), clearDiary("B"), clearSaved("A"), clearSaved("B")]);
 test.beforeEach(clearAll);
@@ -38,6 +38,9 @@ async function openHistory(page: Page, query = "") {
 }
 
 const label = (page: Page) => page.getByTestId("period-label");
+const tab = (page: Page, metric: "calories" | "protein" | "carbs" | "fat") => page.getByTestId(`metric-tab-${metric}`);
+/** The list of days is closed until asked for. */
+const openDays = (page: Page, noun = "days") => page.getByRole("button", { name: new RegExp(`^Show ${noun}`) }).click();
 const now = () => new Date();
 
 test("opens on the current week and shows only what was logged", async ({ page }) => {
@@ -62,6 +65,7 @@ test("the current month and year stop today: no future days in the chart or the 
   await login(page, "A");
   await openHistory(page, `p=month&d=${toDateKey(today)}`);
   await expect(page.getByTestId("kcal-bar")).toHaveCount(today.getDate());
+  await openDays(page);
   await expect(page.getByTestId("bucket-list").getByRole("listitem")).toHaveCount(1); // only today has data
   await page.getByRole("button", { name: "Show all days" }).click();
   await expect(page.getByTestId("bucket-list").getByRole("listitem")).toHaveCount(today.getDate());
@@ -83,55 +87,66 @@ test("averages are per logged day: exact numbers, days summed, empty days left o
   await expect(page.getByText(/meta/i)).toHaveCount(0);
   await expect(page.getByRole("progressbar")).toHaveCount(0);
 
-  // average, highest and lowest day of calories and of every macro
+  // average, highest and lowest day of calories and of every macro: one chart, the tabs pick the metric
   const stat = (metric: string, kind: "avg" | "max" | "min") => page.getByTestId(`stat-${metric}-${kind}`);
+  await expect(page.getByRole("progressbar")).toHaveCount(0);
   await expect(stat("calories", "avg")).toHaveText("1925 kcal");
   await expect(stat("calories", "max")).toContainText("2400 kcal");
   await expect(stat("calories", "max")).toContainText("Fri, 16 Jan");
   await expect(stat("calories", "min")).toContainText("1500 kcal");
   await expect(stat("calories", "min")).toContainText("Tue, 13 Jan");
-  await expect(stat("protein", "avg")).toHaveText("80.1 g"); // (100 + 90.5 + 80 + 50) / 4
+  // one chart, a bar for each day of the week
+  const bars = page.getByTestId("kcal-bar");
+  await expect(bars).toHaveCount(7);
+  await expect(page.getByTestId("macro-bar")).toHaveCount(0); // the macros are another tab, not more charts
+  await expect(bars.nth(4)).toHaveAttribute("aria-label", /2400 kcal/); // Friday 16
+  await expect(bars.nth(2)).toHaveAttribute("aria-label", /none/); // Wednesday
+
+  await tab(page, "protein").click();
+  await expect(stat("protein", "avg")).toContainText("80.1 g"); // (100 + 90.5 + 80 + 50) / 4
+  await expect(stat("protein", "avg")).toContainText("20% of kcal");
   await expect(stat("protein", "max")).toContainText("100 g");
   await expect(stat("protein", "max")).toContainText("Mon, 12 Jan");
   await expect(stat("protein", "min")).toContainText("50 g");
   await expect(stat("protein", "min")).toContainText("Fri, 16 Jan");
-  await expect(stat("carbs", "avg")).toHaveText("195 g");
+  await expect(page.getByTestId("macro-bar")).toHaveCount(7);
+  await tab(page, "carbs").click();
+  await expect(stat("carbs", "avg")).toContainText("195 g");
+  await expect(stat("carbs", "avg")).toContainText("48% of kcal");
   await expect(stat("carbs", "max")).toContainText("250 g");
   await expect(stat("carbs", "min")).toContainText("150 g");
-  await expect(stat("fat", "avg")).toHaveText("57.6 g");
+  await tab(page, "fat").click();
+  await expect(stat("fat", "avg")).toContainText("57.6 g");
+  await expect(stat("fat", "avg")).toContainText("32% of kcal");
   await expect(stat("fat", "max")).toContainText("80 g");
   await expect(stat("fat", "min")).toContainText("40.4 g");
-  await expect(page.getByTestId("metric-protein")).toContainText("20% of kcal");
-  await expect(page.getByTestId("metric-carbs")).toContainText("48% of kcal");
-  await expect(page.getByTestId("metric-fat")).toContainText("32% of kcal");
-
-  // one chart per metric, a bar for each day of the week
-  const bars = page.getByTestId("kcal-bar");
-  await expect(bars).toHaveCount(7);
-  await expect(page.getByTestId("macro-bar")).toHaveCount(21); // protein, carbs and fat
-  await expect(bars.nth(4)).toHaveAttribute("aria-label", /2400 kcal/); // Friday 16
-  await expect(bars.nth(2)).toHaveAttribute("aria-label", /none/); // Wednesday
+  await expect(tab(page, "fat")).toHaveAttribute("aria-pressed", "true");
+  await expect(tab(page, "calories")).toHaveAttribute("aria-pressed", "false");
 });
 
-test("selecting a day in one chart selects it in all four, with every value in one line", async ({ page }) => {
+test("selecting a bar shows every value of that day in one line, and the choice follows the tabs", async ({ page }) => {
   await seedWeek();
   await login(page, "A");
   await openHistory(page, WEEK);
   const readout = page.getByTestId("chart-readout");
-  const selectedBars = page.locator('[data-testid="kcal-bar"][data-selected="true"], [data-testid="macro-bar"][data-selected="true"]');
+  const selected = page.locator('[data-selected="true"]');
 
+  await expect(readout).toHaveText("Tap a bar");
   await page.getByTestId("kcal-bar").nth(0).click();
   await expect(readout).toContainText("2000 kcal");
   await expect(readout).toContainText("P 100 · C 200 · F 60");
-  await expect(selectedBars).toHaveCount(4); // one in each chart
+  await expect(selected).toHaveCount(1);
 
-  await page.locator('[data-testid="macro-bar"][data-metric="fat"]').nth(4).click(); // Friday, in the fat chart
+  await tab(page, "fat").click(); // another metric, the same day stays selected
+  await expect(selected).toHaveCount(1);
+  await expect(page.locator('[data-testid="macro-bar"][data-selected="true"]')).toHaveAttribute("data-metric", "fat");
+  await page.getByTestId("macro-bar").nth(4).click(); // Friday
   await expect(readout).toContainText("2400 kcal");
   await expect(readout).toContainText("P 50 · C 250 · F 80");
-  await expect(selectedBars).toHaveCount(4);
 
-  await page.locator('[data-testid="macro-bar"][data-metric="fat"]').nth(4).click(); // again: unselect
-  await expect(selectedBars).toHaveCount(0);
+  await page.getByTestId("macro-bar").nth(4).click(); // again: unselect
+  await expect(selected).toHaveCount(0);
+  await expect(readout).toHaveText("Tap a bar");
 });
 
 test("the list shows only the days with data, and every day on request", async ({ page }) => {
@@ -140,6 +155,8 @@ test("the list shows only the days with data, and every day on request", async (
   await openHistory(page, WEEK);
   const items = page.getByTestId("bucket-list").getByRole("listitem");
 
+  await expect(page.getByTestId("bucket-list")).toHaveCount(0); // closed until asked for
+  await openDays(page);
   await expect(items).toHaveCount(4); // Mon 12, Tue 13, Thu 15, Fri 16
   await expect(page.getByTestId("bucket-list")).not.toContainText("—");
   await page.getByRole("button", { name: "Show all days" }).click();
@@ -151,6 +168,7 @@ test("the list shows only the days with data, and every day on request", async (
   await expect(items).toHaveCount(4);
 
   await openHistory(page, "p=year&d=2026-01-01"); // months in the year view
+  await openDays(page, "months");
   await page.getByRole("button", { name: "Show all months" }).click();
   await expect(items).toHaveCount(now().getFullYear() === 2026 ? now().getMonth() + 1 : 12); // a past year has 12 months
 });
@@ -179,6 +197,7 @@ test("arrows, kind links, going to a date and 'Back to today'", async ({ page })
   // a past year has 12 months; the current one stops at this month
   await expect(page.getByTestId("kcal-bar")).toHaveCount(now().getFullYear() === 2026 ? now().getMonth() + 1 : 12);
   await expect(page.getByTestId("avg-kcal")).toHaveText("1925");
+  await openDays(page, "months");
   await page.getByTestId("bucket-list").getByRole("link", { name: /January/i }).click(); // drill into the month
   await expect(page).toHaveURL(/p=month&d=2026-01-01/);
 
@@ -262,4 +281,124 @@ test("each user only sees their own days", async ({ page }) => {
   await login(page, "B");
   await openHistory(page, WEEK);
   await expect(page.getByTestId("history-empty")).toBeVisible();
+});
+
+const meal = (date: string, name: string, calories: number, mealName = "lunch") => ({
+  entry_date: date,
+  meal: mealName,
+  kind: "meal",
+  name,
+  calories,
+  protein_g: 30,
+  carbs_g: 60,
+  fat_g: 20,
+  doses: 1,
+  items: [{ name, quantity_g: null, calories, protein_g: 30, carbs_g: 60, fat_g: 20 }],
+});
+
+/** Four logged days in the week of WEEK, plus a day in the week before. */
+const seedInsights = () =>
+  seedDiary("A", [
+    { ...row("2026-01-12", 150, 12, 1, 10, "breakfast"), name: "  ovo " }, // the same food: case and spaces are ignored
+    { ...row("2026-01-12", 1100, 40, 130, 40), name: "Pizza" },
+    { ...row("2026-01-13", 150, 12, 1, 10, "breakfast"), name: "Ovo" },
+    meal("2026-01-13", "Frango com arroz", 600),
+    { ...row("2026-01-15", 150, 12, 1, 10, "breakfast"), name: "Ovo" },
+    meal("2026-01-15", "Frango com arroz", 600),
+    { ...row("2026-01-16", 150, 12, 1, 10, "breakfast"), name: "Ovo" },
+    { ...row("2026-01-16", 5, 0, 1, 0, "snacks"), name: "Café" },
+    { ...row("2026-01-07", 600, 30, 60, 20), name: "Sopa" }, // the week before
+  ]);
+
+test("Most eaten: by times and by calories, foods and meals, same names counted together", async ({ page }) => {
+  await seedInsights();
+  await login(page, "A");
+  await openHistory(page, WEEK);
+
+  const list = page.getByTestId("top-items");
+  const rows = list.getByRole("listitem");
+  await expect(rows).toHaveCount(4);
+  await expect(rows.nth(0)).toContainText("Ovo");
+  await expect(rows.nth(0).getByTestId("top-times")).toHaveText("4×");
+  await expect(rows.nth(0).getByTestId("top-calories")).toHaveText("600 kcal");
+  await expect(rows.nth(1)).toContainText("Frango com arroz");
+  await expect(rows.nth(1)).toContainText("Meal");
+  await expect(rows.nth(2)).toContainText("Pizza"); // a tie on times: the one with more calories first
+  await expect(rows.nth(3)).toContainText("Café");
+
+  await page.getByRole("region", { name: "Most eaten" }).getByRole("button", { name: "Calories" }).click();
+  await expect(rows.nth(0)).toContainText("Frango com arroz");
+  await expect(rows.nth(0).getByTestId("top-times")).toHaveText("2×");
+  await expect(rows.nth(0).getByTestId("top-calories")).toHaveText("1200 kcal");
+  await expect(rows.nth(1)).toContainText("Pizza");
+  await expect(rows.nth(2)).toContainText("Ovo");
+  await expect(rows.nth(3)).toContainText("Café");
+});
+
+test("Calories by meal: the share of each meal and its average per logged day", async ({ page }) => {
+  await seedInsights();
+  await login(page, "A");
+  await openHistory(page, WEEK);
+  // breakfast 600, lunch 2300, dinner 0, snacks 5 of 2905 kcal over 4 logged days
+  await expect(page.getByTestId("meal-percent-breakfast")).toHaveText("21%");
+  await expect(page.getByTestId("meal-percent-lunch")).toHaveText("79%");
+  await expect(page.getByTestId("meal-percent-dinner")).toHaveText("0%");
+  await expect(page.getByTestId("meal-percent-snacks")).toHaveText("0%");
+  const legend = page.getByTestId("meal-legend");
+  await expect(legend).toContainText("150 kcal/day");
+  await expect(legend).toContainText("575 kcal/day");
+  await expect(page.getByTestId("meal-bar")).toHaveAttribute("aria-label", "Breakfast 21%, Lunch 79%, Dinner 0%, Snacks 0%");
+});
+
+test("the average is compared with the period before: a direction and a percentage, no goals", async ({ page }) => {
+  await seedInsights();
+  await login(page, "A");
+  await openHistory(page, WEEK);
+  // (1250 + 750 + 750 + 155) / 4 = 726 against 600 the week before
+  await expect(page.getByTestId("avg-kcal")).toHaveText("726");
+  await expect(page.getByTestId("delta-chip")).toHaveText("+21% vs last week");
+
+  await openHistory(page, "p=week&d=2026-01-05"); // the week before has nothing before it
+  await expect(page.getByTestId("delta-chip")).toHaveCount(0);
+});
+
+test("with fewer than 3 logged days there is no comparison, just a short note", async ({ page }) => {
+  await seedDiary("A", [row("2026-01-12", 1800, 100, 180, 50), row("2026-01-07", 1500)]);
+  await login(page, "A");
+  await openHistory(page, WEEK);
+  await expect(page.getByTestId("avg-kcal")).toHaveText("1800");
+  await expect(page.getByTestId("delta-chip")).toHaveCount(0);
+  await expect(page.getByRole("status").filter({ hasText: "Log 3+ days for trends" })).toBeVisible();
+  await expect(page.getByTestId("top-items").getByRole("listitem")).toHaveCount(1); // what there is is still shown
+});
+
+test("the whole screen is short: the four metrics are one chart", async ({ page }) => {
+  await seedInsights();
+  await login(page, "A");
+  await openHistory(page, WEEK);
+  await expect(page.getByRole("button", { name: /^Show days/ })).toBeVisible();
+  const height = await page.evaluate(() => document.documentElement.scrollHeight);
+  expect(height).toBeLessThan(2100); // it was about 3 times that with four charts and the full list
+});
+
+test("the insight functions only read your own entries and refuse bad input", async () => {
+  await seedInsights();
+  const top = await topItemsAs("A", "2026-01-01", "2026-01-31", "times");
+  expect(top.data?.map((r) => [r.name, r.kind, r.times, r.total_calories])).toEqual([
+    ["Ovo", "food", 4, 600],
+    ["Frango com arroz", "meal", 2, 1200],
+    ["Pizza", "food", 1, 1100],
+    ["Sopa", "food", 1, 600],
+    ["Café", "food", 1, 5],
+  ]);
+  expect((await topItemsAs("A", "2026-01-01", "2026-01-31", "calories", 2)).data?.map((r) => r.name)).toEqual(["Frango com arroz", "Pizza"]);
+  expect((await topItemsAs("B", "2026-01-01", "2026-01-31", "times")).data).toEqual([]);
+  expect((await topItemsAs("A", "2026-01-01", "2026-01-31", "name" as "times")).error?.message).toMatch(/invalid order/);
+  expect((await topItemsAs("A", "2026-01-01", "2026-01-31", "times", 50)).error?.message).toMatch(/invalid limit/);
+  expect((await topItemsAs("A", "2026-02-01", "2026-01-01", "times")).error?.message).toMatch(/invalid date range/);
+
+  const meals = await mealTotalsAs("A", "2026-01-12", "2026-01-18");
+  expect(Object.fromEntries((meals.data ?? []).map((r) => [r.meal, r.calories]))).toEqual({ breakfast: 600, lunch: 2300, snacks: 5 });
+  expect((await mealTotalsAs("B", "2026-01-12", "2026-01-18")).data).toEqual([]);
+  expect((await mealTotalsAs("A", "2000-01-01", "2026-01-01")).error?.message).toMatch(/too large/);
 });

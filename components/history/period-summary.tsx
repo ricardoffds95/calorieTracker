@@ -1,7 +1,8 @@
-import type { PeriodSummary } from "@/lib/history";
+import { DeltaChip } from "@/components/history/delta-chip";
+import type { PeriodKind, PeriodSummary } from "@/lib/history";
 
 
-export function PeriodSummaryCard({ summary }: { summary: PeriodSummary }) {
+export function PeriodSummaryCard({ summary, kind, delta }: { summary: PeriodSummary; kind: PeriodKind; delta: number | null }) {
   const { average, loggedDays, elapsedDays, total } = summary;
   if (!average) {
     return (
@@ -20,6 +21,9 @@ export function PeriodSummaryCard({ summary }: { summary: PeriodSummary }) {
           {average.calories}
         </p>
         <p className="text-base text-muted-foreground">kcal per logged day</p>
+      </div>
+      <div>
+        <DeltaChip percent={delta} kind={kind} />
       </div>
       <p data-testid="logged-days" className="text-sm tabular-nums">
         {loggedDays} of {elapsedDays} {elapsedDays === 1 ? "day logged" : "days logged"}

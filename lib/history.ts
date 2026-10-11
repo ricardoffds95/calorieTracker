@@ -246,14 +246,13 @@ export interface MacroSplit {
   fat: number;
 }
 
-/** Percentage of the calories that come from each macro (4/4/9 kcal per gram), summing to exactly 100 (0 when nothing was eaten). */
-export function macroSplit(avg: Pick<MacroTotals, "protein" | "carbs" | "fat">): MacroSplit {
-  const parts = [avg.protein * 4, avg.carbs * 4, avg.fat * 9];
-  const total = parts[0]! + parts[1]! + parts[2]!;
-  if (total <= 0) return { protein: 0, carbs: 0, fat: 0 };
+/** Whole percentages of `parts` that add up to exactly 100 (largest remainder method); all 0 when there is nothing. */
+export function wholePercents(parts: readonly number[]): number[] {
+  const total = parts.reduce((a, b) => a + b, 0);
+  if (!(total > 0)) return parts.map(() => 0);
   const exact = parts.map((p) => (p / total) * 100);
   const floors = exact.map(Math.floor);
-  // largest remainder method: hand the missing points to the biggest fractions
+  // hand the missing points to the biggest fractions
   let missing = 100 - floors.reduce((a, b) => a + b, 0);
   const order = exact.map((value, i) => ({ i, rest: value - floors[i]! })).sort((a, b) => b.rest - a.rest || a.i - b.i);
   for (const { i } of order) {
@@ -261,7 +260,42 @@ export function macroSplit(avg: Pick<MacroTotals, "protein" | "carbs" | "fat">):
     floors[i]! += 1;
     missing -= 1;
   }
-  return { protein: floors[0]!, carbs: floors[1]!, fat: floors[2]! };
+  return floors;
+}
+
+/** Percentage of the calories that come from each macro (4/4/9 kcal per gram), summing to exactly 100 (0 when nothing was eaten). */
+export function macroSplit(avg: Pick<MacroTotals, "protein" | "carbs" | "fat">): MacroSplit {
+  const [protein, carbs, fat] = wholePercents([avg.protein * 4, avg.carbs * 4, avg.fat * 9]);
+  return { protein: protein!, carbs: carbs!, fat: fat! };
+}
+
+/** Whole-number change from `previous` to `current` in percent; null when there is nothing to compare with. */
+export function percentChange(current: number, previous: number | null | undefined): number | null {
+  if (previous === null || previous === undefined || !(previous > 0)) return null;
+  return Math.round(((current - previous) / previous) * 100);
+}
+
+/** The period right before this one, of the same length (last week, the previous month or year, the same number of days for a range). */
+export function previousPeriod(period: Period): Period {
+  return shiftPeriod(period, -1);
+}
+
+export type MealKey = "breakfast" | "lunch" | "dinner" | "snacks";
+export const MEAL_ORDER: readonly MealKey[] = ["breakfast", "lunch", "dinner", "snacks"];
+
+export interface MealShare {
+  meal: MealKey;
+  /** Whole percent of the period's calories, the four add up to 100 (0 when nothing was eaten). */
+  percent: number;
+  /** Average kcal of this meal per logged day. */
+  perDay: number;
+}
+
+/** How the calories of a period split between the four meals, in the order of the day (meals without entries count 0). */
+export function mealShares(rows: readonly { meal: string; calories: number }[], loggedDays: number): MealShare[] {
+  const calories = MEAL_ORDER.map((meal) => rows.filter((r) => r.meal === meal).reduce((sum, r) => sum + r.calories, 0));
+  const percents = wholePercents(calories);
+  return MEAL_ORDER.map((meal, i) => ({ meal, percent: percents[i]!, perDay: loggedDays > 0 ? roundCalories(calories[i]! / loggedDays) : 0 }));
 }
 
 export type Granularity = "day" | "week" | "month";

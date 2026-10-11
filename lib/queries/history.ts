@@ -26,3 +26,38 @@ export function useHistory(userId: string, from: string, to: string) {
     placeholderData: keepPreviousData,
   });
 }
+
+export interface TopItem {
+  name: string;
+  kind: "food" | "meal";
+  times: number;
+  totalCalories: number;
+}
+
+export type TopOrder = "times" | "calories";
+
+/** The foods and meals eaten most in a period: by number of entries, or by the calories they add up to. */
+export function useTopItems(userId: string, from: string, to: string, order: TopOrder, limit = 5) {
+  return useQuery({
+    queryKey: [...historyKey(userId), "top", order, limit, from, to],
+    queryFn: async (): Promise<TopItem[]> => {
+      const { data, error } = await createClient().rpc("diary_top_items", { p_from: from, p_to: to, p_order: order, p_limit: limit });
+      if (error) throw error;
+      return data.map((row) => ({ name: row.name, kind: row.kind === "meal" ? "meal" : "food", times: row.times, totalCalories: row.total_calories }));
+    },
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** Calories of each meal (breakfast, lunch, dinner, snacks) in a period. */
+export function useMealTotals(userId: string, from: string, to: string) {
+  return useQuery({
+    queryKey: [...historyKey(userId), "meals", from, to],
+    queryFn: async () => {
+      const { data, error } = await createClient().rpc("diary_meal_totals", { p_from: from, p_to: to });
+      if (error) throw error;
+      return data.map((row) => ({ meal: row.meal, calories: row.calories }));
+    },
+    placeholderData: keepPreviousData,
+  });
+}
