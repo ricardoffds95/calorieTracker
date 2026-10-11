@@ -17,16 +17,18 @@ interface NumberStepperProps {
   unit: string;
   fallback?: number;
   invalid?: boolean;
+  /** Smaller buttons and field, for dense rows. */
+  compact?: boolean;
   className?: string;
 }
 
-export function NumberStepper({ label, value, onChange, step, min, max, unit, fallback, invalid, className }: NumberStepperProps) {
+export function NumberStepper({ label, value, onChange, step, min, max, unit, fallback, invalid, compact = false, className }: NumberStepperProps) {
   const current = parseIntegerInput(value);
   const apply = (delta: number) => onChange(String(stepValue(current, delta, min, max, fallback)));
 
   return (
-    <div className={cn("flex items-center gap-2", className)}>
-      <Button type="button" variant="outline" size="icon" className="size-11 shrink-0" aria-label={`Decrease ${label}`} onClick={() => apply(-step)}>
+    <div className={cn("flex items-center", compact ? "gap-1" : "gap-2", className)}>
+      <Button type="button" variant="outline" size="icon" className={cn("shrink-0", compact ? "size-9" : "size-11")} aria-label={`Decrease ${label}`} onClick={() => apply(-step)}>
         <Minus aria-hidden />
       </Button>
       <Input
@@ -35,10 +37,10 @@ export function NumberStepper({ label, value, onChange, step, min, max, unit, fa
         inputMode="numeric"
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="h-11 min-w-0 text-center text-base tabular-nums"
+        className={cn("min-w-0 text-center tabular-nums", compact ? "h-9 px-1 text-sm" : "h-11 text-base")}
       />
-      <span className="w-9 shrink-0 text-sm text-muted-foreground">{unit}</span>
-      <Button type="button" variant="outline" size="icon" className="size-11 shrink-0" aria-label={`Increase ${label}`} onClick={() => apply(step)}>
+      <span className={cn("shrink-0 text-sm text-muted-foreground", compact ? "w-5" : "w-9")}>{unit}</span>
+      <Button type="button" variant="outline" size="icon" className={cn("shrink-0", compact ? "size-9" : "size-11")} aria-label={`Increase ${label}`} onClick={() => apply(step)}>
         <Plus aria-hidden />
       </Button>
     </div>

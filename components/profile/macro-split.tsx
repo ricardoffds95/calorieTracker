@@ -39,38 +39,37 @@ export function MacroSplit({ values, onChange, grams, onGramsChange, gramsErrors
   const ok = total === 100;
   const gramsError = Object.values(gramsErrors).find(Boolean);
   return (
-    <fieldset className="flex flex-col gap-4">
+    <fieldset className="flex flex-col gap-2">
       <legend className="mb-1 text-sm font-medium">Macro split</legend>
       {ROWS.map(({ key, label, dot }) => (
-        <div key={key} className="flex flex-col gap-1.5">
-          <span className="flex items-center gap-2 text-sm">
+        <div key={key} className="flex items-center gap-2">
+          <span className="flex w-[4.5rem] shrink-0 items-center gap-1.5 text-sm">
             <span className={cn("size-2.5 shrink-0 rounded-full", dot)} aria-hidden />
             {label}
           </span>
-          <div className="flex items-center gap-3">
-            <NumberStepper
-              label={`${label} %`}
-              value={values[key]}
-              onChange={(v) => onChange(key, v)}
-              step={PERCENT_STEP}
-              min={0}
-              max={100}
-              unit="%"
-              fallback={0}
-              invalid={!ok}
-              className="min-w-0 flex-1"
+          <NumberStepper
+            label={`${label} %`}
+            value={values[key]}
+            onChange={(v) => onChange(key, v)}
+            step={PERCENT_STEP}
+            min={0}
+            max={100}
+            unit="%"
+            fallback={0}
+            invalid={!ok}
+            compact
+            className="min-w-0 flex-1"
+          />
+          <div className="flex w-[4.25rem] shrink-0 items-center gap-1">
+            <Input
+              aria-label={`${label} (g)`}
+              inputMode="numeric"
+              aria-invalid={gramsErrors[key] ? true : undefined}
+              value={grams[key]}
+              onChange={(e) => onGramsChange(key, e.target.value)}
+              className="h-9 min-w-0 px-1 text-center text-sm tabular-nums"
             />
-            <div className="flex w-24 shrink-0 items-center gap-1.5">
-              <Input
-                aria-label={`${label} (g)`}
-                inputMode="numeric"
-                aria-invalid={gramsErrors[key] ? true : undefined}
-                value={grams[key]}
-                onChange={(e) => onGramsChange(key, e.target.value)}
-                className="h-11 min-w-0 px-2 text-center text-base tabular-nums"
-              />
-              <span className="text-sm text-muted-foreground">g</span>
-            </div>
+            <span className="text-sm text-muted-foreground">g</span>
           </div>
         </div>
       ))}

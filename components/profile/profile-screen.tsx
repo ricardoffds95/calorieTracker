@@ -20,8 +20,9 @@ export function ProfileScreen({ userId, email }: { userId: string; email: string
     <UnsavedGuard>
       <PageHeader title="Profile">{data && <AccountMenu profile={data} email={email} />}</PageHeader>
     <div className="flex flex-col gap-6">
+      {/* not shown any more (the account menu has it all); kept for screen readers */}
       {data && (
-        <p data-testid="profile-summary" className="-mt-4 truncate text-sm text-muted-foreground tabular-nums">
+        <p data-testid="profile-summary" className="sr-only">
           {data.name} · {GOAL_MODE_OPTIONS.find((o) => o.mode === data.mode)?.label ?? data.mode} · {data.goal_calories} kcal
         </p>
       )}
