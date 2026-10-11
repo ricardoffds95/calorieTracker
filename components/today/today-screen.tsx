@@ -16,6 +16,7 @@ import { dayTotals, groupByMeal, mealTotals, type DiaryEntry } from "@/lib/diary
 import { MEAL_TYPES } from "@/lib/macros";
 import { planItemRemoval, useDeleteEntry, useDiaryDay, useRemoveMealItem, useUpdateEntry } from "@/lib/queries/diary";
 import { useProfile } from "@/lib/queries/profile";
+import { useCollapsedMeals } from "@/lib/use-collapsed-meals";
 import { cn } from "@/lib/utils";
 
 // "Today" depends on the browser's time zone, so nothing date-based renders on the server.
@@ -32,6 +33,7 @@ function TodayDay({ userId }: { userId: string }) {
   const [now] = useState(() => new Date());
   const dateKey = dateKeyOrToday(useSearchParams().get("d"), now);
   const [editing, setEditing] = useState<DiaryEntry | null>(null);
+  const { isCollapsed, toggle } = useCollapsedMeals();
 
   const profile = useProfile(userId);
   const router = useRouter();
@@ -89,6 +91,8 @@ function TodayDay({ userId }: { userId: string }) {
               entries={grouped[meal]}
               calories={perMeal[meal].calories}
               dateKey={dateKey}
+              collapsed={isCollapsed(meal)}
+              onToggle={() => toggle(meal)}
               onEdit={setEditing}
               onDelete={(entry) => deleteEntry.mutate(entry)}
               onRemoveItem={(entry, index) => {

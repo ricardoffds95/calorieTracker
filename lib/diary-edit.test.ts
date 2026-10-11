@@ -134,3 +134,12 @@ describe("withLinkOverride", () => {
     expect(mealItemRemovalUpdate({ items }, 0)).not.toHaveProperty("saved_meal_id");
   });
 });
+
+describe("moving an entry to another meal", () => {
+  it("keeps the link to the saved food or meal when only the meal changes", () => {
+    const foodUpdate = { ...toEntryUpdate("food", { name: "Aveia", quantity_g: 60, calories: 224, protein_g: 8, carbs_g: 35, fat_g: 4 }), meal: "dinner" as const };
+    expect(withLinkOverride(food, foodUpdate)).toEqual(foodUpdate);
+    const mealUpdate = { ...toEntryUpdate("meal", { name: "Chicken and rice", calories: 508, protein_g: 51.9, carbs_g: 56, fat_g: 6 }), meal: "dinner" as const };
+    expect(withLinkOverride(meal, mealUpdate)).toEqual(mealUpdate);
+  });
+});

@@ -7,7 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { DiaryEntry } from "@/lib/diary";
 import { foodEditSchema, mealEditSchema, rescaleEntry, toEntryUpdate, withLinkOverride, type EntryUpdate } from "@/lib/diary-edit";
+import { MEAL_TYPES, type MealType } from "@/lib/macros";
 import { formatNumberInput, parseDecimalInput } from "@/lib/numbers";
+import { mealLabel } from "@/lib/today";
+import { cn } from "@/lib/utils";
 
 interface EditEntryDialogProps {
   entry: DiaryEntry;
@@ -20,6 +23,7 @@ const asNumber = (text: string) => parseDecimalInput(text) ?? Number.NaN;
 export function EditEntryDialog({ entry, onClose, onSave }: EditEntryDialogProps) {
   const isFood = entry.kind === "food";
   const [name, setName] = useState(entry.name);
+  const [meal, setMeal] = useState<MealType>(entry.meal);
   const [quantity, setQuantity] = useState(entry.quantity_g === null ? "" : formatNumberInput(entry.quantity_g));
   const [calories, setCalories] = useState(formatNumberInput(entry.calories));
   const [protein, setProtein] = useState(formatNumberInput(entry.protein_g));
@@ -53,7 +57,7 @@ export function EditEntryDialog({ entry, onClose, onSave }: EditEntryDialogProps
   function onSubmit(event: FormEvent) {
     event.preventDefault();
     if (!parsed.success) return;
-    onSave(entry.id, withLinkOverride(entry, toEntryUpdate(entry.kind, parsed.data)));
+    onSave(entry.id, { ...withLinkOverride(entry, toEntryUpdate(entry.kind, parsed.data)), meal });
     onClose();
   }
 
@@ -87,6 +91,23 @@ export function EditEntryDialog({ entry, onClose, onSave }: EditEntryDialogProps
         </DialogHeader>
         <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
           {field("name", "Name", name, setName, "name", false)}
+          <div role="radiogroup" aria-label="Meal" className="grid grid-cols-4 gap-1.5">
+            {MEAL_TYPES.map((type) => (
+              <button
+                key={type}
+                type="button"
+                role="radio"
+                aria-checked={meal === type}
+                onClick={() => setMeal(type)}
+                className={cn(
+                  "h-11 rounded-md border px-1 text-sm",
+                  meal === type ? "border-primary bg-primary text-primary-foreground" : "border-input text-muted-foreground",
+                )}
+              >
+                {mealLabel(type)}
+              </button>
+            ))}
+          </div>
           {isFood && field("quantity", "Amount (g)", quantity, onQuantityChange, "quantity_g")}
           {field("calories", "Calories (kcal)", calories, setCalories, "calories")}
           <div className="grid grid-cols-3 gap-3">

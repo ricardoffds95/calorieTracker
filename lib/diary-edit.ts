@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Json, TablesInsert } from "@/lib/supabase/database.types";
 import type { DiaryEntry } from "./diary";
+import type { MealType } from "./macros";
 import { removeItemFromMeal, roundCalories, roundMacro, scaleFromPer100g, type FoodItem } from "./nutrition";
 
 const name = z.string().trim().min(1, "Name required").max(200, "Name too long");
@@ -36,6 +37,8 @@ export function itemsToJson(items: readonly FoodItem[] | null): Json | null {
 
 export interface EntryUpdate {
   name: string;
+  /** Moves the entry to another meal of the same day. */
+  meal?: MealType;
   quantity_g?: number;
   calories: number;
   protein_g: number;

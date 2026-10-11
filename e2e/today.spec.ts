@@ -136,6 +136,87 @@ test("editing a food rescales values, persists in the DB and survives reload and
   await expect(remaining(page)).toHaveText("857");
 });
 
+test("an entry moves to another meal from the edit form: totals follow, and it persists", async ({ page }) => {
+  await seedDiary("A", dataDayRows());
+  await login(page, "A");
+  await openDay(page, DAY_DATA);
+
+  await page.getByRole("button", { name: "Edit Iogurte" }).click();
+  await expect(dialog(page).getByRole("radio", { name: "Snacks" })).toBeChecked();
+  await dialog(page).getByRole("radio", { name: "Dinner" }).click();
+  await dialog(page).getByRole("button", { name: "Save" }).click();
+
+  await expect(page.getByText("Entry updated")).toBeVisible();
+  await expect(mealKcal(page, "snacks")).toHaveText("—");
+  await expect(mealKcal(page, "dinner")).toHaveText("80 kcal");
+  await expect(page.getByTestId("meal-dinner").getByText("Iogurte")).toBeVisible();
+  await expect(remaining(page)).toHaveText("1081"); // the day does not change
+
+  // a composed meal keeps its items
+  await page.getByRole("button", { name: "Edit Chicken and rice" }).click();
+  await dialog(page).getByRole("radio", { name: "Dinner" }).click();
+  await dialog(page).getByRole("button", { name: "Save" }).click();
+  await expect(mealKcal(page, "lunch")).toHaveText("—");
+  await expect(mealKcal(page, "dinner")).toHaveText("588 kcal");
+
+  // the screen updates before the write ends: wait for the DB
+  const row = async (name: string) => (await fetchDiary("A", DAY_DATA)).find((r) => r.name === name);
+  await expect.poll(async () => (await row("Chicken and rice"))?.meal).toBe("dinner");
+  expect(await row("Iogurte")).toMatchObject({ meal: "dinner", calories: 80, quantity_g: 125 });
+  expect((await row("Chicken and rice"))?.items).toHaveLength(2);
+
+  await page.reload();
+  await expect(mealKcal(page, "dinner")).toHaveText("588 kcal");
+  await clearCache(page);
+  await page.reload();
+  await expect(mealKcal(page, "dinner")).toHaveText("588 kcal");
+});
+
+test("a failed move shows an error and the entry stays where it was", async ({ page }) => {
+  await seedDiary("A", dataDayRows());
+  await login(page, "A");
+  await openDay(page, DAY_DATA);
+  await failWrites(page);
+
+  await page.getByRole("button", { name: "Edit Iogurte" }).click();
+  await dialog(page).getByRole("radio", { name: "Dinner" }).click();
+  await dialog(page).getByRole("button", { name: "Save" }).click();
+  await expect(page.getByText("No connection. Not saved")).toBeVisible();
+  await expect(mealKcal(page, "snacks")).toHaveText("80 kcal");
+  await expect(mealKcal(page, "dinner")).toHaveText("—");
+  expect((await fetchDiary("A", DAY_DATA)).find((r) => r.name === "Iogurte")?.meal).toBe("snacks");
+});
+
+test("a meal can be minimized: only its total stays, and it is remembered", async ({ page }) => {
+  await seedDiary("A", dataDayRows());
+  await login(page, "A");
+  await openDay(page, DAY_DATA);
+
+  const toggle = (state: "hide" | "show") => page.getByRole("button", { name: `Breakfast, ${state}` });
+  await expect(toggle("hide")).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByText("Aveia")).toBeVisible();
+
+  await toggle("hide").click();
+  await expect(toggle("show")).toHaveAttribute("aria-expanded", "false");
+  await expect(page.getByText("Aveia")).toHaveCount(0);
+  await expect(page.getByText("Banana")).toHaveCount(0);
+  await expect(mealKcal(page, "breakfast")).toHaveText("331 kcal");
+  await expect(page.getByText("Iogurte")).toBeVisible(); // the others stay open
+  await expect(remaining(page)).toHaveText("1081");
+  await expect(page.getByRole("link", { name: "Add to Breakfast" })).toBeVisible();
+
+  await page.reload(); // kept on the device, for every day
+  await expect(toggle("show")).toBeVisible();
+  await expect(page.getByText("Aveia")).toHaveCount(0);
+  await openDay(page, DAY_EMPTY);
+  await expect(toggle("show")).toBeVisible();
+
+  await openDay(page, DAY_DATA);
+  await toggle("show").click();
+  await expect(page.getByText("Aveia")).toBeVisible();
+  await expect(toggle("hide")).toHaveAttribute("aria-expanded", "true");
+});
+
 test("the edit form validates, accepts decimal commas and can be cancelled", async ({ page }) => {
   await seedDiary("A", dataDayRows());
   await login(page, "A");
