@@ -9,7 +9,8 @@ function geminiResponse(parts: unknown[], status = 200) {
   return new Response(JSON.stringify({ candidates: [{ content: { parts } }] }), { status });
 }
 
-const base = { apiKey: "test-key", model: "test-model" };
+const sleeps: number[] = [];
+const base = { apiKey: "test-key", model: "test-model", sleep: async (ms: number) => void sleeps.push(ms) };
 
 afterEach(() => vi.unstubAllEnvs());
 
@@ -101,6 +102,31 @@ describe("parseFoodText", () => {
   ])("maps HTTP %i to AiUnavailableError(%s)", async (status, reason) => {
     const fetchMock = async () => new Response(JSON.stringify({ error: { message: "secret detail" } }), { status });
     await expect(parseFoodText("x", { ...base, fetch: fetchMock })).rejects.toMatchObject({ name: "AiUnavailableError", reason });
+  });
+
+  it("retries a passing 503 and answers when Google recovers", async () => {
+    sleeps.length = 0;
+    const answer = { name: "Apple", kind: "food", items: [{ name: "apple", quantity_g: 100, calories: 52, protein_g: 0.3, carbs_g: 14, fat_g: 0.2 }] };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response("{}", { status: 503 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(answer) }] } }] }), { status: 200 }),
+      );
+    await expect(parseFoodText("apple", { ...base, fetch: fetchMock })).resolves.toMatchObject({ name: "Apple" });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(sleeps).toEqual([800]);
+  });
+
+  it("gives up after three tries on a 503, and never retries quota or auth errors", async () => {
+    const down = vi.fn(async () => new Response("{}", { status: 503 }));
+    await expect(parseFoodText("x", { ...base, fetch: down })).rejects.toMatchObject({ reason: "server" });
+    expect(down).toHaveBeenCalledTimes(3);
+    for (const status of [429, 401, 403]) {
+      const once = vi.fn(async () => new Response("{}", { status }));
+      await expect(parseFoodText("x", { ...base, fetch: once })).rejects.toBeInstanceOf(AiUnavailableError);
+      expect(once).toHaveBeenCalledTimes(1);
+    }
   });
 
   it("treats other 4xx as an invalid response, not as unavailable", async () => {

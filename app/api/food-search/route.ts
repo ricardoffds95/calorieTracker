@@ -28,7 +28,9 @@ export async function GET(request: Request) {
     return NextResponse.json(await searchOffServer(parsed.data.q, { page: parsed.data.page, contactEmail: process.env.OFF_CONTACT_EMAIL }));
   } catch (error) {
     if (error instanceof OffUnavailableError) {
-      return jsonError(503, "off_unavailable", "Open Food Facts not responding");
+      // The reason (timeout, rate_limited, ...) is safe to share and tells the user whether waiting helps.
+      console.error("[food-search] Open Food Facts unavailable:", error.reason);
+      return NextResponse.json({ error: "off_unavailable", reason: error.reason, message: "Open Food Facts not responding" }, { status: 503 });
     }
     return jsonError(500, "internal", "Unexpected error");
   }

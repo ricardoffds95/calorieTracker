@@ -68,13 +68,11 @@ describe("GET /api/food-search", () => {
     expect(searchOffServer).toHaveBeenCalledTimes(1);
   });
 
-  it("answers 503 'off_unavailable' without leaking the reason", async () => {
+  it("answers 503 'off_unavailable' with the reason, so the screen can say whether waiting helps", async () => {
     vi.mocked(searchOffServer).mockRejectedValue(new OffUnavailableError("rate_limited"));
     const response = await get("arroz");
     expect(response.status).toBe(503);
-    const body = JSON.stringify(await response.json());
-    expect(body).toContain("off_unavailable");
-    expect(body).not.toContain("rate_limited");
+    expect(await response.json()).toMatchObject({ error: "off_unavailable", reason: "rate_limited" });
   });
 
   it("answers 500 for unexpected errors", async () => {

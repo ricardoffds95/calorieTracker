@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { ListChecks } from "lucide-react";
 import { AiPanel } from "@/components/log/ai-panel";
 import { BarcodeScannerDialog } from "@/components/log/barcode-scanner-dialog";
-import { FoodSearch } from "@/components/log/food-search";
+import { DIALOG_LIST, FoodSearch } from "@/components/log/food-search";
 import { PickSavedFoodsSheet } from "@/components/log/pick-saved-foods-sheet";
 import { JoinFoodSheet } from "@/components/log/join-food-sheet";
 import { ItemsEditor, fromEditable, toEditable, type EditableItem } from "@/components/log/items-editor";
@@ -92,7 +92,7 @@ export function NewMealDialog({ userId, initialTarget, now, foods, onClose, onAd
         </DialogHeader>
 
         <div className="flex flex-col gap-4">
-          <div role="group" aria-label="Como criar" className="grid grid-cols-2 gap-1 rounded-md bg-muted p-1">
+          <div role="group" aria-label="Como criar" hidden={searching} className="grid grid-cols-2 gap-1 rounded-md bg-muted p-1">
             {(["foods", "portion"] as const).map((m) => (
               <Button
                 key={m}
@@ -107,18 +107,18 @@ export function NewMealDialog({ userId, initialTarget, now, foods, onClose, onAd
             ))}
           </div>
 
-          <div className="flex flex-col gap-1.5">
+          <div hidden={searching} className="flex flex-col gap-1.5">
             <Label htmlFor="new-meal-name">Meal name</Label>
             <Input id="new-meal-name" className="h-11" placeholder="e.g. Chicken and rice" value={name} onChange={(e) => setName(e.target.value)} />
           </div>
 
           {mode === "foods" ? (
             <>
-              <Button type="button" variant="outline" className="h-11" disabled={foods.length === 0} onClick={() => setPanel("saved")}>
+              <Button type="button" variant="outline" className="h-11" hidden={searching} disabled={foods.length === 0} onClick={() => setPanel("saved")}>
                 <ListChecks aria-hidden />
                 Pick from my foods · {foods.length}
               </Button>
-              <FoodSearch key={searchKey} saved={foods} onPick={(food) => setPicked(food)} onScan={() => setPanel("scan")} onAi={() => setPanel("ai")} onSearchingChange={setSearching} />
+              <FoodSearch key={searchKey} saved={foods} onPick={(food) => setPicked(food)} onScan={() => setPanel("scan")} onAi={() => setPanel("ai")} onSearchingChange={setSearching} listClassName={DIALOG_LIST} />
               {!searching &&
                 (rows.length > 0 ? (
                   <ItemsEditor rows={rows} onChange={setRows} allowEmpty />

@@ -344,6 +344,40 @@ test("when Open Food Facts is down: clear message, saved foods stay, and 'Try ag
   await expect(problem).toHaveCount(0);
 });
 
+/** A page of 20 results out of 25 pages, whatever is searched. */
+async function manyResults(page: Page) {
+  const results = Array.from({ length: 20 }, (_, i) => ({ ...ARROZ, id: `56000000000${i}`, off_code: `56000000000${i}`, name: `Arroz Teste ${i + 1}` }));
+  await page.route("**/api/food-search**", (route) => route.fulfill({ json: { results, page: 1, pageCount: 25, total: 500, totalExact: false } }));
+}
+
+async function expectPagesInView(page: Page, scope: ReturnType<Page["getByRole"]> | Page) {
+  const pages = scope.getByRole("navigation", { name: "Result pages" });
+  await expect(pages).toBeVisible();
+  const box = (await pages.boundingBox())!;
+  expect(box.y + box.height).toBeLessThanOrEqual(page.viewportSize()!.height);
+}
+
+test("in the new meal dialog the page numbers are in view under the results", async ({ page }) => {
+  await manyResults(page);
+  await login(page, "A");
+  await openLog(page);
+  await page.getByRole("button", { name: "New meal" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("searchbox", { name: "Search food" }).fill("arroz");
+  await dialog.getByRole("button", { name: /^Open Food Facts · / }).click();
+  await expect(dialog.getByRole("button", { name: "Choose Arroz Teste 1", exact: true })).toBeVisible();
+  await expectPagesInView(page, dialog);
+});
+
+test("when Open Food Facts reports too many requests it says to wait", async ({ page }) => {
+  await page.route("**/api/food-search**", (route) => route.fulfill({ status: 503, json: { error: "off_unavailable", reason: "rate_limited" } }));
+  await login(page, "A");
+  await openLog(page);
+  await searchBox(page).fill("arroz");
+  await offTab(page).click();
+  await expect(page.getByRole("alert").filter({ hasText: "Too many searches. Wait a bit" })).toBeVisible();
+});
+
 test.describe("live Open Food Facts", () => {
   test.skip(!process.env.E2E_LIVE_OFF, "Set E2E_LIVE_OFF=1 to search the real Open Food Facts through our route");
 

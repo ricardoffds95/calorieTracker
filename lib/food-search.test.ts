@@ -123,6 +123,11 @@ describe("searchOpenFoodFacts (through our server)", () => {
     expect((error as Error).message).toMatch(message);
   });
 
+  it("says to wait when Open Food Facts reports too many requests", async () => {
+    const error = await searchOpenFoodFacts("aveia", { fetch: async () => jsonResponse({ error: "off_unavailable", reason: "rate_limited" }, 503) }).catch((e: unknown) => e);
+    expect(error).toMatchObject({ kind: "busy", message: "Too many searches. Wait a bit" });
+  });
+
   it("only says 'No connection' when the request itself fails", async () => {
     const offline = vi.fn().mockRejectedValue(new TypeError("fetch failed"));
     const error = await searchOpenFoodFacts("aveia", { fetch: offline }).catch((e: unknown) => e);

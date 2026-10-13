@@ -278,3 +278,29 @@ test("editing a saved meal explains problems in Portuguese words", async ({ page
   await expect(page.getByRole("alert").filter({ hasText: "Name required" })).toBeVisible();
   await expect(page.getByText(/expected array|Invalid input/)).toHaveCount(0);
 });
+
+test("in the new food dialog the page numbers are in view under the results", async ({ page }) => {
+  const results = Array.from({ length: 20 }, (_, i) => ({
+    id: `56000000000${i}`,
+    source: "off",
+    name: `Arroz Teste ${i + 1}`,
+    brand: "Marca",
+    off_code: `56000000000${i}`,
+    serving_size: null,
+    calories_100g: 130,
+    protein_100g: 2.7,
+    carbs_100g: 28.2,
+    fat_100g: 0.3,
+  }));
+  await page.route("**/api/food-search**", (route) => route.fulfill({ json: { results, page: 1, pageCount: 25, total: 500, totalExact: false } }));
+  await login(page, "A");
+  await openSaved(page);
+  await page.getByRole("button", { name: "New food" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("searchbox", { name: "Search food" }).fill("arroz");
+  await dialog.getByRole("button", { name: /^Open Food Facts · / }).click();
+  const pages = dialog.getByRole("navigation", { name: "Result pages" });
+  await expect(pages).toBeVisible();
+  const box = (await pages.boundingBox())!;
+  expect(box.y + box.height).toBeLessThanOrEqual(page.viewportSize()!.height);
+});

@@ -37,7 +37,7 @@ Calorie and macro tracking web app (PWA-style, used on an iPhone through Safari:
 
 ## Food search
 - Always both sources, in two tabs: the user's saved foods (local, instant) and Open Food Facts (OFF), 20 results per page. Opens on Saved when it has results. Search starts 700 ms after typing stops, or on Search/Enter; minimum 2 letters. **No search cache** of any kind (decision).
-- Online search goes through the server: `GET /api/food-search?q=&page=` (session required; zod: 2 to 100 letters, page 1 to 25) calls `search.openfoodfacts.org` via `lib/off-search.ts`. Reason: the old `world.openfoodfacts.org/cgi/search.pl` failed ~50% (503 without CORS) and the new API has no CORS for our domain. 8 s timeout, one retry on 5xx/429/timeout, then 503 `off_unavailable` (the UI offers "try again"; "No connection" only when the request itself fails).
+- Online search goes through the server: `GET /api/food-search?q=&page=` (session required; zod: 2 to 100 letters, page 1 to 25) calls `search.openfoodfacts.org` via `lib/off-search.ts`. Reason: the old `world.openfoodfacts.org/cgi/search.pl` failed ~50% (503 without CORS) and the new API has no CORS for our domain. 8 s timeout, one retry on 5xx/429/timeout, then 503 `off_unavailable` with a `reason` (`rate_limited` shows "Too many searches. Wait a bit"; the reason is also logged by the route; the UI offers "try again"; "No connection" only when the request itself fails).
 - The server sends `User-Agent: CalorieTracker/1.0 (OFF_CONTACT_EMAIL)`. OFF limits per IP (search 10/min, product 15/min), so keep the 700 ms pause.
 - Read only the `*_100g` OFF fields (the others can be per serving). Some OFF products have wrong data: pick another result or fix the food in Saved.
 - A food added to the diary from search is saved automatically (per 100 g). Not-yet-saved foods offer three choices: save and add (main), only add (entry not linked), only save.
@@ -45,7 +45,7 @@ Calorie and macro tracking web app (PWA-style, used on an iPhone through Safari:
 
 ## AI (Gemini)
 - Model from env `GEMINI_MODEL` (never hardcoded; use a stable model without `-preview`; currently `gemini-3.5-flash-lite`). The key never uses `NEXT_PUBLIC_` and goes in the `x-goog-api-key` header, never the URL.
-- Server only (`POST /api/ai/parse`, `/api/ai/plan`): session required, request size limited (text up to 1000 chars, image about 4 MB), zod on the request and on the AI's JSON (it can be malformed). No per-user limit (decision). On quota, bad key, outage or timeout the server answers 503 `ai_unavailable` and the UI shows the "AI mode unavailable" alert (`requestAiParse` in `lib/ai-client.ts`, typed result, never throws).
+- Server only (`POST /api/ai/parse`, `/api/ai/plan`): session required, request size limited (text up to 1000 chars, image about 4 MB), zod on the request and on the AI's JSON (it can be malformed). No per-user limit (decision). Google often answers a passing 503 "overloaded": `geminiText` tries up to 3 times (0.8 s and 2 s pauses) on 500/502/503/504, never on 429/401/403. On quota, bad key, outage or timeout the server answers 503 `ai_unavailable` and the UI shows the "AI mode unavailable" alert (`requestAiParse` in `lib/ai-client.ts`, typed result, never throws).
 - Free-tier quota is shared by all users, and Google may use the data sent.
 - Plans: three saved plans (cut/maintain/bulk) are reconciled against a reference calculation (`lib/nutrition-plan.ts`).
 

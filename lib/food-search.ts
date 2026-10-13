@@ -26,7 +26,7 @@ export interface OffProduct {
   nutriments?: Record<string, unknown>;
 }
 
-export type FoodSearchErrorKind = "network" | "http" | "timeout" | "unavailable" | "unauthorized";
+export type FoodSearchErrorKind = "network" | "http" | "timeout" | "unavailable" | "busy" | "unauthorized";
 
 export class FoodSearchError extends Error {
   constructor(message: string, readonly kind: FoodSearchErrorKind) {
@@ -152,10 +152,11 @@ const SEARCH_ENDPOINT = "/api/food-search";
 // The server tries twice (8 s each) before giving up.
 const SEARCH_TIMEOUT_MS = 20_000;
 
-export const FOOD_SEARCH_MESSAGES: Record<"network" | "timeout" | "unavailable" | "unauthorized" | "http", string> = {
+export const FOOD_SEARCH_MESSAGES: Record<"network" | "timeout" | "unavailable" | "busy" | "unauthorized" | "http", string> = {
   network: "No connection",
   timeout: "Search timed out",
   unavailable: "Open Food Facts not responding",
+  busy: "Too many searches. Wait a bit",
   unauthorized: "Session expired",
   http: "Search failed",
 };
@@ -177,7 +178,12 @@ export async function searchOpenFoodFacts(query: string, options: SearchOffOptio
     throw new FoodSearchError(FOOD_SEARCH_MESSAGES[timeout.aborted ? "timeout" : "network"], timeout.aborted ? "timeout" : "network");
   }
   if (response.status === 401) throw new FoodSearchError(FOOD_SEARCH_MESSAGES.unauthorized, "unauthorized");
-  if (response.status === 503) throw new FoodSearchError(FOOD_SEARCH_MESSAGES.unavailable, "unavailable");
+  if (response.status === 503) {
+    const body = (await response.json().catch(() => null)) as { reason?: string } | null;
+    throw body?.reason === "rate_limited"
+      ? new FoodSearchError(FOOD_SEARCH_MESSAGES.busy, "busy")
+      : new FoodSearchError(FOOD_SEARCH_MESSAGES.unavailable, "unavailable");
+  }
   if (!response.ok) throw new FoodSearchError(FOOD_SEARCH_MESSAGES.http, "http");
 
   const data = (await response.json().catch(() => null)) as Partial<SearchPage> | null;

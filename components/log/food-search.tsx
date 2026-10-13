@@ -34,6 +34,9 @@ const SCROLL_ARM_MS = 500;
 
 type Source = "saved" | "off";
 
+/** Result lists inside a dialog: short enough that the page numbers below them are in view without scrolling the dialog. */
+export const DIALOG_LIST = "max-h-[34dvh]";
+
 interface FoodSearchProps {
   saved: readonly SavedFood[];
   onPick: (food: FoodSearchResult) => void;
@@ -44,11 +47,13 @@ interface FoodSearchProps {
   onPickMeal?: (meal: SavedMeal) => void;
   /** Called when the results start/stop showing, so a dialog can hide the rest of its form meanwhile. */
   onSearchingChange?: (searching: boolean) => void;
+  /** Max height of the result lists; dialogs pass a smaller one so the page numbers below stay in view. */
+  listClassName?: string;
   /** Rendered below the field while nothing is being searched (saved lists). */
   children?: ReactNode;
 }
 
-export function FoodSearch({ saved, onPick, onScan, onAi, meals = [], onPickMeal, onSearchingChange, children }: FoodSearchProps) {
+export function FoodSearch({ saved, onPick, onScan, onAi, meals = [], onPickMeal, onSearchingChange, listClassName, children }: FoodSearchProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
   const [submitted, setSubmitted] = useState<string | null>(null); // set by the button / Enter, cleared by typing
@@ -187,7 +192,7 @@ export function FoodSearch({ saved, onPick, onScan, onAi, meals = [], onPickMeal
           {source === "saved" ? (
             <>
               {savedPage.items.length > 0 ? (
-                <ScrollList aria-label="Search results">
+                <ScrollList aria-label="Search results" className={listClassName}>
                   <ul className="flex flex-col">
                     {savedPage.items.map((hit) =>
                       hit.kind === "food" ? (
@@ -223,7 +228,7 @@ export function FoodSearch({ saved, onPick, onScan, onAi, meals = [], onPickMeal
                 </div>
               )}
               {off.data && off.data.results.length > 0 && (
-                <ScrollList aria-label="Open Food Facts results">
+                <ScrollList aria-label="Open Food Facts results" className={listClassName}>
                   <ul className="flex flex-col">
                     {off.data.results.map((food) => (
                       <FoodResultRow key={food.id} food={food} onPick={onPick} />

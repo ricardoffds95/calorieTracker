@@ -39,7 +39,12 @@ interface GeminiOptions {
   fetch?: typeof fetch;
   apiKey?: string;
   model?: string;
+  sleep?: (ms: number) => Promise<void>;
 }
+
+/** Google answers 503 "overloaded" in passing: try again shortly, then give up. */
+const RETRY_DELAYS_MS = [800, 2_000];
+const isTransient = (status: number) => status === 500 || status === 502 || status === 503 || status === 504;
 
 function parseModelText(text: string): AiMeal {
   // responseMimeType should give clean JSON, but strip markdown fences defensively.
@@ -71,23 +76,29 @@ async function geminiText(parts: GeminiPart[], options: GeminiOptions): Promise<
   if (!apiKey || !model) throw new AiUnavailableError("not_configured");
 
   const fetchFn = options.fetch ?? fetch;
-  let response: Response;
-  try {
-    response = await fetchFn(`${GEMINI_BASE_URL}/${encodeURIComponent(model)}:generateContent`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-      body: JSON.stringify({
-        contents: [{ parts }],
-        generationConfig: { responseMimeType: "application/json", temperature: 0.2 },
-      }),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
-  } catch (error) {
-    if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) {
-      throw new AiUnavailableError("timeout");
+  const sleep = options.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+  let response: Response | undefined;
+  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+    if (attempt > 0) await sleep(RETRY_DELAYS_MS[attempt - 1]!);
+    try {
+      response = await fetchFn(`${GEMINI_BASE_URL}/${encodeURIComponent(model)}:generateContent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+        body: JSON.stringify({
+          contents: [{ parts }],
+          generationConfig: { responseMimeType: "application/json", temperature: 0.2 },
+        }),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+    } catch (error) {
+      if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) {
+        throw new AiUnavailableError("timeout");
+      }
+      throw new AiUnavailableError("network");
     }
-    throw new AiUnavailableError("network");
+    if (!isTransient(response.status)) break;
   }
+  if (!response) throw new AiUnavailableError("network");
 
   if (!response.ok) {
     // The response body is intentionally never logged or returned: it may echo request data.
