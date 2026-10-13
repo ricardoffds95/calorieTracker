@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { ListChecks } from "lucide-react";
 import { AiPanel } from "@/components/log/ai-panel";
 import { BarcodeScannerDialog } from "@/components/log/barcode-scanner-dialog";
-import { DIALOG_LIST, FoodSearch } from "@/components/log/food-search";
+import { FoodSearch } from "@/components/log/food-search";
 import { PickSavedFoodsSheet } from "@/components/log/pick-saved-foods-sheet";
 import { JoinFoodSheet } from "@/components/log/join-food-sheet";
 import { ItemsEditor, fromEditable, toEditable, type EditableItem } from "@/components/log/items-editor";
@@ -118,7 +118,7 @@ export function NewMealDialog({ userId, initialTarget, now, foods, onClose, onAd
                 <ListChecks aria-hidden />
                 Pick from my foods · {foods.length}
               </Button>
-              <FoodSearch key={searchKey} saved={foods} onPick={(food) => setPicked(food)} onScan={() => setPanel("scan")} onAi={() => setPanel("ai")} onSearchingChange={setSearching} listClassName={DIALOG_LIST} />
+              <FoodSearch key={searchKey} saved={foods} onPick={(food) => setPicked(food)} onScan={() => setPanel("scan")} onAi={() => setPanel("ai")} onSearchingChange={setSearching} compact />
               {!searching &&
                 (rows.length > 0 ? (
                   <ItemsEditor rows={rows} onChange={setRows} allowEmpty />

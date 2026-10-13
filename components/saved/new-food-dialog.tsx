@@ -3,7 +3,7 @@
 import { useRef, useState, type FormEvent } from "react";
 import { AiPanel } from "@/components/log/ai-panel";
 import { BarcodeScannerDialog } from "@/components/log/barcode-scanner-dialog";
-import { DIALOG_LIST, FoodSearch } from "@/components/log/food-search";
+import { FoodSearch } from "@/components/log/food-search";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -93,7 +93,7 @@ export function NewFoodDialog({ userId, foods, onClose }: { userId: string; food
           <DialogTitle>New food</DialogTitle>
           <DialogDescription>Per 100 g</DialogDescription>
         </DialogHeader>
-        <FoodSearch key={searchKey} saved={foods} onPick={(food: FoodSearchResult) => fill(food)} onScan={() => setPanel("scan")} onAi={() => setPanel("ai")} onSearchingChange={setSearching} listClassName={DIALOG_LIST} />
+        <FoodSearch key={searchKey} saved={foods} onPick={(food: FoodSearchResult) => fill(food)} onScan={() => setPanel("scan")} onAi={() => setPanel("ai")} onSearchingChange={setSearching} compact />
         {fillNote && !searching && (
           <p role="status" className="text-sm text-muted-foreground">
             {fillNote}

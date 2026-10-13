@@ -34,8 +34,9 @@ const SCROLL_ARM_MS = 500;
 
 type Source = "saved" | "off";
 
-/** Result lists inside a dialog: short enough that the page numbers below them are in view without scrolling the dialog. */
-export const DIALOG_LIST = "max-h-[34dvh]";
+/** Inside a dialog the lists are shorter, and the page numbers stick to the dialog's bottom instead of the tab bar. */
+const COMPACT_LIST = "max-h-[34dvh]";
+const PAGES_ABOVE_TAB_BAR = "bottom-[calc(var(--tab-bar-height)+env(safe-area-inset-bottom))]";
 
 interface FoodSearchProps {
   saved: readonly SavedFood[];
@@ -47,13 +48,13 @@ interface FoodSearchProps {
   onPickMeal?: (meal: SavedMeal) => void;
   /** Called when the results start/stop showing, so a dialog can hide the rest of its form meanwhile. */
   onSearchingChange?: (searching: boolean) => void;
-  /** Max height of the result lists; dialogs pass a smaller one so the page numbers below stay in view. */
-  listClassName?: string;
+  /** For dialogs: shorter result lists and page numbers stuck to the dialog's bottom. */
+  compact?: boolean;
   /** Rendered below the field while nothing is being searched (saved lists). */
   children?: ReactNode;
 }
 
-export function FoodSearch({ saved, onPick, onScan, onAi, meals = [], onPickMeal, onSearchingChange, listClassName, children }: FoodSearchProps) {
+export function FoodSearch({ saved, onPick, onScan, onAi, meals = [], onPickMeal, onSearchingChange, compact = false, children }: FoodSearchProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
   const [submitted, setSubmitted] = useState<string | null>(null); // set by the button / Enter, cleared by typing
@@ -90,6 +91,8 @@ export function FoodSearch({ saved, onPick, onScan, onAi, meals = [], onPickMeal
     meta: { persist: false },
   });
 
+  const listClassName = compact ? COMPACT_LIST : undefined;
+  const pagesPosition = compact ? "bottom-0" : PAGES_ABOVE_TAB_BAR;
   const source: Source = current.source ?? (savedAll.length > 0 ? "saved" : "off");
   const update = (patch: Partial<typeof view>) => setView({ ...current, ...patch });
 
@@ -206,7 +209,7 @@ export function FoodSearch({ saved, onPick, onScan, onAi, meals = [], onPickMeal
               ) : (
                 <p className="text-sm text-muted-foreground">No matches</p>
               )}
-              <Pagination page={current.savedPage} pageCount={savedPage.pageCount} onChange={(page) => update({ savedPage: page })} />
+              <Pagination className={pagesPosition} page={current.savedPage} pageCount={savedPage.pageCount} onChange={(page) => update({ savedPage: page })} />
             </>
           ) : (
             <div className={cn("flex flex-col gap-1 transition-opacity", off.isPlaceholderData && "opacity-60")}>
@@ -239,7 +242,7 @@ export function FoodSearch({ saved, onPick, onScan, onAi, meals = [], onPickMeal
               {off.data && off.data.results.length === 0 && (
                 <p className="text-sm text-muted-foreground">No results</p>
               )}
-              {off.data && <Pagination page={current.offPage} pageCount={off.data.pageCount} disabled={off.isFetching} onChange={(page) => update({ offPage: page })} />}
+              {off.data && <Pagination className={pagesPosition} page={current.offPage} pageCount={off.data.pageCount} disabled={off.isFetching} onChange={(page) => update({ offPage: page })} />}
             </div>
           )}
         </div>

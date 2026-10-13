@@ -369,6 +369,20 @@ test("in the new meal dialog the page numbers are in view under the results", as
   await expectPagesInView(page, dialog);
 });
 
+test("on a short screen the page numbers stay above the tab bar without scrolling the page", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 640 });
+  await manyResults(page);
+  await login(page, "A");
+  await openLog(page);
+  await searchBox(page).fill("arroz");
+  await offTab(page).click();
+  await expect(page.getByRole("button", { name: "Choose Arroz Teste 1", exact: true })).toBeVisible();
+  const pages = await page.getByRole("navigation", { name: "Result pages" }).boundingBox();
+  const tabBar = await page.getByRole("navigation", { name: "Main navigation" }).boundingBox();
+  expect(pages!.y + pages!.height).toBeLessThanOrEqual(tabBar!.y + 1);
+  expect(pages!.y).toBeGreaterThan(0);
+});
+
 test("when Open Food Facts reports too many requests it says to wait", async ({ page }) => {
   await page.route("**/api/food-search**", (route) => route.fulfill({ status: 503, json: { error: "off_unavailable", reason: "rate_limited" } }));
   await login(page, "A");
