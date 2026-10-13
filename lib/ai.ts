@@ -69,6 +69,25 @@ function withKind(answer: { name: string; kind?: "food" | "meal"; items: AiMeal[
   return { ...answer, kind: single && (answer.kind ?? "food") === "food" ? "food" : "meal" };
 }
 
+/** Google's own error code in a failed answer (`UNAVAILABLE`, `RESOURCE_EXHAUSTED`, ...); only this fixed word is read, never the message. */
+async function googleErrorCode(response: Response): Promise<string> {
+  const body = (await response.clone().json().catch(() => null)) as { error?: { status?: unknown } } | null;
+  const code = body?.error?.status;
+  return typeof code === "string" && /^[A-Z_]{3,40}$/.test(code) ? code : "unknown";
+}
+
+function failureReason(status: number): string {
+  if (status === 429) return "quota";
+  if (status === 401 || status === 403) return "auth";
+  if (status >= 500) return "server";
+  return "invalid_request";
+}
+
+/** One line per failed try, so the server logs say why the AI failed. Never the body, the message, the request or the key. */
+function logFailure(model: string, attempt: number, http: number | "none", google: string, reason: string) {
+  console.warn(`[ai] model=${model} attempt=${attempt}/${RETRY_DELAYS_MS.length + 1} http=${http} google=${google} reason=${reason}`);
+}
+
 /** Sends the parts to Gemini and returns the text of its answer (JSON, by the request's response type). */
 async function geminiText(parts: GeminiPart[], options: GeminiOptions): Promise<string> {
   const apiKey = options.apiKey ?? process.env.GEMINI_API_KEY;
@@ -91,11 +110,11 @@ async function geminiText(parts: GeminiPart[], options: GeminiOptions): Promise<
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });
     } catch (error) {
-      if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) {
-        throw new AiUnavailableError("timeout");
-      }
-      throw new AiUnavailableError("network");
+      const timedOut = error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
+      logFailure(model, attempt + 1, "none", "none", timedOut ? "timeout" : "network");
+      throw new AiUnavailableError(timedOut ? "timeout" : "network");
     }
+    if (!response.ok) logFailure(model, attempt + 1, response.status, await googleErrorCode(response), failureReason(response.status));
     if (!isTransient(response.status)) break;
   }
   if (!response) throw new AiUnavailableError("network");

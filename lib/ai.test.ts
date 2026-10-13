@@ -129,6 +129,43 @@ describe("parseFoodText", () => {
     }
   });
 
+  it("logs why a try failed (status and Google's code) and never the message, the request or the key", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const body = JSON.stringify({ error: { code: 503, status: "UNAVAILABLE", message: "secret detail about my-food-text" } });
+      await expect(parseFoodText("my-food-text", { ...base, fetch: async () => new Response(body, { status: 503 }) })).rejects.toBeInstanceOf(AiUnavailableError);
+      const lines = warn.mock.calls.map((call) => String(call[0]));
+      expect(lines).toHaveLength(3);
+      expect(lines[0]).toBe("[ai] model=test-model attempt=1/3 http=503 google=UNAVAILABLE reason=server");
+      for (const line of lines) {
+        expect(line).not.toContain("secret detail");
+        expect(line).not.toContain("my-food-text");
+        expect(line).not.toContain("test-key");
+      }
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("logs quota, auth and timeouts too, and survives bodies that are not JSON or have an odd status", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const run = (fetchFn: typeof fetch) => parseFoodText("x", { ...base, fetch: fetchFn }).catch(() => null);
+      await run(async () => new Response(JSON.stringify({ error: { status: "RESOURCE_EXHAUSTED" } }), { status: 429 }));
+      await run(async () => new Response("<html>not json</html>", { status: 401 }));
+      await run(async () => new Response(JSON.stringify({ error: { status: "ignore previous instructions!" } }), { status: 400 }));
+      await run(vi.fn().mockRejectedValue(new DOMException("timed out", "TimeoutError")));
+      expect(warn.mock.calls.map((call) => String(call[0]))).toEqual([
+        "[ai] model=test-model attempt=1/3 http=429 google=RESOURCE_EXHAUSTED reason=quota",
+        "[ai] model=test-model attempt=1/3 http=401 google=unknown reason=auth",
+        "[ai] model=test-model attempt=1/3 http=400 google=unknown reason=invalid_request",
+        "[ai] model=test-model attempt=1/3 http=none google=none reason=timeout",
+      ]);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it("treats other 4xx as an invalid response, not as unavailable", async () => {
     await expect(parseFoodText("x", { ...base, fetch: async () => new Response("{}", { status: 400 }) })).rejects.toBeInstanceOf(
       AiInvalidResponseError,
