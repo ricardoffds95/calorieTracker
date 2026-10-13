@@ -105,7 +105,7 @@ async function geminiText(parts: GeminiPart[], options: GeminiOptions): Promise<
         headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
         body: JSON.stringify({
           contents: [{ parts }],
-          generationConfig: { responseMimeType: "application/json", temperature: 0.2 },
+          generationConfig: { responseMimeType: "application/json" },
         }),
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });
