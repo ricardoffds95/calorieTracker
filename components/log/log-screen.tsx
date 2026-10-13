@@ -11,7 +11,7 @@ import { BarcodeScannerDialog } from "@/components/log/barcode-scanner-dialog";
 import { EditSavedDialog, type SavedTarget } from "@/components/log/edit-saved-dialog";
 import { FoodSearch } from "@/components/log/food-search";
 import { LogHeader, dayHref } from "@/components/log/log-header";
-import { ManualEntryDialog } from "@/components/log/manual-entry-dialog";
+import { ManualEntryDialog, type ManualEntry } from "@/components/log/manual-entry-dialog";
 import { NewMealDialog } from "@/components/log/new-meal-dialog";
 import { SavedList } from "@/components/log/saved-list";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,7 @@ import { dateKeyOrToday, toDateKey } from "@/lib/dates";
 import { savedToResult, type FoodSearchResult } from "@/lib/food-search";
 import { describeTarget, foodEntryRow, itemRows, mealEntryRow, mealFromParam, type LogTarget, type NewDiaryEntry } from "@/lib/log";
 import { useAddEntries } from "@/lib/queries/diary";
-import { ensureSavedFood, useSaveFoodOnly, useSavedFoods, useSavedMeals, type SavedMeal } from "@/lib/queries/saved";
+import { DUPLICATE_NAME, ensureSavedFood, useCreateSavedMeal, useSaveFoodOnly, useSavedFoods, useSavedMeals, type SavedMeal } from "@/lib/queries/saved";
 
 export function LogScreen({ userId }: { userId: string }) {
   // "Today" depends on the browser's clock, so nothing date-based renders on the server.
@@ -45,6 +45,8 @@ function LogDay({ userId }: { userId: string }) {
   const meals = useSavedMeals(userId);
   const add = useAddEntries(userId);
   const saveOnly = useSaveFoodOnly(userId);
+  const createMeal = useCreateSavedMeal(userId);
+  const [manualError, setManualError] = useState<string | null>(null);
 
   function showAdded(message: string, day = dateKey) {
     setPanel(null);
@@ -53,6 +55,32 @@ function LogDay({ userId }: { userId: string }) {
 
   function addRows(rows: NewDiaryEntry[] | (() => Promise<NewDiaryEntry[]>), what: string, target: LogTarget) {
     add.mutate({ rows }, { onSuccess: () => showAdded(`${what} added to ${describeTarget(target, now)}`, target.entry_date) });
+  }
+
+  /** Add by hand: a food in grams, or a whole meal (one portion), saved to the library when asked. */
+  async function addManual(entry: ManualEntry, target: LogTarget) {
+    setManualError(null);
+    if (entry.kind === "food") {
+      return addRows(
+        async () => {
+          const [row] = itemRows(target, [entry.item]);
+          const savedId = entry.saveAs ? await ensureSavedFood({ ...entry.saveAs, id: "", source: "off" }) : null;
+          return [{ ...row!, saved_food_id: savedId }];
+        },
+        entry.item.name,
+        target,
+      );
+    }
+    let savedId: string | null = null;
+    if (entry.save) {
+      try {
+        savedId = (await createMeal.mutateAsync({ name: entry.name, items: entry.items })).id;
+      } catch (error) {
+        if ((error as { code?: string }).code === DUPLICATE_NAME) setManualError("Meal name already saved");
+        return; // any other error was already shown as a toast
+      }
+    }
+    addRows([mealEntryRow(target, { id: savedId, name: entry.name, items: entry.items }, 1)], entry.name, target);
   }
 
   return (
@@ -126,19 +154,10 @@ function LogDay({ userId }: { userId: string }) {
       {panel?.kind === "manual" && (
         <ManualEntryDialog
           initialTarget={initialTarget}
-          pending={add.isPending}
+          pending={add.isPending || createMeal.isPending}
+          error={manualError}
           onClose={() => setPanel(null)}
-          onAdd={(item, saveAs, target) =>
-            addRows(
-              async () => {
-                const [row] = itemRows(target, [item]);
-                const savedId = saveAs ? await ensureSavedFood({ ...saveAs, id: "", source: "off" }) : null;
-                return [{ ...row!, saved_food_id: savedId }];
-              },
-              item.name,
-              target,
-            )
-          }
+          onAdd={(entry, target) => void addManual(entry, target)}
         />
       )}
       <BarcodeScannerDialog

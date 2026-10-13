@@ -33,8 +33,8 @@ export function MetricTabsChart({ summary, buckets, kind }: MetricTabsChartProps
   const split = macroSplit(summary.average);
   const boxes = [
     { key: "avg", name: "Avg", icon: null, value: stats.average, day: null },
-    { key: "max", name: "Max", icon: ArrowUp, value: stats.max.value, day: stats.max.date },
-    { key: "min", name: "Min", icon: ArrowDown, value: stats.min.value, day: stats.min.date },
+    { key: "max", name: "Max", icon: ArrowUp, value: stats.max?.value ?? null, day: stats.max?.date ?? null },
+    { key: "min", name: "Min", icon: ArrowDown, value: stats.min?.value ?? null, day: stats.min?.date ?? null },
   ] as const;
 
   return (
@@ -71,8 +71,8 @@ export function MetricTabsChart({ summary, buckets, kind }: MetricTabsChartProps
               {box.name}
             </dt>
             <dd data-testid={`stat-${metric}-${box.key}`} className="min-w-0 tabular-nums">
-              <span className={cn("text-xl font-semibold", TEXT[metric])}>{box.value}</span>
-              <span className="text-xs text-muted-foreground"> {unit}</span>
+              <span className={cn("text-xl font-semibold", TEXT[metric])}>{box.value ?? "—"}</span>
+              {box.value !== null && <span className="text-xs text-muted-foreground"> {unit}</span>}
               {box.day && <span className="block truncate text-xs text-muted-foreground">{dayLabel(box.day)}</span>}
               {!box.day && metric !== "calories" && <span className="block truncate text-xs text-muted-foreground">{split[metric]}% of kcal</span>}
             </dd>

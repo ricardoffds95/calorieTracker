@@ -164,10 +164,21 @@ describe("summarize", () => {
   });
   it("takes the earliest day on a tie, and one logged day is both highest and lowest", () => {
     const tie = summarize([day("2026-10-07", 1800), day("2026-10-06", 1800), day("2026-10-08", 1800)], week, "2026-10-10");
-    expect(tie.stats?.calories.max.date).toBe("2026-10-06");
-    expect(tie.stats?.calories.min.date).toBe("2026-10-06");
+    expect(tie.stats?.calories.max?.date).toBe("2026-10-06");
+    expect(tie.stats?.calories.min?.date).toBe("2026-10-06");
     const one = summarize([day("2026-10-07", 1234, 50)], week, "2026-10-10");
     expect(one.stats?.calories).toEqual({ average: 1234, max: { date: "2026-10-07", value: 1234 }, min: { date: "2026-10-07", value: 1234 } });
+  });
+  it("leaves today out of the highest and lowest day (it is not over), but not out of the average", () => {
+    const withToday = summarize([...days, day("2026-10-09", 300, 10, 20, 5)], week, "2026-10-09");
+    expect(withToday.loggedDays).toBe(4);
+    expect(withToday.stats?.calories.min).toEqual({ date: "2026-10-06", value: 1500 }); // not today's 300
+    expect(withToday.stats?.calories.max).toEqual({ date: "2026-10-05", value: 2000 });
+    expect(withToday.stats?.calories.average).toBe(1400); // (5299 + 300) / 4
+  });
+  it("has no highest or lowest day when today is the only one logged", () => {
+    const onlyToday = summarize([day("2026-10-09", 300, 10, 20, 5)], week, "2026-10-09");
+    expect(onlyToday.stats?.calories).toEqual({ average: 300, max: null, min: null });
   });
   it("ignores days outside the period and days without entries", () => {
     const s = summarize([...days, day("2026-10-12", 9999), day("2026-10-07", 777, 0, 0, 0, 0)], week, "2026-10-10");

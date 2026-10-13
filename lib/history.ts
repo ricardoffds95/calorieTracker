@@ -161,11 +161,12 @@ export interface DayValue {
   value: number;
 }
 
-/** Average per logged day, and the highest and lowest day, of one metric. */
+/** Average per logged day, and the highest and lowest finished day, of one metric. */
 export interface MetricStats {
   average: number;
-  max: DayValue;
-  min: DayValue;
+  /** Null when the only logged day is today (it is not over yet). */
+  max: DayValue | null;
+  min: DayValue | null;
 }
 
 export interface PeriodSummary {
@@ -195,19 +196,26 @@ function averageOf(days: readonly DayTotals[]): MacroTotals | null {
   return { calories: roundCalories(total.calories / n), protein: roundMacro(total.protein / n), carbs: roundMacro(total.carbs / n), fat: roundMacro(total.fat / n) };
 }
 
-/** Average per logged day, and the highest and lowest day (the earliest one on a tie) of every metric. */
-function statsOf(days: readonly DayTotals[], average: MacroTotals): Record<Metric, MetricStats> {
-  const ordered = [...days].sort((a, b) => a.date.localeCompare(b.date));
+/**
+ * Average per logged day, and the highest and lowest day (the earliest one on a tie) of every metric.
+ * Today is left out of the highest and lowest: it is not over, so it would nearly always be the lowest.
+ */
+function statsOf(days: readonly DayTotals[], average: MacroTotals, todayKey: string): Record<Metric, MetricStats> {
+  const ordered = days.filter((d) => d.date !== todayKey).sort((a, b) => a.date.localeCompare(b.date));
   const stats = {} as Record<Metric, MetricStats>;
   for (const { key } of METRICS) {
     const field = DAY_FIELD[key];
-    let max = ordered[0]!;
-    let min = ordered[0]!;
+    let max = ordered[0];
+    let min = ordered[0];
     for (const day of ordered) {
-      if (day[field] > max[field]) max = day;
-      if (day[field] < min[field]) min = day;
+      if (day[field] > max![field]) max = day;
+      if (day[field] < min![field]) min = day;
     }
-    stats[key] = { average: average[key], max: { date: max.date, value: max[field] }, min: { date: min.date, value: min[field] } };
+    stats[key] = {
+      average: average[key],
+      max: max ? { date: max.date, value: max[field] } : null,
+      min: min ? { date: min.date, value: min[field] } : null,
+    };
   }
   return stats;
 }
@@ -221,7 +229,7 @@ export function summarize(days: readonly DayTotals[], period: Period, todayKey: 
     loggedDays: inPeriod.length,
     total: { calories: roundCalories(total.calories), protein: roundMacro(total.protein), carbs: roundMacro(total.carbs), fat: roundMacro(total.fat) },
     average,
-    stats: average ? statsOf(inPeriod, average) : null,
+    stats: average ? statsOf(inPeriod, average, todayKey) : null,
   };
 }
 

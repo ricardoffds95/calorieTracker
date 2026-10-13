@@ -357,6 +357,80 @@ async function expectPagesInView(page: Page, scope: ReturnType<Page["getByRole"]
   expect(box.y + box.height).toBeLessThanOrEqual(page.viewportSize()!.height);
 }
 
+async function openManual(page: Page) {
+  await login(page, "A");
+  await openLog(page, DAY, "dinner");
+  await page.getByRole("button", { name: "Add manually" }).click();
+  await expect(page.getByRole("dialog", { name: "Add manually" })).toBeVisible();
+}
+
+test("Add manually as a food: grams, saved to my foods, logged as a food", async ({ page }) => {
+  await openManual(page);
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("radio", { name: "Food" })).toBeChecked();
+  await dialog.getByLabel("Name").fill("Bolacha E2E");
+  await dialog.getByLabel("Amount (g)").fill("50");
+  await dialog.getByLabel("Calories (kcal)").fill("200");
+  await dialog.getByRole("button", { name: "Add to diary" }).click();
+  await expect(page.getByText(/Bolacha E2E added to/)).toBeVisible();
+  const [entry] = await fetchDiary("A", DAY);
+  expect(entry).toMatchObject({ kind: "food", name: "Bolacha E2E", meal: "dinner", quantity_g: 50, calories: 200 });
+  expect(entry!.saved_food_id).not.toBeNull();
+  expect(await fetchSavedFoods("A")).toHaveLength(1);
+});
+
+test("Add manually as a meal: one portion, saved to my meals and linked", async ({ page }) => {
+  await openManual(page);
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Name").fill("Sopa E2E");
+  await dialog.getByLabel("Calories (kcal)").fill("180");
+  await dialog.getByRole("radio", { name: "Meal" }).click();
+  await expect(dialog.getByLabel("Name")).toHaveValue("Sopa E2E"); // what was typed stays
+  await expect(dialog.getByLabel("Calories (kcal)")).toHaveValue("180");
+  await expect(dialog.getByLabel("Amount (g)")).toHaveCount(0); // a meal has no grams
+  await dialog.getByLabel("Protein (g)").fill("6");
+  await expect(dialog.getByText("Save to my meals")).toBeVisible();
+  await dialog.getByRole("button", { name: "Add to diary" }).click();
+  await expect(page.getByText(/Sopa E2E added to/)).toBeVisible();
+
+  const meals = await fetchSavedMeals("A");
+  expect(meals).toHaveLength(1);
+  const [entry] = await fetchDiary("A", DAY);
+  expect(entry).toMatchObject({ kind: "meal", name: "Sopa E2E", meal: "dinner", calories: 180, protein_g: 6, doses: 1, saved_meal_id: meals[0]!.id });
+  expect(entry!.items).toHaveLength(1);
+  expect(await fetchSavedFoods("A")).toHaveLength(0);
+});
+
+test("Add manually as a meal without saving it: logged only, nothing in my meals", async ({ page }) => {
+  await openManual(page);
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("radio", { name: "Meal" }).click();
+  await dialog.getByLabel("Name").fill("Prato E2E");
+  await dialog.getByLabel("Calories (kcal)").fill("650");
+  await dialog.getByLabel("Save to my meals").uncheck();
+  await dialog.getByRole("button", { name: "Add to diary" }).click();
+  await expect(page.getByText(/Prato E2E added to/)).toBeVisible();
+  const [entry] = await fetchDiary("A", DAY);
+  expect(entry).toMatchObject({ kind: "meal", name: "Prato E2E", calories: 650, saved_meal_id: null });
+  expect(await fetchSavedMeals("A")).toHaveLength(0);
+});
+
+test("Add manually as a meal: a saved name is refused inline and nothing is added", async ({ page }) => {
+  await seedSavedMeal("A", { name: "Sopa E2E", items: [{ name: "Sopa E2E", quantity_g: null, calories: 100, protein_g: 1, carbs_g: 10, fat_g: 1 }], total_calories: 100, total_protein: 1, total_carbs: 10, total_fat: 1 });
+  await openManual(page);
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("radio", { name: "Meal" }).click();
+  await dialog.getByLabel("Name").fill("Sopa E2E");
+  await dialog.getByLabel("Calories (kcal)").fill("180");
+  await dialog.getByRole("button", { name: "Add to diary" }).click();
+  await expect(dialog.getByRole("alert").filter({ hasText: "Meal name already saved" })).toBeVisible();
+  expect(await fetchDiary("A", DAY)).toHaveLength(0);
+  await dialog.getByLabel("Save to my meals").uncheck(); // it can still be only logged
+  await dialog.getByRole("button", { name: "Add to diary" }).click();
+  await expect(page.getByText(/Sopa E2E added to/)).toBeVisible();
+  expect(await fetchDiary("A", DAY)).toHaveLength(1);
+});
+
 test("in the new meal dialog the page numbers are in view under the results", async ({ page }) => {
   await manyResults(page);
   await login(page, "A");

@@ -73,6 +73,28 @@ test("the current month and year stop today: no future days in the chart or the 
   await expect(page.getByTestId("kcal-bar")).toHaveCount(today.getMonth() + 1); // January up to this month
 });
 
+test("highest and lowest day leave out today, which is not over yet", async ({ page }) => {
+  const today = toDateKey(now());
+  await seedDiary("A", [row("2026-01-14", 1500, 100, 150, 40), row("2026-01-15", 2000, 120, 200, 60), row(today, 300, 10, 20, 5)]);
+  await login(page, "A");
+  await openHistory(page, `p=custom&from=2026-01-01&to=${today}`);
+  const stat = (kind: "avg" | "max" | "min") => page.getByTestId(`stat-calories-${kind}`);
+  await expect(stat("min")).toContainText("1500 kcal"); // not today's 300
+  await expect(stat("min")).toContainText("Wed, 14 Jan");
+  await expect(stat("max")).toContainText("2000 kcal");
+  await expect(stat("avg")).toHaveText("1267 kcal"); // today still counts in the average: (1500 + 2000 + 300) / 3
+});
+
+test("with only today logged there is no highest or lowest day", async ({ page }) => {
+  const today = toDateKey(now());
+  await seedDiary("A", [row(today, 300, 10, 20, 5)]);
+  await login(page, "A");
+  await openHistory(page, `p=month&d=${today}`);
+  await expect(page.getByTestId("stat-calories-avg")).toHaveText("300 kcal");
+  await expect(page.getByTestId("stat-calories-max")).toHaveText("—");
+  await expect(page.getByTestId("stat-calories-min")).toHaveText("—");
+});
+
 test("averages are per logged day: exact numbers, days summed, empty days left out", async ({ page }) => {
   await seedWeek();
   await login(page, "A");
