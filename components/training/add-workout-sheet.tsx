@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { DateField } from "@/components/training/date-field";
+import { WorkoutExerciseList } from "@/components/training/workout-exercise-list";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { parseDateKey } from "@/lib/dates";
@@ -28,11 +29,7 @@ export function AddWorkoutSheet({ workout, initialDate, pending, onAdd, onClose 
           </SheetDescription>
         </SheetHeader>
         <div className="flex flex-col gap-4 px-4">
-          <ol className="flex list-decimal flex-col gap-1 pl-5 text-sm">
-            {workout.exercises.map((exercise) => (
-              <li key={exercise.id}>{exercise.name}</li>
-            ))}
-          </ol>
+          <WorkoutExerciseList exercises={workout.exercises} />
           <DateField value={date} onChange={setDate} />
         </div>
         <SheetFooter>

@@ -133,8 +133,8 @@ export const LEVELS = ["beginner", "intermediate", "expert"] as const;
 export interface ExerciseFilter {
   /** Part of the name, any case. */
   query?: string;
-  /** One equipment, or null/undefined for any. */
-  equipment?: string | null;
+  /** Some equipment (an exercise needs any one of them), or an empty list / null / undefined for any. */
+  equipment?: readonly string[] | string | null;
   /** One level (beginner, intermediate, expert), or null/undefined for any. */
   level?: string | null;
 }
@@ -147,10 +147,11 @@ export function filterExercises(exercises: readonly Exercise[], muscles: readonl
   if (muscles.length === 0) return [];
   const query = (filter.query ?? "").trim().toLowerCase();
   const wanted: readonly string[] = muscles;
+  const equipment = typeof filter.equipment === "string" ? [filter.equipment] : (filter.equipment ?? []);
   const primary: Exercise[] = [];
   const secondary: Exercise[] = [];
   for (const exercise of exercises) {
-    if (filter.equipment && exercise.equipment !== filter.equipment) continue;
+    if (equipment.length > 0 && !equipment.includes(exercise.equipment)) continue;
     if (filter.level && exercise.level !== filter.level) continue;
     if (query && !exercise.name.toLowerCase().includes(query)) continue;
     if (exercise.primaryMuscles.some((m) => wanted.includes(m))) primary.push(exercise);

@@ -12,6 +12,20 @@ const muscle = (page: Page, name: string) => page.getByRole("group", { name: "Mu
 const chosen = (page: Page) => page.getByRole("list", { name: "Chosen muscles" }).getByRole("listitem");
 const rows = (page: Page) => page.getByTestId("exercise-list").getByRole("listitem");
 
+/** Opens the equipment choices, sets exactly these (none = any) and closes them. */
+async function chooseEquipment(page: Page, ...names: string[]) {
+  await page.getByRole("button", { name: "Equipment", exact: true }).click();
+  const sheet = page.locator('[data-slot="sheet-content"]');
+  const choices = sheet.getByRole("group", { name: "Equipment choices" }).getByRole("button");
+  for (const button of await choices.all()) {
+    const on = (await button.getAttribute("aria-pressed")) === "true";
+    const wanted = names.includes((await button.innerText()).trim());
+    if (on !== wanted) await button.click();
+  }
+  await sheet.getByRole("button", { name: "Done" }).click();
+  await expect(sheet).toHaveCount(0);
+}
+
 async function openTraining(page: Page) {
   await page.goto("/training");
   await expect(page.getByRole("heading", { name: "Training", level: 1 })).toBeVisible();
@@ -94,19 +108,19 @@ test("the list has page numbers; search and equipment narrow it down", async ({ 
   await page.getByLabel("Search exercises").fill("barbell squat");
   await expect(nav).toHaveCount(0);
   await expect(rows(page).first()).toContainText("Squat");
-  await page.getByLabel("Equipment").selectOption("kettlebells");
+  await chooseEquipment(page, "kettlebells");
   await expect(page.getByText("No exercises")).toBeVisible();
-  await page.getByLabel("Equipment").selectOption("");
+  await chooseEquipment(page); // none: any equipment again
   await page.getByLabel("Search exercises").fill("squat");
   const all = Number((await page.getByTestId("exercise-count").innerText()).split(" ")[0]);
   await page.getByLabel("Level").selectOption("beginner");
   await expect(page.getByTestId("exercise-count")).not.toHaveText(`${all} exercises`);
   const beginners = Number((await page.getByTestId("exercise-count").innerText()).split(" ")[0]);
   expect(beginners).toBeLessThan(all);
-  await page.getByLabel("Equipment").selectOption("dumbbell"); // both filters together
+  await chooseEquipment(page, "dumbbell"); // both filters together
   await expect(rows(page).first()).toContainText("Dumbbell");
   await page.getByLabel("Level").selectOption("");
-  await page.getByLabel("Equipment").selectOption("");
+  await chooseEquipment(page);
   await page.getByLabel("Search exercises").fill("");
   await expect(nav).toBeVisible();
 });
@@ -324,4 +338,88 @@ test("the Workouts view has New workout: it goes to the exercises with nothing i
   await expect(page.getByRole("group", { name: "Training view" }).getByRole("button", { name: "Exercises" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("status").filter({ hasText: "Pick a muscle" })).toBeVisible();
   await expect(page.getByRole("button", { name: /^Workout · / })).toHaveCount(0);
+});
+
+test("several equipment at once: an exercise needs any of them", async ({ page }) => {
+  await login(page, "A");
+  await openTraining(page);
+  await pick(page, "Chest");
+  const equipment = page.getByRole("button", { name: "Equipment", exact: true });
+  await expect(equipment).toHaveText("Any equipment");
+  await chooseEquipment(page, "dumbbell");
+  await expect(equipment).toHaveText("dumbbell");
+  const dumbbell = Number((await page.getByTestId("exercise-count").innerText()).split(" ")[0]);
+  await chooseEquipment(page, "dumbbell", "barbell");
+  await expect(equipment).toHaveText("2 equipment");
+  const both = Number((await page.getByTestId("exercise-count").innerText()).split(" ")[0]);
+  expect(both).toBeGreaterThan(dumbbell);
+  const kinds = await rows(page).locator("span.text-xs").allInnerTexts();
+  for (const kind of kinds) expect(kind).toMatch(/^(dumbbell|barbell)/);
+  await page.getByRole("button", { name: "Equipment", exact: true }).click();
+  await page.getByRole("button", { name: "Clear" }).click();
+  await page.getByRole("button", { name: "Done" }).click();
+  await expect(equipment).toHaveText("Any equipment");
+});
+
+test("opening a workout lists its exercises with photos, and each one opens with all its photos and steps", async ({ page }) => {
+  await seedWorkout("A", { name: "Chest day", exercises: [BENCH, FLYES] });
+  await login(page, "A");
+  await openTraining(page);
+  await page.getByRole("group", { name: "Training view" }).getByRole("button", { name: "Workouts" }).click();
+  await page.getByRole("button", { name: "Open Chest day" }).click();
+  const sheet = page.locator('[data-slot="sheet-content"]');
+  const list = sheet.getByTestId("workout-exercises").getByRole("listitem");
+  await expect(list).toHaveCount(2);
+  await expect(list.first()).toContainText(BENCH.name);
+  await expect(list.first().locator("img")).toHaveAttribute("src", /cdn\.jsdelivr\.net\/gh\/yuhonas\/free-exercise-db/);
+
+  await sheet.getByRole("button", { name: `Open ${FLYES.name}`, exact: true }).click();
+  const detail = page.locator('[data-slot="sheet-content"]').last();
+  await expect(detail.getByTestId("exercise-photos").locator("img")).toHaveCount(2);
+  await expect(detail.getByTestId("exercise-muscles")).toHaveText("Chest");
+  await expect(detail.getByRole("listitem").first()).toBeVisible(); // the steps
+  await expect(detail.getByRole("button", { name: "Add to workout" })).toHaveCount(0); // it is not being edited
+  await page.keyboard.press("Escape");
+  await expect(sheet.getByTestId("workout-exercises")).toBeVisible(); // back to the workout
+});
+
+test("Add training: the workout sheet also shows the photos, and Today lists them under the done training", async ({ page }) => {
+  await seedWorkout("A", { name: "Chest day", exercises: [BENCH, FLYES] });
+  await login(page, "A");
+  await page.goto(`/training/add?d=${DAY}`);
+  await page.getByRole("button", { name: "Choose Chest day" }).click();
+  const sheet = page.locator('[data-slot="sheet-content"]');
+  await expect(sheet.getByTestId("workout-exercises").locator("img")).toHaveCount(2);
+  await sheet.getByRole("button", { name: "Add to diary" }).click();
+  await expect(page.getByText(/Chest day added to/)).toBeVisible();
+  await page.goto(`/?d=${DAY}`);
+  await page.getByRole("button", { name: "Chest day, 2 exercises" }).click();
+  await expect(page.getByTestId("training-row").getByTestId("workout-exercises").locator("img")).toHaveCount(2);
+  await page.getByTestId("training-row").getByRole("button", { name: `Open ${BENCH.name}`, exact: true }).click();
+  await expect(page.locator('[data-slot="sheet-content"]').getByTestId("exercise-photos").locator("img")).toHaveCount(2);
+});
+
+test("Today: the training can be minimized like a meal, and it is remembered", async ({ page }) => {
+  await seedWorkout("A", { name: "Chest day", exercises: [BENCH, FLYES] });
+  await login(page, "A");
+  await page.goto(`/training/add?d=${DAY}`);
+  await page.getByRole("button", { name: "Choose Chest day" }).click();
+  await page.locator('[data-slot="sheet-content"]').getByRole("button", { name: "Add to diary" }).click();
+  await expect(page.getByText(/Chest day added to/)).toBeVisible();
+  await page.goto(`/?d=${DAY}`);
+
+  const toggle = (state: "hide" | "show") => page.getByRole("button", { name: `Training, ${state}` });
+  await expect(toggle("hide")).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByTestId("training-row")).toHaveCount(1);
+  await toggle("hide").click();
+  await expect(toggle("show")).toHaveAttribute("aria-expanded", "false");
+  await expect(page.getByTestId("training-row")).toHaveCount(0);
+  await expect(page.getByTestId("training-count")).toHaveText("1 done"); // the number stays
+  await expect(page.getByRole("link", { name: "Add to Training" })).toBeVisible();
+
+  await page.reload(); // kept on the device
+  await expect(toggle("show")).toBeVisible();
+  await expect(page.getByTestId("training-row")).toHaveCount(0);
+  await toggle("show").click();
+  await expect(page.getByTestId("training-row")).toHaveCount(1);
 });

@@ -20,7 +20,8 @@ const isZone = (value: string | undefined): value is BodyZone => value !== undef
 
 /** The body, front or back: tap a muscle to choose it (several at once), tap again to let it go. */
 export function BodyPicker({ selected, onChange, view, onViewChange, gender = "male" }: BodyPickerProps) {
-  const data = zonesOf(selected).map((slug) => ({ slug, intensity: 1 }));
+  // The head and the hair are not muscles: they take the colour of the body, not the library's greys.
+  const data = [...zonesOf(selected).map((slug) => ({ slug, intensity: 1 })), { slug: "head" as const, color: "var(--body-color)" }, { slug: "hair" as const, color: "var(--body-color)" }];
   return (
     <div className="flex flex-col items-center gap-3">
       <div role="group" aria-label="Body side" className="grid w-full max-w-60 grid-cols-2 gap-1 rounded-md bg-muted p-1">
@@ -41,7 +42,7 @@ export function BodyPicker({ selected, onChange, view, onViewChange, gender = "m
         <Body
           side={view}
           gender={gender}
-          scale={0.9}
+          scale={1.15}
           data={data}
           colors={["var(--primary)"]}
           defaultFill="var(--body-color)"

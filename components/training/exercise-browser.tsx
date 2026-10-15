@@ -1,15 +1,18 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Search, X } from "lucide-react";
 import { Pagination } from "@/components/log/pagination";
+import { useBlurOnScroll } from "@/components/log/use-blur-on-scroll";
 import { BodyPicker, type BodyView } from "@/components/training/body-picker";
+import { EquipmentFilter } from "@/components/training/equipment-filter";
 import { ExerciseSheet } from "@/components/training/exercise-sheet";
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { paginate } from "@/lib/food-search";
+import { useKeyboardOpen } from "@/lib/use-keyboard-open";
 import { useExercises } from "@/lib/queries/training";
 import { LEVELS, MUSCLE_LABELS, equipmentOf, exerciseImageUrl, filterExercises, toWorkoutExercise, type Exercise, type Muscle } from "@/lib/training";
 import { cn } from "@/lib/utils";
@@ -31,14 +34,18 @@ export function ExerciseBrowser({ inWorkout, onAdd, gender }: ExerciseBrowserPro
   const [muscles, setMuscles] = useState<Muscle[]>([]);
   const [view, setView] = useState<BodyView>("front");
   const [query, setQuery] = useState("");
-  const [equipment, setEquipment] = useState("");
+  const [equipment, setEquipment] = useState<string[]>([]);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const [searchFocused, setSearchFocused] = useState(false);
+  const keyboardOpen = useKeyboardOpen();
+  useBlurOnScroll(searchRef, searchFocused);
   const [level, setLevel] = useState("");
   const [page, setPage] = useState(1);
   const [open, setOpen] = useState<Exercise | null>(null);
 
   const equipmentList = useMemo(() => (exercises.data ? equipmentOf(exercises.data) : []), [exercises.data]);
   const hits = useMemo(
-    () => (exercises.data ? filterExercises(exercises.data, muscles, { query, equipment: equipment || null, level: level || null }) : []),
+    () => (exercises.data ? filterExercises(exercises.data, muscles, { query, equipment, level: level || null }) : []),
     [exercises.data, muscles, query, equipment, level],
   );
   const shown = paginate(hits, page);
@@ -78,17 +85,23 @@ export function ExerciseBrowser({ inWorkout, onAdd, gender }: ExerciseBrowserPro
           <div className="flex flex-col gap-2">
             <div className="relative">
               <Search aria-hidden className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input type="search" aria-label="Search exercises" placeholder="Search exercises" className="h-11 pl-9" value={query} onChange={(e) => change(setQuery)(e.target.value)} />
+              <Input
+                ref={searchRef}
+                type="search"
+                aria-label="Search exercises"
+                placeholder="Search exercises"
+                enterKeyHint="search"
+                autoComplete="off"
+                className="h-11 pl-9"
+                value={query}
+                onFocus={() => setSearchFocused(true)}
+                onBlur={() => setSearchFocused(false)}
+                onChange={(e) => change(setQuery)(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+              />
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <select aria-label="Equipment" value={equipment} onChange={(e) => change(setEquipment)(e.target.value)} className={SELECT}>
-                <option value="">Any equipment</option>
-                {equipmentList.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
+              <EquipmentFilter options={equipmentList} selected={equipment} onChange={change(setEquipment)} />
               <select aria-label="Level" value={level} onChange={(e) => change(setLevel)(e.target.value)} className={SELECT}>
                 <option value="">Any level</option>
                 {LEVELS.map((item) => (
@@ -148,7 +161,8 @@ export function ExerciseBrowser({ inWorkout, onAdd, gender }: ExerciseBrowserPro
                 page={Math.min(page, shown.pageCount)}
                 pageCount={shown.pageCount}
                 onChange={setPage}
-                className={cn("bottom-[calc(var(--tab-bar-height)+env(safe-area-inset-bottom))]")}
+                // Fixed above the tab bar; with the keyboard open the tab bar is hidden and iOS does not move "sticky", so it stays in the flow.
+                className={cn(keyboardOpen ? "static" : "bottom-[calc(var(--tab-bar-height)+env(safe-area-inset-bottom))]")}
               />
             </section>
           )}

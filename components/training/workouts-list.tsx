@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Pencil, Plus } from "lucide-react";
+import { WorkoutExerciseList } from "@/components/training/workout-exercise-list";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -62,11 +63,9 @@ export function WorkoutsList({ userId, onEdit, onNew }: WorkoutsListProps) {
                 {open.exercises.length} {open.exercises.length === 1 ? "exercise" : "exercises"} · used {open.times_used} {open.times_used === 1 ? "time" : "times"}
               </SheetDescription>
             </SheetHeader>
-            <ol className="flex list-decimal flex-col gap-1 px-4 pl-9">
-              {open.exercises.map((exercise) => (
-                <li key={exercise.id}>{exercise.name}</li>
-              ))}
-            </ol>
+            <div className="px-4">
+              <WorkoutExerciseList exercises={open.exercises} />
+            </div>
             <SheetFooter>
               {confirming ? (
                 <>

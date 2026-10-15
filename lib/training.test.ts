@@ -91,6 +91,13 @@ describe("filterExercises", () => {
     expect(filterExercises(all, ["chest"], { equipment: null }).length).toBe(3);
   });
 
+  it("accepts several equipment at once: an exercise needs any one of them", () => {
+    expect(filterExercises(all, ["chest"], { equipment: ["dumbbell", "body only"] }).map((h) => h.exercise.id)).toEqual(["fly", "dip"]);
+    expect(filterExercises(all, ["chest"], { equipment: ["barbell", "dumbbell"] }).map((h) => h.exercise.id)).toEqual(["bench", "fly", "dip"].filter((id) => id !== "dip"));
+    expect(filterExercises(all, ["chest"], { equipment: [] }).length).toBe(3);
+    expect(filterExercises(all, ["chest"], { equipment: ["kettlebells"] })).toEqual([]);
+  });
+
   it("filters by level, together with equipment", () => {
     expect(filterExercises(all, ["chest"], { level: "intermediate" }).map((h) => h.exercise.id)).toEqual(["fly"]);
     expect(filterExercises(all, ["chest"], { level: "beginner" }).map((h) => h.exercise.id)).toEqual(["bench", "dip"]);
