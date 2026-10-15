@@ -260,6 +260,74 @@ export type Database = {
         }
         Relationships: []
       }
+      saved_workouts: {
+        Row: {
+          created_at: string
+          exercises: Json
+          id: string
+          name: string
+          times_used: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          exercises: Json
+          id?: string
+          name: string
+          times_used?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          exercises?: Json
+          id?: string
+          name?: string
+          times_used?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      training_entries: {
+        Row: {
+          created_at: string
+          entry_date: string
+          exercises: Json
+          id: string
+          name: string
+          saved_workout_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          entry_date: string
+          exercises: Json
+          id?: string
+          name: string
+          saved_workout_id?: string | null
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          entry_date?: string
+          exercises?: Json
+          id?: string
+          name?: string
+          saved_workout_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_entries_user_id_saved_workout_id_fkey"
+            columns: ["user_id", "saved_workout_id"]
+            isOneToOne: false
+            referencedRelation: "saved_workouts"
+            referencedColumns: ["user_id", "id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

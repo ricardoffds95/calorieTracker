@@ -3,6 +3,7 @@ import { login } from "./helpers";
 
 const TABS = [
   { name: "Today", url: /\/$/, heading: /^Today/ },
+  { name: "Training", url: /\/training$/, heading: "Training" },
   { name: "Saved", url: /\/saved$/, heading: "Saved" },
   { name: "History", url: /\/history$/, heading: "History" },
   { name: "Profile", url: /\/profile$/, heading: "Profile" },
@@ -16,7 +17,7 @@ test("login page has no tab bar", async ({ page }) => {
 test("tabs navigate and mark the active one", async ({ page }) => {
   await login(page, "A");
   for (const tab of TABS) {
-    await page.getByRole("link", { name: tab.name }).click();
+    await page.getByRole("link", { name: tab.name, exact: true }).click();
     await expect(page).toHaveURL(tab.url);
     await expect(page.getByRole("heading", { level: 1, name: tab.heading })).toBeVisible();
     await expect(page.getByRole("link", { name: tab.name })).toHaveAttribute("aria-current", "page");
@@ -27,7 +28,7 @@ test("tabs navigate and mark the active one", async ({ page }) => {
 test("there is no Registar tab: only 4 tabs", async ({ page }) => {
   await login(page, "A");
   const nav = page.getByRole("navigation", { name: "Main navigation" });
-  await expect(nav.getByRole("link")).toHaveText(["Today", "Saved", "History", "Profile"]);
+  await expect(nav.getByRole("link")).toHaveText(["Today", "Training", "Saved", "History", "Profile"]);
 });
 
 test("page content is not hidden behind the tab bar", async ({ page }) => {

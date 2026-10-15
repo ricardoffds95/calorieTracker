@@ -206,3 +206,46 @@ export async function restorePassword(user: TestUser, temporary: string) {
   const { error: updateError } = await supabase.auth.updateUser({ password });
   if (updateError) throw updateError;
 }
+
+type WorkoutRow = Omit<TablesInsert<"saved_workouts">, "user_id">;
+
+export const BENCH = { id: "Barbell_Bench_Press_-_Medium_Grip", name: "Barbell Bench Press - Medium Grip" };
+export const FLYES = { id: "Dumbbell_Flyes", name: "Dumbbell Flyes" };
+export const CURL = { id: "Barbell_Curl", name: "Barbell Curl" };
+
+/** Every training done and every saved workout of a user. */
+export async function clearTraining(user: TestUser) {
+  const supabase = await clientFor(user);
+  const entries = await supabase.from("training_entries").delete().gte("created_at", "1970-01-01");
+  if (entries.error) throw entries.error;
+  const workouts = await supabase.from("saved_workouts").delete().gte("created_at", "1970-01-01");
+  if (workouts.error) throw workouts.error;
+}
+
+export async function seedWorkout(user: TestUser, row: Pick<WorkoutRow, "name" | "exercises"> & Partial<WorkoutRow>) {
+  const supabase = await clientFor(user);
+  const { data, error } = await supabase.from("saved_workouts").insert(row).select().single();
+  if (error) throw error;
+  return data;
+}
+
+export async function fetchWorkouts(user: TestUser) {
+  const supabase = await clientFor(user);
+  const { data, error } = await supabase.from("saved_workouts").select("*").order("created_at");
+  if (error) throw error;
+  return data;
+}
+
+export async function fetchTrainings(user: TestUser, date?: string) {
+  const supabase = await clientFor(user);
+  const query = supabase.from("training_entries").select("*").order("created_at");
+  const { data, error } = await (date ? query.eq("entry_date", date) : query);
+  if (error) throw error;
+  return data;
+}
+
+/** Inserts a training as `user` (RLS and the composite FK apply): returns the error, if any. */
+export async function insertTrainingAs(user: TestUser, row: { entry_date: string; name: string; saved_workout_id: string | null }) {
+  const supabase = await clientFor(user);
+  return supabase.from("training_entries").insert({ ...row, exercises: [BENCH] });
+}

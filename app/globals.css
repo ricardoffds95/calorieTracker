@@ -32,6 +32,9 @@
   --protein: #14866d;
   --carbs: #b87708;
   --fat: #d6456b;
+
+  /* The body drawing in Training: muscles not chosen. */
+  --body-color: #c9ced8;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -61,6 +64,8 @@
     --protein: #3cb895;
     --carbs: #f0b342;
     --fat: #f27a98;
+
+    --body-color: #3a4152;
   }
 }
 

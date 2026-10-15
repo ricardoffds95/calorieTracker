@@ -7,6 +7,8 @@ import { cn } from "@/lib/utils";
 interface LogHeaderProps {
   dateKey: string;
   now: Date;
+  /** "Add meal" by default; "Add training" on the training screen. */
+  title?: string;
 }
 
 export function dayHref(dateKey: string, now: Date) {
@@ -14,13 +16,13 @@ export function dayHref(dateKey: string, now: Date) {
 }
 
 /** The meal is chosen on the screen where food is added, not here. */
-export function LogHeader({ dateKey, now }: LogHeaderProps) {
+export function LogHeader({ dateKey, now, title = "Add meal" }: LogHeaderProps) {
   return (
     <header className="flex items-center gap-1">
       <Link href={dayHref(dateKey, now)} aria-label="Back to day" className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "-ml-2 size-11")}>
         <ChevronLeft aria-hidden />
       </Link>
-      <h1 className="text-2xl font-semibold tracking-tight">Add meal</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
       <span data-testid="log-day" className="ml-auto text-sm text-muted-foreground">
         {formatDayLabel(dateKey, now)}
       </span>

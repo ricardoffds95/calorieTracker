@@ -9,6 +9,7 @@ import { EditEntryDialog } from "@/components/today/edit-entry-dialog";
 import { MacroColumns } from "@/components/today/macro-columns";
 import { MealSection } from "@/components/today/meal-section";
 import { SummaryHero } from "@/components/today/summary-hero";
+import { TrainingSection } from "@/components/today/training-section";
 import { buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { dateKeyOrToday } from "@/lib/dates";
@@ -69,10 +70,16 @@ function TodayDay({ userId }: { userId: string }) {
       )}
 
       {/* Without a meal in mind the food goes to the snacks; the meals' own + buttons pick theirs. */}
-      <Link href={`/add?meal=snacks&d=${dateKey}`} className={cn(buttonVariants({ size: "lg" }), "h-11")}>
-        <Plus aria-hidden />
-        Add meal
-      </Link>
+      <div className="grid grid-cols-2 gap-2">
+        <Link href={`/add?meal=snacks&d=${dateKey}`} className={cn(buttonVariants({ size: "lg" }), "h-11")}>
+          <Plus aria-hidden />
+          Add meal
+        </Link>
+        <Link href={`/training/add?d=${dateKey}`} className={cn(buttonVariants({ size: "lg", variant: "outline" }), "h-11")}>
+          <Plus aria-hidden />
+          Add training
+        </Link>
+      </div>
 
       {diary.isError && !diary.data && (
         <p role="alert" className="text-sm text-destructive">
@@ -101,6 +108,7 @@ function TodayDay({ userId }: { userId: string }) {
               }}
             />
           ))}
+          <TrainingSection userId={userId} dateKey={dateKey} />
         </div>
       )}
 

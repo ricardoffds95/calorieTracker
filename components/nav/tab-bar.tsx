@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bookmark, ChartColumn, House, User, type LucideIcon } from "lucide-react";
+import { Bookmark, ChartColumn, Dumbbell, House, User, type LucideIcon } from "lucide-react";
 import { useKeyboardOpen } from "@/lib/use-keyboard-open";
 import { cn } from "@/lib/utils";
 
 const TABS: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/", label: "Today", icon: House },
+  { href: "/training", label: "Training", icon: Dumbbell },
   { href: "/saved", label: "Saved", icon: Bookmark },
   { href: "/history", label: "History", icon: ChartColumn },
   { href: "/profile", label: "Profile", icon: User },
