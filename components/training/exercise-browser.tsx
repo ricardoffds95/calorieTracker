@@ -21,13 +21,15 @@ interface ExerciseBrowserProps {
   inWorkout: readonly string[];
   /** Without it (no workout being made) the exercise sheet has no "Add" button. */
   onAdd?: (exercise: { id: string; name: string }) => void;
+  /** Which body to draw. */
+  gender?: "male" | "female";
 }
 
 /** The body to pick muscles on, and the exercises for them. */
-export function ExerciseBrowser({ inWorkout, onAdd }: ExerciseBrowserProps) {
+export function ExerciseBrowser({ inWorkout, onAdd, gender }: ExerciseBrowserProps) {
   const exercises = useExercises();
   const [muscles, setMuscles] = useState<Muscle[]>([]);
-  const [view, setView] = useState<BodyView>("anterior");
+  const [view, setView] = useState<BodyView>("front");
   const [query, setQuery] = useState("");
   const [equipment, setEquipment] = useState("");
   const [level, setLevel] = useState("");
@@ -49,7 +51,7 @@ export function ExerciseBrowser({ inWorkout, onAdd }: ExerciseBrowserProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      <BodyPicker selected={muscles} onChange={change(setMuscles)} view={view} onViewChange={setView} />
+      <BodyPicker selected={muscles} onChange={change(setMuscles)} view={view} onViewChange={setView} gender={gender} />
 
       {muscles.length > 0 ? (
         <ul aria-label="Chosen muscles" className="flex flex-wrap gap-2">

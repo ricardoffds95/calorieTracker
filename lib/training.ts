@@ -64,7 +64,7 @@ export function exerciseImageUrl(path: string): string {
 
 // --- the body drawing ---------------------------------------------------------------------------
 
-/** The zones of the body drawing (`react-body-highlighter`), each one a tap target. */
+/** The zones of the body drawing (`react-muscle-highlighter`), each one a tap target. */
 export const BODY_ZONES = [
   "trapezius",
   "upper-back",
@@ -73,15 +73,14 @@ export const BODY_ZONES = [
   "biceps",
   "triceps",
   "forearm",
-  "back-deltoids",
-  "front-deltoids",
+  "deltoids",
   "abs",
   "obliques",
-  "adductor",
-  "abductors",
+  "adductors",
   "hamstring",
   "quadriceps",
   "calves",
+  "tibialis",
   "gluteal",
   "neck",
 ] as const;
@@ -96,16 +95,15 @@ export const ZONE_MUSCLES: Record<BodyZone, readonly Muscle[]> = {
   biceps: ["biceps"],
   triceps: ["triceps"],
   forearm: ["forearms"],
-  "back-deltoids": ["shoulders"],
-  "front-deltoids": ["shoulders"],
+  deltoids: ["shoulders"],
   abs: ["abdominals"],
   obliques: ["abdominals"],
-  adductor: ["adductors"],
-  abductors: ["abductors"],
+  adductors: ["adductors"],
   hamstring: ["hamstrings"],
   quadriceps: ["quadriceps"],
   calves: ["calves"],
-  gluteal: ["glutes"],
+  tibialis: ["calves"],
+  gluteal: ["glutes", "abductors"],
   neck: ["neck"],
 };
 

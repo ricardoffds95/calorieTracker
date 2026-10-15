@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { ExerciseBrowser } from "@/components/training/exercise-browser";
+import { useBodyGender } from "@/components/training/use-body-gender";
 import { useWorkoutDraft } from "@/components/training/use-workout-draft";
 import { WorkoutSheet } from "@/components/training/workout-sheet";
 import { WorkoutsList } from "@/components/training/workouts-list";
@@ -15,6 +16,7 @@ type Tab = "exercises" | "workouts";
 export function TrainingScreen({ userId }: { userId: string }) {
   const [tab, setTab] = useState<Tab>("exercises");
   const draft = useWorkoutDraft();
+  const gender = useBodyGender(userId);
   const [name, setName] = useState("");
   const [editing, setEditing] = useState<SavedWorkout | null>(null);
   const [sheet, setSheet] = useState(false);
@@ -29,6 +31,12 @@ export function TrainingScreen({ userId }: { userId: string }) {
     setEditing(null);
     setError(null);
     setSheet(false);
+  }
+
+  /** "New workout": pick the exercises first, the name comes when saving. */
+  function startNew() {
+    clear();
+    setTab("exercises");
   }
 
   function startEditing(workout: SavedWorkout) {
@@ -73,9 +81,9 @@ export function TrainingScreen({ userId }: { userId: string }) {
       </div>
 
       {tab === "exercises" ? (
-        <ExerciseBrowser inWorkout={draft.exercises.map((e) => e.id)} onAdd={draft.add} />
+        <ExerciseBrowser inWorkout={draft.exercises.map((e) => e.id)} onAdd={draft.add} gender={gender} />
       ) : (
-        <WorkoutsList userId={userId} onEdit={startEditing} />
+        <WorkoutsList userId={userId} onEdit={startEditing} onNew={startNew} />
       )}
 
       {draft.exercises.length > 0 && (

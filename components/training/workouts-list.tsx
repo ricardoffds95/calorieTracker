@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil } from "lucide-react";
+import { Pencil, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -10,10 +10,12 @@ import { useDeleteWorkout, useSavedWorkouts, type SavedWorkout } from "@/lib/que
 interface WorkoutsListProps {
   userId: string;
   onEdit: (workout: SavedWorkout) => void;
+  /** Starts a new workout (the exercises are picked first). */
+  onNew: () => void;
 }
 
 /** The workouts the user keeps: tap one to see its exercises, edit it or delete it. */
-export function WorkoutsList({ userId, onEdit }: WorkoutsListProps) {
+export function WorkoutsList({ userId, onEdit, onNew }: WorkoutsListProps) {
   const workouts = useSavedWorkouts(userId);
   const remove = useDeleteWorkout(userId);
   const [open, setOpen] = useState<SavedWorkout | null>(null);
@@ -26,6 +28,9 @@ export function WorkoutsList({ userId, onEdit }: WorkoutsListProps) {
 
   return (
     <section aria-label="Workouts" className="flex flex-col gap-2">
+      <Button type="button" size="lg" className="h-11" onClick={onNew}>
+        <Plus aria-hidden /> New workout
+      </Button>
       {workouts.isPending && <Skeleton className="h-32 w-full" aria-label="Loading workouts" />}
       {workouts.isError && !workouts.data && (
         <p role="alert" className="text-sm text-destructive">

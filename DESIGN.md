@@ -14,7 +14,7 @@ Neutral monochrome + **one accent**. Mobile-first (iPhone, Safari), light and da
 | `border` / `input` | `#e3e5ea` / `#d5d8df` | `#2a2f3a` / `#333946` | lines, fields |
 | `primary` (the accent) | `#2d6be4` | `#5b8df0` | primary actions, focus ring, active tab |
 | `destructive` | `#d92d4a` | `#f0607a` | errors, goal exceeded |
-| `body-color` | `#c9ced8` | `#3a4152` | the body drawing in Training (muscles not chosen; chosen ones use `primary`) |
+| `body-color` | `#8a93a4` | `#4a5266` | the body drawing in Training (muscles not chosen; chosen ones use `primary`) |
 | `protein` / `carbs` / `fat` | `#3a6fd8` / `#b87708` / `#d6456b` | `#6e9bf2` / `#f0b342` / `#f27a98` | **data only** (rings, bars, charts) |
 
 Rules:

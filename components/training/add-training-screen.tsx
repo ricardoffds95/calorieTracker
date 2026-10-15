@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { LogHeader, dayHref } from "@/components/log/log-header";
 import { AddWorkoutSheet } from "@/components/training/add-workout-sheet";
 import { ExerciseBrowser } from "@/components/training/exercise-browser";
+import { useBodyGender } from "@/components/training/use-body-gender";
 import { FinishWorkoutSheet } from "@/components/training/finish-workout-sheet";
 import { useWorkoutDraft } from "@/components/training/use-workout-draft";
 import { Button } from "@/components/ui/button";
@@ -38,6 +39,7 @@ function AddTrainingDay({ userId }: { userId: string }) {
   const [finishing, setFinishing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const draft = useWorkoutDraft();
+  const gender = useBodyGender(userId);
 
   function added(name: string, day: string) {
     setOpen(null);
@@ -77,7 +79,7 @@ function AddTrainingDay({ userId }: { userId: string }) {
           <Button type="button" variant="ghost" className="-ml-2 h-11 self-start px-2 text-muted-foreground" onClick={() => setBuilding(false)}>
             <ChevronLeft aria-hidden /> Back to workouts
           </Button>
-          <ExerciseBrowser inWorkout={draft.exercises.map((e) => e.id)} onAdd={draft.add} />
+          <ExerciseBrowser inWorkout={draft.exercises.map((e) => e.id)} onAdd={draft.add} gender={gender} />
           {draft.exercises.length > 0 && (
             <div className="sticky bottom-[calc(var(--tab-bar-height)+env(safe-area-inset-bottom)+0.5rem)] z-10">
               <Button type="button" size="lg" className="h-12 w-full shadow-md" onClick={() => setFinishing(true)}>

@@ -52,9 +52,10 @@ describe("the body zones", () => {
     expect(toggleZone(["chest"], "biceps")).toEqual(["chest", "biceps"]);
   });
 
-  it("shares a muscle between two zones (shoulders in front and back)", () => {
-    expect(zonesOf(["shoulders"])).toEqual(["back-deltoids", "front-deltoids"]);
-    expect(toggleZone(["shoulders"], "front-deltoids")).toEqual([]);
+  it("shares a muscle between two zones (the calves and the shin, the abs and the obliques)", () => {
+    expect(zonesOf(["calves"])).toEqual(["calves", "tibialis"]);
+    expect(toggleZone(["calves"], "tibialis")).toEqual([]);
+    expect(toggleZone([], "gluteal")).toEqual(["glutes", "abductors"]);
   });
 
   it("colours the zones that have a chosen muscle", () => {

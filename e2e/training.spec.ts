@@ -29,22 +29,37 @@ test("the Training tab shows the body and asks to pick a muscle", async ({ page 
   await page.getByRole("link", { name: "Training", exact: true }).click();
   await expect(page).toHaveURL(/\/training$/);
   await expect(page.getByRole("status").filter({ hasText: "Pick a muscle" })).toBeVisible();
-  await expect(page.getByTestId("body")).toHaveAttribute("data-view", "anterior");
+  await expect(page.getByTestId("body")).toHaveAttribute("data-view", "front");
   await sideButton(page, "Back").click();
-  await expect(page.getByTestId("body")).toHaveAttribute("data-view", "posterior");
+  await expect(page.getByTestId("body")).toHaveAttribute("data-view", "back");
   await sideButton(page, "Front").click();
-  await expect(page.getByTestId("body")).toHaveAttribute("data-view", "anterior");
+  await expect(page.getByTestId("body")).toHaveAttribute("data-view", "front");
   await expect(page.getByTestId("exercise-list")).toHaveCount(0); // nothing until a muscle is chosen
 });
 
 test("tapping the body picks a muscle, and the exercises for it appear with photos", async ({ page }) => {
   await login(page, "A");
   await openTraining(page);
-  await page.locator('[data-testid="body"] polygon').nth(8).click({ force: true });
+  await page.locator('[data-testid="body"] path#chest').first().click({ force: true });
   await expect(chosen(page).first()).toBeVisible();
   await expect(page.getByTestId("exercise-count")).toBeVisible();
   await expect(rows(page).first().locator("img")).toHaveAttribute("src", /cdn\.jsdelivr\.net\/gh\/yuhonas\/free-exercise-db/);
-  await expect(page.locator('[data-testid="body"] polygon[style*="var(--primary)"]').first()).toBeVisible(); // the chosen zone is coloured
+  await expect(chosen(page)).toHaveCount(1);
+  await expect(page.locator('[data-testid="body"] path#chest').first()).toHaveAttribute("fill", "var(--primary)"); // the chosen zone is coloured
+  await expect(page.locator('[data-testid="body"] path#biceps').first()).not.toHaveAttribute("fill", "var(--primary)");
+  await page.locator('[data-testid="body"] path#chest').first().click({ force: true }); // tapping again lets it go
+  await expect(chosen(page)).toHaveCount(0);
+});
+
+test("the body follows the sex of the profile, and a muscle that shows on both sides keeps its choice", async ({ page }) => {
+  await login(page, "A");
+  await openTraining(page);
+  await expect(page.getByTestId("body")).toHaveAttribute("data-gender", /^(male|female)$/);
+  await sideButton(page, "Back").click();
+  await page.locator('[data-testid="body"] path#deltoids').first().click({ force: true });
+  await expect(page.getByRole("button", { name: "Remove Shoulders" })).toBeVisible();
+  await sideButton(page, "Front").click();
+  await expect(page.locator('[data-testid="body"] path#deltoids').first()).toHaveAttribute("fill", "var(--primary)"); // coloured on the front too
 });
 
 test("several muscles at once; chips take them off; the front and the back are one choice", async ({ page }) => {
@@ -297,4 +312,16 @@ test("one user never sees another user's workouts or trainings, and cannot link 
   const refused = await insertTrainingAs("B", { entry_date: DAY, name: "Sneaky", saved_workout_id: mine.id });
   expect(refused.error).not.toBeNull();
   expect(await fetchTrainings("B")).toHaveLength(0);
+});
+
+test("the Workouts view has New workout: it goes to the exercises with nothing in the workout", async ({ page }) => {
+  await seedWorkout("A", { name: "Back day", exercises: [CURL] });
+  await login(page, "A");
+  await openTraining(page);
+  await page.getByRole("group", { name: "Training view" }).getByRole("button", { name: "Workouts" }).click();
+  await expect(page.getByRole("button", { name: "Open Back day" })).toBeVisible();
+  await page.getByRole("button", { name: "New workout" }).click();
+  await expect(page.getByRole("group", { name: "Training view" }).getByRole("button", { name: "Exercises" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("status").filter({ hasText: "Pick a muscle" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Workout · / })).toHaveCount(0);
 });
