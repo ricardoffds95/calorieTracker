@@ -358,7 +358,7 @@ export function dayLabel(key: string): string {
 }
 
 /** Short name of a bucket for lists: "ter, 6 out", "5–11 out", "outubro". */
-export function bucketLabel(bucket: Bucket): string {
+export function bucketLabel(bucket: Pick<Bucket, "granularity" | "from" | "to">): string {
   if (bucket.granularity === "day") return dayLabel(bucket.from);
   if (bucket.granularity === "month") return format(dateOf(bucket.from), "MMMM", { locale: enGB });
   const from = dateOf(bucket.from);
@@ -367,7 +367,7 @@ export function bucketLabel(bucket: Bucket): string {
 }
 
 /** The x-axis text of a bar; empty for the bars that would crowd the axis. */
-export function axisLabel(bucket: Bucket, index: number, total: number, kind: PeriodKind): string {
+export function axisLabel(bucket: Pick<Bucket, "granularity" | "from">, index: number, total: number, kind: PeriodKind): string {
   const date = dateOf(bucket.from);
   if (bucket.granularity === "day") {
     // weekday initials for a week (or a short range); the first days of a month still get day numbers
@@ -380,7 +380,51 @@ export function axisLabel(bucket: Bucket, index: number, total: number, kind: Pe
 }
 
 /** Where tapping a bucket leads: a day opens in "Today", a week/month drills into that period. */
-export function bucketHref(bucket: Bucket, now: Date): string {
+export function bucketHref(bucket: Pick<Bucket, "granularity" | "from">, now: Date): string {
   if (bucket.granularity === "day") return bucket.from === toDateKey(now) ? "/" : `/?d=${bucket.from}`;
   return periodHref(periodFor(bucket.granularity, bucket.from), now);
+}
+
+// --- training -----------------------------------------------------------------------------------------------
+
+/** How many trainings were done on a day (from `training_daily_counts`: only days with trainings come). */
+export interface TrainingDay {
+  date: string;
+  trainings: number;
+}
+
+export interface TrainingSummary {
+  /** Trainings done in the period. */
+  trainings: number;
+  /** Days of the period with at least one training. */
+  days: number;
+}
+
+const inside = (date: string, from: string, to: string) => date >= from && date <= to;
+
+export function summarizeTraining(counts: readonly TrainingDay[], period: Pick<Period, "from" | "to">): TrainingSummary {
+  const within = counts.filter((c) => c.trainings > 0 && inside(c.date, period.from, period.to));
+  return { trainings: within.reduce((sum, c) => sum + c.trainings, 0), days: within.length };
+}
+
+export interface TrainingBucket {
+  key: string;
+  granularity: Granularity;
+  from: string;
+  to: string;
+  /** Trainings done inside the bucket. */
+  count: number;
+  /** At least one training inside the bucket. */
+  trained: boolean;
+}
+
+/**
+ * The same buckets as the calorie bars (days up to a month, weeks, months), each with how many trainings it holds.
+ * With `todayKey`, days that have not happened yet are left out.
+ */
+export function trainingBuckets(counts: readonly TrainingDay[], period: Period, todayKey?: string): TrainingBucket[] {
+  return bucketize([], period, todayKey).map(({ key, granularity, from, to }) => {
+    const count = counts.filter((c) => inside(c.date, from, to)).reduce((sum, c) => sum + c.trainings, 0);
+    return { key, granularity, from, to, count, trained: count > 0 };
+  });
 }

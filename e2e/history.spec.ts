@@ -2,9 +2,9 @@ import { expect, test, type Page } from "@playwright/test";
 import { toDateKey } from "../lib/dates";
 import { elapsedDays, periodFor, periodLabel, shiftPeriod } from "../lib/history";
 import { login } from "./helpers";
-import { clearDiary, clearSaved, dailyTotalsAs, mealTotalsAs, seedDiary, seedSavedFood, topItemsAs } from "./seed";
+import { clearDiary, clearSaved, clearTraining, dailyTotalsAs, mealTotalsAs, seedDiary, seedSavedFood, seedTraining, topItemsAs, trainingCountsAs } from "./seed";
 
-const clearAll = () => Promise.all([clearDiary("A"), clearDiary("B"), clearSaved("A"), clearSaved("B")]);
+const clearAll = () => Promise.all([clearDiary("A"), clearDiary("B"), clearSaved("A"), clearSaved("B"), clearTraining("A"), clearTraining("B")]);
 test.beforeEach(clearAll);
 test.afterAll(clearAll);
 
@@ -423,4 +423,126 @@ test("the insight functions only read your own entries and refuse bad input", as
   expect(Object.fromEntries((meals.data ?? []).map((r) => [r.meal, r.calories]))).toEqual({ breakfast: 600, lunch: 2300, snacks: 5 });
   expect((await mealTotalsAs("B", "2026-01-12", "2026-01-18")).data).toEqual([]);
   expect((await mealTotalsAs("A", "2000-01-01", "2026-01-01")).error?.message).toMatch(/too large/);
+});
+
+test.describe("training in the history", () => {
+  const days = (page: Page) => page.getByTestId("training-days").getByRole("listitem");
+
+  test("a week: how many trainings, on how many days, and a check on each day trained", async ({ page }) => {
+    // Mon 12 and Wed 14 (two trainings) and Fri 16; nothing logged to eat that week
+    await seedTraining("A", [{ entry_date: "2026-01-12" }, { entry_date: "2026-01-14" }, { entry_date: "2026-01-14", name: "Legs" }, { entry_date: "2026-01-16" }]);
+    await login(page, "A");
+    await openHistory(page, WEEK);
+
+    await expect(page.getByTestId("training-card")).toBeVisible(); // even with nothing eaten
+    await expect(page.getByTestId("history-empty")).toBeVisible();
+    await expect(page.getByTestId("training-total")).toHaveText("4");
+    await expect(page.getByTestId("training-days-count")).toHaveText("on 3 days");
+    await expect(days(page)).toHaveCount(7);
+    await expect(page.locator('[data-testid="training-days"] li[data-trained="true"]')).toHaveCount(3);
+    await expect(page.locator('[data-testid="training-days"] li[data-trained="false"]')).toHaveCount(4);
+    await expect(days(page).nth(2).getByRole("link")).toHaveAccessibleName(/Wed, 14 Jan: 2 trainings/);
+    await expect(days(page).nth(1).getByRole("link")).toHaveAccessibleName(/Tue, 13 Jan: no training/);
+    await days(page).nth(2).getByRole("link").click(); // a day opens in Today
+    await expect(page).toHaveURL(/\/\?d=2026-01-14/);
+  });
+
+  test("the change against the week before, only when that week had trainings", async ({ page }) => {
+    await seedTraining("A", [{ entry_date: "2026-01-12" }, { entry_date: "2026-01-14" }, { entry_date: "2026-01-16" }, { entry_date: "2026-01-17" }, { entry_date: "2026-01-06" }, { entry_date: "2026-01-08" }]);
+    await login(page, "A");
+    await openHistory(page, WEEK);
+    await expect(page.getByTestId("training-total")).toHaveText("4");
+    await expect(page.getByTestId("training-card").getByTestId("delta-chip")).toContainText("+100% vs last week"); // 4 against 2
+
+    await openHistory(page, "p=week&d=2026-01-06"); // the week before has nothing before it
+    await expect(page.getByTestId("training-total")).toHaveText("2");
+    await expect(page.getByTestId("training-card").getByTestId("delta-chip")).toHaveCount(0);
+  });
+
+  test("no trainings: a short line and no strip", async ({ page }) => {
+    await seedDiary("A", [row("2026-01-13", 1500, 90, 150, 40)]);
+    await login(page, "A");
+    await openHistory(page, WEEK);
+    await expect(page.getByTestId("training-empty")).toHaveText("No training");
+    await expect(page.getByTestId("training-days")).toHaveCount(0);
+  });
+
+  test("today with a training is checked", async ({ page }) => {
+    const today = toDateKey(now());
+    await seedTraining("A", [{ entry_date: today }]);
+    await login(page, "A");
+    await openHistory(page, `p=week&d=${today}`);
+    await expect(page.getByTestId("training-total")).toHaveText("1");
+    const done = page.locator(`[data-testid="training-days"] li[data-trained="true"]`);
+    await expect(done).toHaveCount(1);
+    await expect(done.getByRole("link")).toHaveAccessibleName(/: trained$/);
+  });
+
+  test("a month shows a circle per day; a year shows a bar per month", async ({ page }) => {
+    await seedTraining("A", [{ entry_date: "2025-01-03" }, { entry_date: "2025-01-20" }, { entry_date: "2025-01-20", name: "Legs" }, { entry_date: "2025-03-10" }]);
+    await login(page, "A");
+    await openHistory(page, "p=month&d=2025-01-15");
+    await expect(page.getByTestId("training-total")).toHaveText("3");
+    await expect(days(page)).toHaveCount(31);
+    await expect(page.locator('[data-testid="training-days"] li[data-trained="true"]')).toHaveCount(2);
+
+    await openHistory(page, "p=year&d=2025-06-01");
+    await expect(page.getByTestId("training-total")).toHaveText("4");
+    await expect(page.getByTestId("training-days-count")).toHaveText("on 3 days");
+    const bars = page.getByTestId("training-bars").getByRole("listitem");
+    await expect(bars).toHaveCount(12);
+    await expect(bars.nth(0).getByRole("link")).toHaveAccessibleName(/January: 3 trainings/);
+    await expect(bars.nth(1).getByRole("link")).toHaveAccessibleName(/February: 0 trainings/);
+    await expect(bars.nth(2).getByRole("link")).toHaveAccessibleName(/March: 1 training$/);
+  });
+
+  test("the list of days marks the days trained", async ({ page }) => {
+    await seedDiary("A", [row("2026-01-12", 1500, 90, 150, 40), row("2026-01-13", 1700, 90, 150, 40)]);
+    await seedTraining("A", [{ entry_date: "2026-01-13" }]);
+    await login(page, "A");
+    await openHistory(page, WEEK);
+    await openDays(page);
+    const rows = page.getByTestId("bucket-list").getByRole("listitem");
+    await expect(rows).toHaveCount(2);
+    await expect(rows.nth(0).getByTestId("trained-mark")).toHaveCount(0);
+    await expect(rows.nth(1).getByTestId("trained-mark")).toBeVisible();
+  });
+
+  test("adding a training in Add training shows up in the history, and removing it takes it away", async ({ page }) => {
+    const today = toDateKey(now());
+    await login(page, "A");
+    await page.goto(`/training/add?d=${today}`);
+    await page.getByRole("button", { name: "New workout" }).click();
+    await page.locator('[data-testid="body"] path#biceps').first().click({ force: true });
+    await page.getByRole("button", { name: /^Open .*Curl/ }).first().click();
+    await page.getByRole("button", { name: "Add to workout" }).click();
+    await page.getByRole("button", { name: /^Workout · 1 exercise$/ }).click();
+    const sheet = page.locator('[data-slot="sheet-content"]');
+    await sheet.getByLabel("Workout name").fill("Arms");
+    await sheet.getByRole("button", { name: "Save to favorites" }).click(); // only logged
+    await sheet.getByRole("button", { name: "Add to diary" }).click();
+    await expect(page.getByText(/Arms added to/)).toBeVisible();
+
+    await page.getByRole("link", { name: "History", exact: true }).click();
+    await expect(page.getByTestId("training-total")).toHaveText("1");
+    await page.getByRole("link", { name: "Today", exact: true }).click();
+    await page.getByRole("button", { name: "Remove Arms" }).click();
+    await expect(page.getByTestId("training-count")).toHaveText("—");
+    await page.getByRole("link", { name: "History", exact: true }).click();
+    await expect(page.getByTestId("training-empty")).toBeVisible();
+  });
+
+  test("each user only counts their own trainings", async ({ page }) => {
+    await seedTraining("A", [{ entry_date: "2026-01-12" }]);
+    await seedTraining("B", [{ entry_date: "2026-01-13" }, { entry_date: "2026-01-13" }]);
+    const a = await trainingCountsAs("A", "2026-01-01", "2026-12-31");
+    expect(a.data).toEqual([{ entry_date: "2026-01-12", trainings: 1 }]);
+    const b = await trainingCountsAs("B", "2026-01-01", "2026-12-31");
+    expect(b.data).toEqual([{ entry_date: "2026-01-13", trainings: 2 }]);
+    expect((await trainingCountsAs("A", "2026-02-01", "2026-01-01")).error?.message).toMatch(/invalid date range/);
+    expect((await trainingCountsAs("A", "2000-01-01", "2026-01-01")).error?.message).toMatch(/too large/);
+    await login(page, "A");
+    await openHistory(page, WEEK);
+    await expect(page.getByTestId("training-total")).toHaveText("1");
+  });
 });

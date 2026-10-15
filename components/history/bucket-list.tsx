@@ -2,13 +2,14 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { Dumbbell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { bucketHref, bucketLabel, type Bucket, type Granularity } from "@/lib/history";
 
 const NOUN: Record<Granularity, string> = { day: "days", week: "weeks", month: "months" };
 
 /** The table view of the charts: every bar with its values and a link to open that day (or drill into that week/month). */
-export function BucketList({ buckets, now }: { buckets: readonly Bucket[]; now: Date }) {
+export function BucketList({ buckets, now, trainedDays }: { buckets: readonly Bucket[]; now: Date; trainedDays?: ReadonlySet<string> }) {
   const [showAll, setShowAll] = useState(false);
   const noun = NOUN[buckets[0]?.granularity ?? "day"];
   const withData = buckets.filter((bucket) => bucket.average !== null);
@@ -36,8 +37,13 @@ export function BucketList({ buckets, now }: { buckets: readonly Bucket[]; now: 
                   </span>
                 )}
               </span>
-              <span className={bucket.average ? "shrink-0 tabular-nums" : "shrink-0 text-muted-foreground"}>
-                {bucket.average ? `${bucket.average.calories} kcal` : "—"}
+              <span className="flex shrink-0 items-center gap-2">
+                {bucket.granularity === "day" && trainedDays?.has(bucket.from) && (
+                  <span data-testid="trained-mark" role="img" aria-label="Trained" className="flex items-center gap-0.5 text-primary">
+                    <Dumbbell aria-hidden className="size-4" />
+                  </span>
+                )}
+                <span className={bucket.average ? "tabular-nums" : "text-muted-foreground"}>{bucket.average ? `${bucket.average.calories} kcal` : "—"}</span>
               </span>
             </Link>
           </li>

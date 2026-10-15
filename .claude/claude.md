@@ -60,6 +60,7 @@ Calorie and macro tracking web app (PWA-style, used on an iPhone through Safari:
 - Data comes from SQL aggregates (PostgREST returns at most 1000 rows per request), never from reading the entries. **No statistics tables**: the diary is the only source of truth, and diary and saved mutations invalidate `["history", userId, …]`.
 - **Averages are per logged day** (days without entries are not zeros) and the screen always says "N of M days logged".
 - **Nothing is compared with the goals** (decision): goals change over time and there is no goal history. Only the change against the previous period is shown, as direction and percentage, with no good/bad judgment.
+- **Training in the history**: a card under the summary (shown even with nothing eaten): number of trainings in the period, on how many days, the change against the period before, and a check circle for every day trained (week and month) or a bar per week/month (long periods); the list of days marks the days trained. Counted in SQL by `training_daily_counts(p_from, p_to)`; trainings add/remove invalidate `["history", userId]`.
 - Layout: period picker, summary with change vs previous period, one chart with metric tabs (Calories/Protein/Carbs/Fat) and Avg/Max/Min, calories by meal, most eaten (by times and by calories), collapsed list of days.
 - No Apple Health or smartwatch import (decision); History uses only data already in the app.
 

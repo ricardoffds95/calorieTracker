@@ -249,3 +249,16 @@ export async function insertTrainingAs(user: TestUser, row: { entry_date: string
   const supabase = await clientFor(user);
   return supabase.from("training_entries").insert({ ...row, exercises: [BENCH] });
 }
+
+/** Trainings done on days, as the user (RLS applies). Each row is one training. */
+export async function seedTraining(user: TestUser, rows: { entry_date: string; name?: string }[]) {
+  const supabase = await clientFor(user);
+  const { error } = await supabase.from("training_entries").insert(rows.map((r) => ({ entry_date: r.entry_date, name: r.name ?? "Chest day", exercises: [BENCH] })));
+  if (error) throw error;
+}
+
+/** Calls training_daily_counts as `user` (RLS applies). */
+export async function trainingCountsAs(user: TestUser, from: string, to: string) {
+  const supabase = await clientFor(user);
+  return supabase.rpc("training_daily_counts", { p_from: from, p_to: to });
+}

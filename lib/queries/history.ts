@@ -1,7 +1,7 @@
 "use client";
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import type { DayTotals } from "@/lib/history";
+import type { DayTotals, TrainingDay } from "@/lib/history";
 import { createClient } from "@/lib/supabase/client";
 
 export const historyKey = (userId: string) => ["history", userId] as const;
@@ -57,6 +57,19 @@ export function useMealTotals(userId: string, from: string, to: string) {
       const { data, error } = await createClient().rpc("diary_meal_totals", { p_from: from, p_to: to });
       if (error) throw error;
       return data.map((row) => ({ meal: row.meal, calories: row.calories }));
+    },
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** How many trainings were done on each day of a period (one row per day with trainings), counted in SQL. */
+export function useTrainingCounts(userId: string, from: string, to: string) {
+  return useQuery({
+    queryKey: [...historyKey(userId), "training", from, to],
+    queryFn: async (): Promise<TrainingDay[]> => {
+      const { data, error } = await createClient().rpc("training_daily_counts", { p_from: from, p_to: to });
+      if (error) throw error;
+      return data.map((row) => ({ date: row.entry_date, trainings: row.trainings }));
     },
     placeholderData: keepPreviousData,
   });

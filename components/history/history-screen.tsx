@@ -8,13 +8,14 @@ import { MetricTabsChart } from "@/components/history/metric-tabs-chart";
 import { PeriodPicker } from "@/components/history/period-picker";
 import { PeriodSummaryCard } from "@/components/history/period-summary";
 import { TopItems } from "@/components/history/top-items";
+import { TrainingCard } from "@/components/history/training-card";
 import { Hint } from "@/components/ui/hint";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMounted } from "@/components/use-mounted";
 import { toDateKey } from "@/lib/dates";
-import { bucketize, parsePeriodParams, percentChange, previousPeriod, summarize } from "@/lib/history";
-import { useHistory } from "@/lib/queries/history";
+import { bucketize, parsePeriodParams, percentChange, previousPeriod, summarize, summarizeTraining, trainingBuckets } from "@/lib/history";
+import { useHistory, useTrainingCounts } from "@/lib/queries/history";
 import { cn } from "@/lib/utils";
 
 /** Fewer logged days than this and there is no trend to talk about. */
@@ -41,6 +42,16 @@ function HistoryPeriod({ userId }: { userId: string }) {
   const before = useMemo(() => previousPeriod(period), [period]);
   const beforeHistory = useHistory(userId, before.from, before.to);
   const beforeAverage = useMemo(() => (beforeHistory.data ? summarize(beforeHistory.data, before, todayKey).average : null), [beforeHistory.data, before, todayKey]);
+  // trainings: how many in the period, a check on every day, and the change against the period before
+  const training = useTrainingCounts(userId, period.from, period.to);
+  const trainingBefore = useTrainingCounts(userId, before.from, before.to);
+  const trainingCounts = useMemo(() => training.data ?? [], [training.data]);
+  const trainingSummary = useMemo(() => summarizeTraining(trainingCounts, period), [trainingCounts, period]);
+  const trainingDelta = useMemo(
+    () => (trainingBefore.data ? percentChange(trainingSummary.trainings, summarizeTraining(trainingBefore.data, before).trainings) : null),
+    [trainingBefore.data, trainingSummary.trainings, before],
+  );
+  const trainingDays = useMemo(() => new Set(trainingCounts.filter((c) => c.trainings > 0).map((c) => c.date)), [trainingCounts]);
   const enoughDays = summary.loggedDays >= MIN_DAYS_FOR_TRENDS;
   const delta = summary.average && enoughDays ? percentChange(summary.average.calories, beforeAverage?.calories) : null;
   return (
@@ -63,13 +74,16 @@ function HistoryPeriod({ userId }: { userId: string }) {
         // While the next period loads the previous one stays on screen, dimmed: no skeleton, no layout jump.
         <div className={cn("flex flex-col gap-6 transition-opacity", history.isPlaceholderData && "opacity-60")} aria-busy={history.isPlaceholderData}>
           <PeriodSummaryCard summary={summary} kind={period.kind} delta={delta} />
+          {training.data && (
+            <TrainingCard summary={trainingSummary} buckets={trainingBuckets(trainingCounts, period, todayKey)} kind={period.kind} now={now} delta={trainingDelta} todayKey={todayKey} />
+          )}
           {summary.average && (
             <>
               <MetricTabsChart key={`${period.kind}-${period.from}-${period.to}`} summary={summary} buckets={buckets} kind={period.kind} />
               {!enoughDays && <Hint>Log {MIN_DAYS_FOR_TRENDS}+ days for trends</Hint>}
               <MealSplit userId={userId} from={period.from} to={period.to} loggedDays={summary.loggedDays} />
               <TopItems userId={userId} from={period.from} to={period.to} />
-              <DaysSection buckets={buckets} now={now} />
+              <DaysSection buckets={buckets} now={now} trainedDays={trainingDays} />
             </>
           )}
         </div>

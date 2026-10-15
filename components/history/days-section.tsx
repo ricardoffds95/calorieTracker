@@ -7,7 +7,7 @@ import type { Bucket } from "@/lib/history";
 import { cn } from "@/lib/utils";
 
 /** The day-by-day list, closed until asked for (it is the longest part of the page). */
-export function DaysSection({ buckets, now }: { buckets: readonly Bucket[]; now: Date }) {
+export function DaysSection({ buckets, now, trainedDays }: { buckets: readonly Bucket[]; now: Date; trainedDays?: ReadonlySet<string> }) {
   const [open, setOpen] = useState(false);
   const logged = buckets.filter((b) => b.average !== null).length;
   const noun = buckets[0]?.granularity === "month" ? "months" : buckets[0]?.granularity === "week" ? "weeks" : "days";
@@ -28,7 +28,7 @@ export function DaysSection({ buckets, now }: { buckets: readonly Bucket[]; now:
       </button>
       {open && (
         <div id="days-list">
-          <BucketList buckets={buckets} now={now} />
+          <BucketList buckets={buckets} now={now} trainedDays={trainedDays} />
         </div>
       )}
     </section>

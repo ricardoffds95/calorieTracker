@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { toastSaveError } from "@/lib/queries/errors";
+import { historyKey } from "@/lib/queries/history";
 import { createClient } from "@/lib/supabase/client";
 import type { Json, Tables } from "@/lib/supabase/database.types";
 import { parseWorkoutExercises, type Exercise, type WorkoutExercise } from "@/lib/training";
@@ -170,6 +171,7 @@ export function useAddTraining(userId: string) {
         entry ? queryClient.invalidateQueries({ queryKey: trainingDayKey(userId, entry.entry_date) }) : queryClient.invalidateQueries({ queryKey: allTrainingKey(userId) }),
         // times_used changed in SQL
         queryClient.invalidateQueries({ queryKey: savedWorkoutsKey(userId) }),
+        queryClient.invalidateQueries({ queryKey: historyKey(userId) }),
       ]),
   });
 }
@@ -189,6 +191,7 @@ export function useDeleteTraining(userId: string) {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: trainingDayKey(userId, entry.entry_date) }),
       queryClient.invalidateQueries({ queryKey: savedWorkoutsKey(userId) }),
+      queryClient.invalidateQueries({ queryKey: historyKey(userId) }),
     ]);
   }
 
@@ -214,6 +217,7 @@ export function useDeleteTraining(userId: string) {
       Promise.all([
         queryClient.invalidateQueries({ queryKey: trainingDayKey(userId, entry.entry_date) }),
         queryClient.invalidateQueries({ queryKey: savedWorkoutsKey(userId) }),
+        queryClient.invalidateQueries({ queryKey: historyKey(userId) }),
       ]),
   });
 }

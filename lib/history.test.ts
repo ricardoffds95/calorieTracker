@@ -21,6 +21,8 @@ import {
   shiftPeriod,
   spanDays,
   summarize,
+  summarizeTraining,
+  trainingBuckets,
   validateRange,
   type DayTotals,
   type Period,
@@ -379,5 +381,54 @@ describe("wholePercents / mealShares", () => {
   });
   it("is all zeros when nothing was logged", () => {
     expect(mealShares([], 0).every((s) => s.percent === 0 && s.perDay === 0)).toBe(true);
+  });
+});
+
+describe("training in the history", () => {
+  const week = periodFor("week", "2026-10-07"); // Mon 5 to Sun 11 Oct 2026
+  const counts = [
+    { date: "2026-10-05", trainings: 1 },
+    { date: "2026-10-07", trainings: 2 },
+    { date: "2026-10-09", trainings: 1 },
+    { date: "2026-10-12", trainings: 3 }, // next week
+    { date: "2026-10-04", trainings: 1 }, // the week before
+  ];
+
+  it("counts the trainings and the days with training inside the period only", () => {
+    expect(summarizeTraining(counts, week)).toEqual({ trainings: 4, days: 3 });
+    expect(summarizeTraining([], week)).toEqual({ trainings: 0, days: 0 });
+    expect(summarizeTraining([{ date: "2026-10-06", trainings: 0 }], week)).toEqual({ trainings: 0, days: 0 });
+    expect(summarizeTraining(counts, periodFor("month", "2026-10-07"))).toEqual({ trainings: 8, days: 5 });
+  });
+
+  it("has a bucket for each day of a week with how many trainings it holds", () => {
+    const buckets = trainingBuckets(counts, week, "2026-10-31");
+    expect(buckets.map((b) => b.from)).toEqual(["2026-10-05", "2026-10-06", "2026-10-07", "2026-10-08", "2026-10-09", "2026-10-10", "2026-10-11"]);
+    expect(buckets.map((b) => b.count)).toEqual([1, 0, 2, 0, 1, 0, 0]);
+    expect(buckets.map((b) => b.trained)).toEqual([true, false, true, false, true, false, false]);
+    expect(buckets.every((b) => b.granularity === "day")).toBe(true);
+  });
+
+  it("leaves out the days that have not happened yet, like the calorie bars", () => {
+    const buckets = trainingBuckets(counts, week, "2026-10-08");
+    expect(buckets.map((b) => b.from)).toEqual(["2026-10-05", "2026-10-06", "2026-10-07", "2026-10-08"]);
+  });
+
+  it("groups a long period by week or by month", () => {
+    const quarter = { kind: "custom" as const, from: "2026-07-01", to: "2026-12-31" };
+    const weekly = trainingBuckets([{ date: "2026-07-02", trainings: 2 }, { date: "2026-07-08", trainings: 1 }], { ...quarter, to: "2026-08-31" }, "2026-12-31");
+    expect(weekly[0]).toMatchObject({ granularity: "week", count: 2, trained: true });
+    expect(weekly[1]).toMatchObject({ count: 1 });
+    const yearly = trainingBuckets([{ date: "2026-03-10", trainings: 4 }, { date: "2026-03-20", trainings: 1 }, { date: "2026-05-01", trainings: 2 }], periodFor("year", "2026-06-01"), "2026-12-31");
+    expect(yearly).toHaveLength(12);
+    expect(yearly[2]).toMatchObject({ granularity: "month", from: "2026-03-01", count: 5 });
+    expect(yearly[4]).toMatchObject({ count: 2 });
+    expect(yearly[0]).toMatchObject({ count: 0, trained: false });
+  });
+
+  it("compares with the period before only when that one had trainings", () => {
+    expect(percentChange(4, 2)).toBe(100);
+    expect(percentChange(4, 0)).toBeNull();
+    expect(percentChange(4, undefined)).toBeNull();
   });
 });

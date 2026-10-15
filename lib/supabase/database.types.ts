@@ -350,6 +350,13 @@ export type Database = {
           total_calories: number
         }[]
       }
+      training_daily_counts: {
+        Args: { p_from: string; p_to: string }
+        Returns: {
+          entry_date: string
+          trainings: number
+        }[]
+      }
       delete_my_account: {
         Args: Record<PropertyKey, never>
         Returns: undefined
