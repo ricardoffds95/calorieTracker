@@ -288,7 +288,7 @@ export function paginate<T>(items: readonly T[], page: number, size = PAGE_SIZE)
 
 /** Which page numbers to show: the first, the last and the neighbours of the current one, with "…" for the gaps. */
 export function pageWindow(current: number, total: number): (number | "…")[] {
-  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  if (total <= 5) return Array.from({ length: total }, (_, i) => i + 1);
   const wanted = new Set([1, total, current - 1, current, current + 1].filter((n) => n >= 1 && n <= total));
   const pages = [...wanted].sort((a, b) => a - b);
   const result: (number | "…")[] = [];

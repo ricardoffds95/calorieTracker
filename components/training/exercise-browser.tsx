@@ -17,6 +17,9 @@ import { useExercises } from "@/lib/queries/training";
 import { LEVELS, MUSCLE_LABELS, equipmentOf, exerciseImageUrl, filterExercises, toWorkoutExercise, type Exercise, type Muscle } from "@/lib/training";
 import { cn } from "@/lib/utils";
 
+/** Few exercises a page keep the list short and the page numbers in view. */
+const EXERCISES_PER_PAGE = 10;
+
 const SELECT = "h-11 w-full min-w-0 rounded-md border border-input bg-transparent px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 interface ExerciseBrowserProps {
@@ -48,7 +51,7 @@ export function ExerciseBrowser({ inWorkout, onAdd, gender }: ExerciseBrowserPro
     () => (exercises.data ? filterExercises(exercises.data, muscles, { query, equipment, level: level || null }) : []),
     [exercises.data, muscles, query, equipment, level],
   );
-  const shown = paginate(hits, page);
+  const shown = paginate(hits, page, EXERCISES_PER_PAGE);
 
   // Any change of the search starts again at page 1.
   const change = <T,>(set: (value: T) => void) => (value: T) => {

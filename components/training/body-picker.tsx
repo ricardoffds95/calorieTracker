@@ -1,9 +1,9 @@
 "use client";
 
 import Body from "react-muscle-highlighter";
+import { RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { BODY_ZONES, MUSCLES, MUSCLE_LABELS, toggleZone, zonesOf, type BodyZone, type Muscle } from "@/lib/training";
-import { cn } from "@/lib/utils";
+import { BODY_ZONES, toggleZone, zonesOf, type BodyZone, type Muscle } from "@/lib/training";
 
 export type BodyView = "front" | "back";
 
@@ -18,59 +18,34 @@ interface BodyPickerProps {
 
 const isZone = (value: string | undefined): value is BodyZone => value !== undefined && (BODY_ZONES as readonly string[]).includes(value);
 
-/** The body, front or back: tap a muscle to choose it (several at once), tap again to let it go. */
+/** The body, front or back (turn it with the arrow): tap a muscle to choose it (several at once), tap again to let it go. */
 export function BodyPicker({ selected, onChange, view, onViewChange, gender = "male" }: BodyPickerProps) {
   // The head and the hair are not muscles: they take the colour of the body, not the library's greys.
   const data = [...zonesOf(selected).map((slug) => ({ slug, intensity: 1 })), { slug: "head" as const, color: "var(--body-color)" }, { slug: "hair" as const, color: "var(--body-color)" }];
   return (
-    <div className="flex flex-col items-center gap-3">
-      <div role="group" aria-label="Body side" className="grid w-full max-w-60 grid-cols-2 gap-1 rounded-md bg-muted p-1">
-        {(["front", "back"] as const).map((side) => (
-          <Button
-            key={side}
-            type="button"
-            variant="ghost"
-            aria-pressed={view === side}
-            className="h-10 text-sm text-muted-foreground aria-pressed:bg-card aria-pressed:text-foreground dark:aria-pressed:bg-background"
-            onClick={() => onViewChange(side)}
-          >
-            {side === "front" ? "Front" : "Back"}
-          </Button>
-        ))}
-      </div>
-      <div data-testid="body" data-view={view} data-gender={gender} className="flex w-full justify-center">
-        <Body
-          side={view}
-          gender={gender}
-          scale={1.15}
-          data={data}
-          colors={["var(--primary)"]}
-          defaultFill="var(--body-color)"
-          border="var(--background)"
-          onBodyPartPress={(part) => {
-            if (isZone(part.slug)) onChange(toggleZone(selected, part.slug));
-          }}
-        />
-      </div>
-      <details className="w-full">
-        <summary className="flex min-h-11 cursor-pointer items-center justify-center text-sm text-muted-foreground">By name</summary>
-        <div role="group" aria-label="Muscles" className="flex flex-wrap justify-center gap-2 pt-1 pb-2">
-          {MUSCLES.map((muscle) => {
-            const on = selected.includes(muscle);
-            return (
-              <button
-                key={muscle}
-                type="button"
-                aria-pressed={on}
-                onClick={() => onChange(on ? selected.filter((m) => m !== muscle) : [...selected, muscle])}
-                className={cn("min-h-9 rounded-full border px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring", on ? "border-primary bg-primary/10 text-primary" : "border-input text-muted-foreground")}
-              >
-                {MUSCLE_LABELS[muscle]}
-              </button>
-            );
-          })}
-        </div>
-      </details>
+    <div data-testid="body" data-view={view} data-gender={gender} className="relative flex w-full justify-center">
+      <Body
+        side={view}
+        gender={gender}
+        scale={1.15}
+        data={data}
+        colors={["var(--primary)"]}
+        defaultFill="var(--body-color)"
+        border="var(--background)"
+        onBodyPartPress={(part) => {
+          if (isZone(part.slug)) onChange(toggleZone(selected, part.slug));
+        }}
+      />
+      <Button
+        type="button"
+        variant="outline"
+        size="icon"
+        className="absolute top-0 right-0 size-11 rounded-full"
+        aria-label="Rotate body"
+        onClick={() => onViewChange(view === "front" ? "back" : "front")}
+      >
+        <RotateCw aria-hidden />
+      </Button>
     </div>
   );
 }

@@ -259,7 +259,8 @@ describe("paginate", () => {
 describe("pageWindow", () => {
   it("lists every page when there are few", () => {
     expect(pageWindow(1, 1)).toEqual([1]);
-    expect(pageWindow(3, 7)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(pageWindow(3, 5)).toEqual([1, 2, 3, 4, 5]);
+    expect(pageWindow(3, 7)).toEqual([1, 2, 3, 4, "…", 7]); // more than five: the ends and the neighbours, so the bar fits a phone
   });
   it("keeps the first, the last and the neighbours of the current page", () => {
     expect(pageWindow(1, 21)).toEqual([1, 2, "…", 21]);

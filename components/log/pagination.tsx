@@ -16,13 +16,13 @@ interface PaginationProps {
 export function Pagination({ page, pageCount, onChange, disabled = false, className }: PaginationProps) {
   if (pageCount <= 1) return null;
   return (
-    <nav aria-label="Result pages" className={cn("sticky z-10 flex items-center justify-center gap-1 bg-background pt-2", className)}>
-      <Button type="button" variant="ghost" size="icon" className="size-11" aria-label="Previous page" disabled={disabled || page <= 1} onClick={() => onChange(page - 1)}>
+    <nav aria-label="Result pages" className={cn("sticky z-10 flex items-center justify-center gap-0.5 bg-background pt-2", className)}>
+      <Button type="button" variant="ghost" size="icon" className="size-10" aria-label="Previous page" disabled={disabled || page <= 1} onClick={() => onChange(page - 1)}>
         <ChevronLeft aria-hidden />
       </Button>
       {pageWindow(page, pageCount).map((entry, i) =>
         entry === "…" ? (
-          <span key={`gap-${i}`} aria-hidden className="w-6 text-center text-muted-foreground">
+          <span key={`gap-${i}`} aria-hidden className="w-5 text-center text-muted-foreground">
             …
           </span>
         ) : (
@@ -30,7 +30,7 @@ export function Pagination({ page, pageCount, onChange, disabled = false, classN
             key={entry}
             type="button"
             variant={entry === page ? "default" : "ghost"}
-            className="size-11 px-0 tabular-nums"
+            className="size-10 px-0 tabular-nums"
             aria-label={`Page ${entry}`}
             aria-current={entry === page ? "page" : undefined}
             disabled={disabled}
@@ -40,7 +40,7 @@ export function Pagination({ page, pageCount, onChange, disabled = false, classN
           </Button>
         ),
       )}
-      <Button type="button" variant="ghost" size="icon" className="size-11" aria-label="Next page" disabled={disabled || page >= pageCount} onClick={() => onChange(page + 1)}>
+      <Button type="button" variant="ghost" size="icon" className="size-10" aria-label="Next page" disabled={disabled || page >= pageCount} onClick={() => onChange(page + 1)}>
         <ChevronRight aria-hidden />
       </Button>
     </nav>

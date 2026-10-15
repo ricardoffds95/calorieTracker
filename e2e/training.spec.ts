@@ -7,8 +7,7 @@ const clearAll = () => Promise.all([clearTraining("A"), clearTraining("B"), clea
 test.beforeEach(clearAll);
 test.afterAll(clearAll);
 
-const sideButton = (page: Page, name: "Front" | "Back") => page.getByRole("group", { name: "Body side" }).getByRole("button", { name });
-const muscle = (page: Page, name: string) => page.getByRole("group", { name: "Muscles" }).getByRole("button", { name, exact: true });
+const rotate = (page: Page) => page.getByRole("button", { name: "Rotate body" });
 const chosen = (page: Page) => page.getByRole("list", { name: "Chosen muscles" }).getByRole("listitem");
 const rows = (page: Page) => page.getByTestId("exercise-list").getByRole("listitem");
 
@@ -32,21 +31,24 @@ async function openTraining(page: Page) {
   await page.waitForLoadState("networkidle");
 }
 
-/** Chooses muscles by name (the list under the body): the same thing as tapping them on the drawing. */
-async function pick(page: Page, ...names: string[]) {
-  await page.getByText("By name").click();
-  for (const name of names) await muscle(page, name).click();
+/** Turns the body to this side (if it is not there yet) and taps these zones of the drawing, as a finger would. */
+async function pick(page: Page, view: "front" | "back", ...zones: string[]) {
+  const body = page.getByTestId("body");
+  if ((await body.getAttribute("data-view")) !== view) await rotate(page).click();
+  await expect(body).toHaveAttribute("data-view", view);
+  for (const zone of zones) await page.locator(`[data-testid="body"] path#${zone}`).first().click({ force: true });
 }
 
-test("the Training tab shows the body and asks to pick a muscle", async ({ page }) => {
+test("the Training tab shows the body and asks to pick a muscle; the arrow turns it", async ({ page }) => {
   await login(page, "A");
   await page.getByRole("link", { name: "Training", exact: true }).click();
   await expect(page).toHaveURL(/\/training$/);
   await expect(page.getByRole("status").filter({ hasText: "Pick a muscle" })).toBeVisible();
   await expect(page.getByTestId("body")).toHaveAttribute("data-view", "front");
-  await sideButton(page, "Back").click();
+  await expect(page.getByText("By name")).toHaveCount(0); // the drawing is the only way, to keep the screen simple
+  await rotate(page).click();
   await expect(page.getByTestId("body")).toHaveAttribute("data-view", "back");
-  await sideButton(page, "Front").click();
+  await rotate(page).click();
   await expect(page.getByTestId("body")).toHaveAttribute("data-view", "front");
   await expect(page.getByTestId("exercise-list")).toHaveCount(0); // nothing until a muscle is chosen
 });
@@ -54,7 +56,7 @@ test("the Training tab shows the body and asks to pick a muscle", async ({ page 
 test("tapping the body picks a muscle, and the exercises for it appear with photos", async ({ page }) => {
   await login(page, "A");
   await openTraining(page);
-  await page.locator('[data-testid="body"] path#chest').first().click({ force: true });
+  await pick(page, "front", "chest");
   await expect(chosen(page).first()).toBeVisible();
   await expect(page.getByTestId("exercise-count")).toBeVisible();
   await expect(rows(page).first().locator("img")).toHaveAttribute("src", /cdn\.jsdelivr\.net\/gh\/yuhonas\/free-exercise-db/);
@@ -69,17 +71,17 @@ test("the body follows the sex of the profile, and a muscle that shows on both s
   await login(page, "A");
   await openTraining(page);
   await expect(page.getByTestId("body")).toHaveAttribute("data-gender", /^(male|female)$/);
-  await sideButton(page, "Back").click();
-  await page.locator('[data-testid="body"] path#deltoids').first().click({ force: true });
+  await pick(page, "back", "deltoids");
   await expect(page.getByRole("button", { name: "Remove Shoulders" })).toBeVisible();
-  await sideButton(page, "Front").click();
+  await rotate(page).click();
   await expect(page.locator('[data-testid="body"] path#deltoids').first()).toHaveAttribute("fill", "var(--primary)"); // coloured on the front too
 });
 
 test("several muscles at once; chips take them off; the front and the back are one choice", async ({ page }) => {
   await login(page, "A");
   await openTraining(page);
-  await pick(page, "Chest", "Triceps");
+  await pick(page, "front", "chest");
+  await pick(page, "back", "triceps");
   await expect(chosen(page)).toHaveCount(2);
   const both = Number((await page.getByTestId("exercise-count").innerText()).split(" ")[0]);
   await page.getByRole("button", { name: "Remove Triceps" }).click();
@@ -87,7 +89,7 @@ test("several muscles at once; chips take them off; the front and the back are o
   const chest = Number((await page.getByTestId("exercise-count").innerText()).split(" ")[0]);
   expect(both).toBeGreaterThan(chest);
   expect(chest).toBeGreaterThan(80); // the chest has 84 exercises with it as the main muscle, and more with it as a secondary one
-  await sideButton(page, "Back").click(); // turning the body does not lose the choice
+  await rotate(page).click(); // turning the body does not lose the choice
   await expect(chosen(page)).toHaveCount(1);
   await page.getByRole("button", { name: "Remove Chest" }).click();
   await expect(page.getByRole("status").filter({ hasText: "Pick a muscle" })).toBeVisible();
@@ -96,14 +98,14 @@ test("several muscles at once; chips take them off; the front and the back are o
 test("the list has page numbers; search and equipment narrow it down", async ({ page }) => {
   await login(page, "A");
   await openTraining(page);
-  await pick(page, "Quads");
-  await expect(rows(page)).toHaveCount(20);
+  await pick(page, "front", "quadriceps");
+  await expect(rows(page)).toHaveCount(10); // few a page, so the page numbers are always in view
   const first = await rows(page).first().innerText();
   const nav = page.getByRole("navigation", { name: "Result pages" });
   await expect(nav).toBeVisible();
-  await nav.getByRole("button", { name: "Page 2" }).click();
+  await nav.getByRole("button", { name: "Page 2", exact: true }).click();
   await expect(rows(page).first()).not.toHaveText(first);
-  await expect(nav.getByRole("button", { name: "Page 2" })).toHaveAttribute("aria-current", "page");
+  await expect(nav.getByRole("button", { name: "Page 2", exact: true })).toHaveAttribute("aria-current", "page");
 
   await page.getByLabel("Search exercises").fill("barbell squat");
   await expect(nav).toHaveCount(0);
@@ -128,7 +130,7 @@ test("the list has page numbers; search and equipment narrow it down", async ({ 
 test("an exercise opens with its photos, muscles and steps", async ({ page }) => {
   await login(page, "A");
   await openTraining(page);
-  await pick(page, "Chest");
+  await pick(page, "front", "chest");
   await page.getByLabel("Search exercises").fill("dumbbell flyes");
   await page.getByRole("button", { name: "Open Dumbbell Flyes", exact: true }).click();
   const sheet = page.locator('[data-slot="sheet-content"]');
@@ -146,7 +148,7 @@ test("an exercise opens with its photos, muscles and steps", async ({ page }) =>
 test("a workout is put together, saved, found in Workouts, edited and deleted", async ({ page }) => {
   await login(page, "A");
   await openTraining(page);
-  await pick(page, "Chest");
+  await pick(page, "front", "chest");
   await page.getByLabel("Search exercises").fill("bench press - medium");
   await page.getByRole("button", { name: `Open ${BENCH.name}`, exact: true }).click();
   await page.getByRole("button", { name: "Add to workout" }).click();
@@ -200,7 +202,7 @@ test("a workout name already saved is refused inline", async ({ page }) => {
   await seedWorkout("A", { name: "Back day", exercises: [CURL] });
   await login(page, "A");
   await openTraining(page);
-  await pick(page, "Biceps");
+  await pick(page, "front", "biceps");
   await page.getByRole("button", { name: `Open ${CURL.name}`, exact: true }).click();
   await page.getByRole("button", { name: "Add to workout" }).click();
   await page.getByRole("button", { name: /^Workout · 1 exercise$/ }).click();
@@ -250,8 +252,7 @@ test("Add training with a new workout: the star keeps it, no star only logs it",
 
   async function newWorkout(name: string, star: boolean) {
     await page.getByRole("button", { name: "New workout" }).click();
-    await page.getByText("By name").click();
-    await muscle(page, "Biceps").click();
+    await pick(page, "front", "biceps");
     await page.getByRole("button", { name: `Open ${CURL.name}`, exact: true }).click();
     await page.getByRole("button", { name: "Add to workout" }).click();
     await page.getByRole("button", { name: /^Workout · 1 exercise$/ }).click();
@@ -291,7 +292,7 @@ test("the saved workouts open on the five most used", async ({ page }) => {
 test("a failed save shows an error and nothing is shown as saved", async ({ page }) => {
   await login(page, "A");
   await openTraining(page);
-  await pick(page, "Biceps");
+  await pick(page, "front", "biceps");
   await page.getByRole("button", { name: `Open ${CURL.name}`, exact: true }).click();
   await page.getByRole("button", { name: "Add to workout" }).click();
   await page.getByRole("button", { name: /^Workout · 1 exercise$/ }).click();
@@ -343,7 +344,7 @@ test("the Workouts view has New workout: it goes to the exercises with nothing i
 test("several equipment at once: an exercise needs any of them", async ({ page }) => {
   await login(page, "A");
   await openTraining(page);
-  await pick(page, "Chest");
+  await pick(page, "front", "chest");
   const equipment = page.getByRole("button", { name: "Equipment", exact: true });
   await expect(equipment).toHaveText("Any equipment");
   await chooseEquipment(page, "dumbbell");
