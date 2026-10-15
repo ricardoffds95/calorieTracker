@@ -158,8 +158,8 @@ export async function fetchProfile(user: TestUser) {
   return data;
 }
 
-/** Puts a test user back to a clean profile: default goals, no questionnaire answers, onboarding done or not. */
-export async function resetProfileRow(user: TestUser, { onboardingDone }: { onboardingDone: boolean }) {
+/** Puts a test user back to a clean profile: default goals, no questionnaire answers, onboarding done or not, with or without an icon. */
+export async function resetProfileRow(user: TestUser, { onboardingDone, avatar = null }: { onboardingDone: boolean; avatar?: string | null }) {
   const supabase = await clientFor(user);
   // getSession reads the local session: getUser would ask the server, which refuses after a test signed this user out everywhere.
   const { data: auth, error: authError } = await supabase.auth.getSession();
@@ -179,7 +179,7 @@ export async function resetProfileRow(user: TestUser, { onboardingDone }: { onbo
       weight_kg: null,
       body_fat_pct: null,
       daily_activity: null,
-      avatar: null,
+      avatar,
       saved_plans: null,
       aerobic_sessions_per_week: null,
       anaerobic_sessions_per_week: null,

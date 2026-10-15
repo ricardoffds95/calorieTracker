@@ -7,6 +7,7 @@ import {
   profileFormSchema,
   stepValue,
   toProfileUpdate,
+  validateWelcomeName,
 } from "./profile";
 
 const valid = { mode: "maintain", calories: 2000, proteinPct: 30, carbsPct: 40, fatPct: 30, proteinG: 150, carbsG: 200, fatG: 67 } as const;
@@ -122,5 +123,17 @@ describe("parseIntegerInput", () => {
   });
   it("returns null for empty, decimals, signs and text", () => {
     for (const bad of ["", "  ", "12.5", "-3", "+3", "abc", "1e3", "1,5"]) expect(parseIntegerInput(bad)).toBeNull();
+  });
+});
+
+describe("validateWelcomeName", () => {
+  it("needs a name, without the spaces at the ends", () => {
+    expect(validateWelcomeName("  Ana Maria ")).toEqual({ ok: true, name: "Ana Maria" });
+    expect(validateWelcomeName("")).toEqual({ ok: false, message: "Name required" });
+    expect(validateWelcomeName("   ")).toEqual({ ok: false, message: "Name required" });
+  });
+  it("accepts 50 characters and refuses 51", () => {
+    expect(validateWelcomeName("a".repeat(50)).ok).toBe(true);
+    expect(validateWelcomeName("a".repeat(51))).toEqual({ ok: false, message: "Max 50 characters" });
   });
 });

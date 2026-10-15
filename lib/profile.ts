@@ -9,6 +9,16 @@ export const GRAMS_STEP = 5;
 export const MAX_GRAMS = 2000;
 export const DEFAULT_NAME = "Utilizador";
 
+export const MAX_NAME_LENGTH = 50;
+
+/** The name asked on the welcome screen: required, without spaces at the ends (a short message when it is not valid). */
+export function validateWelcomeName(text: string): { ok: true; name: string } | { ok: false; message: string } {
+  const name = text.trim();
+  if (name === "") return { ok: false, message: "Name required" };
+  if (name.length > MAX_NAME_LENGTH) return { ok: false, message: `Max ${MAX_NAME_LENGTH} characters` };
+  return { ok: true, name };
+}
+
 export const GOAL_MODE_OPTIONS: readonly { mode: GoalMode; label: string; description: string }[] = [
   { mode: "cut", label: "Lose weight", description: "Deficit" },
   { mode: "maintain", label: "Maintain weight", description: "Maintenance" },

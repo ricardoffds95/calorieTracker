@@ -4,14 +4,13 @@ import { useState } from "react";
 import { ChevronLeft, ChevronRight, ImageIcon, Settings, UserRound, type LucideIcon } from "lucide-react";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { Avatar } from "@/components/profile/avatar";
+import { AvatarGrid } from "@/components/profile/avatar-grid";
 import { SettingsView } from "@/components/profile/settings-view";
 import { useLeave } from "@/components/profile/unsaved-guard";
 import { UserDataForm } from "@/components/profile/user-data-form";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { AVATARS } from "@/lib/avatars";
 import { useUpdateProfile, type Profile } from "@/lib/queries/profile";
-import { cn } from "@/lib/utils";
 
 type View = "menu" | "icon" | "settings" | "data";
 const TITLES: Record<View, string> = { menu: "Account", icon: "Change icon", settings: "Settings", data: "User data" };
@@ -74,25 +73,5 @@ function MenuRow({ label, icon: Icon, lead, onClick }: { label: string; icon?: L
 
 function IconPicker({ profile }: { profile: Profile }) {
   const update = useUpdateProfile(profile.user_id, "Icon saved");
-  return (
-    <div role="radiogroup" aria-label="Icon" className="grid grid-cols-3 gap-4 py-2">
-      {AVATARS.map((avatar) => {
-        const selected = profile.avatar === avatar.id;
-        return (
-          <button
-            key={avatar.id}
-            type="button"
-            role="radio"
-            aria-checked={selected}
-            aria-label={avatar.label}
-            disabled={update.isPending}
-            onClick={() => !selected && update.mutate({ avatar: avatar.id })}
-            className={cn("mx-auto rounded-full p-1 outline-none focus-visible:ring-2 focus-visible:ring-ring", selected && "ring-2 ring-primary")}
-          >
-            <Avatar id={avatar.id} className="size-20" />
-          </button>
-        );
-      })}
-    </div>
-  );
+  return <AvatarGrid value={profile.avatar} onChange={(id) => update.mutate({ avatar: id })} disabled={update.isPending} />;
 }

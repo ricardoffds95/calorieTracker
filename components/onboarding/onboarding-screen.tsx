@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { GoalModePicker } from "@/components/profile/goal-mode-picker";
 import { Activity, AboutYou, BodyComposition, DailyLife, answersFromProfile, type AnswersForm } from "@/components/onboarding/answers-fields";
 import { PlanResult } from "@/components/onboarding/plan-result";
+import { WelcomeStep } from "@/components/onboarding/welcome-step";
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -71,7 +72,15 @@ export function OnboardingScreen({ userId, fromProfile }: { userId: string; from
     );
   }
   if (!profile.data) return <Skeleton className="h-96 w-full" aria-label="Loading" />;
+  // A new account starts with its name and icon; once the icon is saved this step never comes back.
+  if (!fromProfile && profile.data.avatar === null) return <Welcome userId={userId} />;
   return <Flow userId={userId} profile={profile.data} fromProfile={fromProfile} />;
+}
+
+function Welcome({ userId }: { userId: string }) {
+  const router = useRouter();
+  const skip = useSaveOnboarding(userId);
+  return <WelcomeStep userId={userId} skipping={skip.isPending} onSkip={() => skip.mutate({}, { onSuccess: () => router.replace("/") })} />;
 }
 
 type Result = { plans: PlansByGoal; summary: string; source: "ai" | "standard" };

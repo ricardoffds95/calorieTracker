@@ -2,9 +2,9 @@ import { expect, test, type Page } from "@playwright/test";
 import { login, signIn } from "./helpers";
 import { fetchProfile, resetProfileRow } from "./seed";
 
-// A new account: the questionnaire is shown on the first login. Every test starts with user A as "never answered"
-// and leaves A with a clean, finished profile for the other specs.
-test.beforeEach(() => resetProfileRow("A", { onboardingDone: false }));
+// A new account: the welcome and then the questionnaire are shown on the first login. Every test starts with user A as
+// "never answered", already with an icon (so it starts at the questionnaire), and leaves A with a clean, finished profile.
+test.beforeEach(() => resetProfileRow("A", { onboardingDone: false, avatar: "icon-flame" }));
 test.afterEach(() => resetProfileRow("A", { onboardingDone: true }));
 test.afterAll(() => resetProfileRow("A", { onboardingDone: true }));
 
@@ -264,4 +264,64 @@ test("Perfil: the button redoes the plan with the saved answers, 'Cancel' change
   await expect(page.getByRole("button", { name: /^Moderate/ })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByLabel("Training notes (optional)")).toHaveValue("Treino de pernas à segunda.");
   await expect(page.getByLabel("Aerobic sessions per week", { exact: true })).toHaveValue("2");
+});
+
+test.describe("welcome: name and icon before the questionnaire", () => {
+  test.beforeEach(() => resetProfileRow("A", { onboardingDone: false })); // a brand new account: no icon yet
+
+  test("first login asks for a name and an icon, saves them and goes on to the questionnaire", async ({ page }) => {
+    await signIn(page, "A");
+    await expect(page).toHaveURL(/\/onboarding$/);
+    await expect(page.getByRole("heading", { name: "Welcome" })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Main navigation" })).toHaveCount(0);
+
+    const next = page.getByRole("button", { name: "Continue" });
+    await expect(next).toBeDisabled();
+    await expect(page.getByRole("status").filter({ hasText: "Name required" })).toBeVisible();
+    await page.getByLabel("Name").fill("   ");
+    await expect(next).toBeDisabled();
+    await page.getByLabel("Name").fill("  Ana Maria ");
+    await expect(next).toBeDisabled(); // still no icon
+    await expect(page.getByRole("status").filter({ hasText: "Pick an icon" })).toBeVisible();
+
+    await page.getByRole("radio", { name: "Photo 5" }).click();
+    await expect(page.getByRole("radio", { name: "Photo 5" })).toBeChecked();
+    await expect(next).toBeEnabled();
+    await next.click();
+
+    await expect(page.getByRole("heading", { name: "Nutrition plan" })).toBeVisible();
+    await expect(page.getByText("Step 1 of 5")).toBeVisible();
+    await expect.poll(async () => (await fetchProfile("A")).avatar).toBe("photo-5");
+    expect((await fetchProfile("A")).name).toBe("Ana Maria");
+
+    // it does not come back after a reload: the questionnaire goes on
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "Nutrition plan" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Welcome" })).toHaveCount(0);
+  });
+
+  test("a name over 50 characters is refused", async ({ page }) => {
+    await signIn(page, "A");
+    await page.getByLabel("Name").fill("a".repeat(51));
+    await expect(page.getByRole("status").filter({ hasText: "Max 50 characters" })).toBeVisible();
+    await page.getByRole("radio", { name: "Photo 1" }).click();
+    await expect(page.getByRole("button", { name: "Continue" })).toBeDisabled();
+  });
+
+  test("Skip leaves everything, as in the questionnaire, and the name stays as it was", async ({ page }) => {
+    await signIn(page, "A");
+    await page.getByRole("button", { name: "Skip" }).click();
+    await expect(page).toHaveURL(/\/$/);
+    const profile = await fetchProfile("A");
+    expect(profile.onboarding_done_at).not.toBeNull();
+    expect(profile.name).toBe("Utilizador");
+  });
+
+  test("redoing the plan from the Profile does not ask for the name again", async ({ page }) => {
+    await resetProfileRow("A", { onboardingDone: true }); // finished, but without an icon
+    await login(page, "A");
+    await page.goto("/onboarding?from=profile");
+    await expect(page.getByRole("heading", { name: "Nutrition plan" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Welcome" })).toHaveCount(0);
+  });
 });
