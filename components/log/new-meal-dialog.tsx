@@ -134,6 +134,7 @@ export function NewMealDialog({ userId, initialTarget, now, foods, onClose, onAd
             // Remount when the meal changes after being saved, so a stale saved copy is never reused.
             <MealActions
               key={JSON.stringify([trimmed, items])}
+              saveByDefault
               userId={userId}
               initialTarget={initialTarget}
               now={now}

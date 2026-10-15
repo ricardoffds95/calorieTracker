@@ -29,9 +29,11 @@ Calorie and macro tracking web app (PWA-style, used on an iPhone through Safari:
 - SQL functions (`security invoker`, RLS applies): `diary_daily_totals`, `diary_top_items`, `diary_meal_totals`, `apply_saved_food`; `delete_my_account()` is `security definer` and deletes `auth.users`, whose `on delete cascade` removes all user data.
 - Every table has `user_id` and RLS (`user_id = auth.uid()`). A new table needs RLS and policy tests with two different users before moving on.
 
+- PWA: `app/manifest.ts` (display `minimal-ui`: Chrome on Android offers "Install app"; the iPhone shortcut keeps opening in Safari) and public icons at `/pwa-icon/<192|512|maskable-512>.png`. No service worker (no offline).
+
 ## Screens (routes: `/`, `/add`, `/saved`, `/history`, `/profile`, `/login`, `/onboarding`)
 - **Today**: day navigation, kcal left, macro columns, four meal sections. Every row uses the same three columns (`components/today/row-layout.ts`). A meal heading minimizes to just its total (state kept on the device, for every day). An entry moves to another meal from its edit dialog.
-- **Add** (`components/log/`): meal and day are chosen on this screen (`DiaryTargetPicker`); the `+` of a meal on Today preselects it (`?meal=&d=`); default is snacks. Food quantity: 10 g steps (10 to 500 g) with a "type grams" field; meals in portions (0.5 steps). No dialog or sheet focuses a field on open (`onOpenAutoFocus` is cancelled in `ui/dialog.tsx` and `ui/sheet.tsx`: iOS would open the keyboard).
+- **Add** (`components/log/`): the saved list opens on the 5 most used ("Most used", "Show all · N" for more); search covers all saved. meal and day are chosen on this screen (`DiaryTargetPicker`); the `+` of a meal on Today preselects it (`?meal=&d=`); default is snacks. Food quantity: 10 g steps (10 to 500 g) with a "type grams" field; meals in portions (0.5 steps). No dialog or sheet focuses a field on open (`onOpenAutoFocus` is cancelled in `ui/dialog.tsx` and `ui/sheet.tsx`: iOS would open the keyboard).
 - **Saved**: library of foods and meals; a row opens a sheet with Add to diary / Edit / Delete. Editing a saved item asks: from today / whole history / don't update.
 - **Profile**: goals (calories, % and grams edited together), nutrition plan, avatar menu (Settings, User data, Log out, delete account) with an unsaved-changes guard. Onboarding questionnaire on first login, with an AI plan (`/api/ai/plan`).
 
@@ -40,7 +42,7 @@ Calorie and macro tracking web app (PWA-style, used on an iPhone through Safari:
 - Online search goes through the server: `GET /api/food-search?q=&page=` (session required; zod: 2 to 100 letters, page 1 to 25) calls `search.openfoodfacts.org` via `lib/off-search.ts`. Reason: the old `world.openfoodfacts.org/cgi/search.pl` failed ~50% (503 without CORS) and the new API has no CORS for our domain. 8 s timeout, one retry on 5xx/429/timeout, then 503 `off_unavailable` with a `reason` (`rate_limited` shows "Too many searches. Wait a bit"; the reason is also logged by the route; the UI offers "try again"; "No connection" only when the request itself fails).
 - The server sends `User-Agent: CalorieTracker/1.0 (OFF_CONTACT_EMAIL)`. OFF limits per IP (search 10/min, product 15/min), so keep the 700 ms pause.
 - Read only the `*_100g` OFF fields (the others can be per serving). Some OFF products have wrong data: pick another result or fix the food in Saved.
-- A food added to the diary from search is saved automatically (per 100 g). Not-yet-saved foods offer three choices: save and add (main), only add (entry not linked), only save.
+- **One button, one star.** Adding a food or meal has a single "Add to diary" button and a star ("Save to favorites"). Without the star the entry goes only to the diary (not linked to Saved); with it the food/meal is saved too (per 100 g for foods) and the entry is linked to it. The star starts off for search, scan and AI results and on in New meal and Add manually (Food | Meal). A food that is already saved shows a filled, inactive star. Only the Saved tab has a "Save meal" button (no day to add to).
 - Barcode: the browser reads the product directly from OFF (`/api/v2/product/<code>`), using zxing.
 
 ## AI (Gemini)

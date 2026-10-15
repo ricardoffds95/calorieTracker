@@ -21,7 +21,7 @@ import { dateKeyOrToday, toDateKey } from "@/lib/dates";
 import { savedToResult, type FoodSearchResult } from "@/lib/food-search";
 import { describeTarget, foodEntryRow, itemRows, mealEntryRow, mealFromParam, type LogTarget, type NewDiaryEntry } from "@/lib/log";
 import { useAddEntries } from "@/lib/queries/diary";
-import { DUPLICATE_NAME, ensureSavedFood, useCreateSavedMeal, useSaveFoodOnly, useSavedFoods, useSavedMeals, type SavedMeal } from "@/lib/queries/saved";
+import { DUPLICATE_NAME, ensureSavedFood, useCreateSavedMeal, useSavedFoods, useSavedMeals, type SavedMeal } from "@/lib/queries/saved";
 
 export function LogScreen({ userId }: { userId: string }) {
   // "Today" depends on the browser's clock, so nothing date-based renders on the server.
@@ -44,7 +44,6 @@ function LogDay({ userId }: { userId: string }) {
   const foods = useSavedFoods(userId);
   const meals = useSavedMeals(userId);
   const add = useAddEntries(userId);
-  const saveOnly = useSaveFoodOnly(userId);
   const createMeal = useCreateSavedMeal(userId);
   const [manualError, setManualError] = useState<string | null>(null);
 
@@ -53,8 +52,8 @@ function LogDay({ userId }: { userId: string }) {
     toast.success(message, { action: { label: "View day", onClick: () => router.push(dayHref(day, now)) } });
   }
 
-  function addRows(rows: NewDiaryEntry[] | (() => Promise<NewDiaryEntry[]>), what: string, target: LogTarget) {
-    add.mutate({ rows }, { onSuccess: () => showAdded(`${what} added to ${describeTarget(target, now)}`, target.entry_date) });
+  function addRows(rows: NewDiaryEntry[] | (() => Promise<NewDiaryEntry[]>), what: string, target: LogTarget, savedNow = false) {
+    add.mutate({ rows }, { onSuccess: () => showAdded(`${what} added to ${describeTarget(target, now)}${savedNow ? " · saved" : ""}`, target.entry_date) });
   }
 
   /** Add by hand: a food in grams, or a whole meal (one portion), saved to the library when asked. */
@@ -122,13 +121,12 @@ function LogDay({ userId }: { userId: string }) {
           food={panel.food}
           initialGrams={panel.grams}
           initialTarget={initialTarget}
-          pending={add.isPending || saveOnly.isPending}
+          pending={add.isPending}
           onClose={() => setPanel(null)}
           // Foods from search/scan are saved first (per 100 g) so next time they are instant.
           onAdd={(food, quantity, target, save) =>
-            addRows(async () => [foodEntryRow(target, food, quantity, save ? await ensureSavedFood(food) : null)], food.name, target)
+            addRows(async () => [foodEntryRow(target, food, quantity, save ? await ensureSavedFood(food) : null)], food.name, target, save && food.source !== "saved")
           }
-          onSaveOnly={(food) => saveOnly.mutate(food, { onSuccess: () => setPanel(null) })}
         />
       )}
       {panel?.kind === "meal" && (

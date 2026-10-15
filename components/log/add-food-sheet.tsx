@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Star } from "lucide-react";
 import { DiaryTargetPicker } from "@/components/log/diary-target-picker";
 import { NutrientSummary } from "@/components/log/nutrient-summary";
 import { QuantityControl } from "@/components/log/quantity-control";
@@ -18,14 +19,13 @@ interface AddFoodSheetProps {
   initialTarget: LogTarget;
   pending: boolean;
   onClose: () => void;
-  /** `save`: also keep the food in "Saved" (always true for a food that is already saved). */
+  /** `save`: also keep the food in "Saved" (the star; always true for a food that is already saved). */
   onAdd: (food: FoodSearchResult, quantity_g: number, target: LogTarget, save: boolean) => void;
-  /** Save the food in "Saved" without logging it (only offered for foods that are not saved yet). */
-  onSaveOnly?: (food: FoodSearchResult) => void;
 }
 
-export function AddFoodSheet({ food, initialGrams, initialTarget, pending, onClose, onAdd, onSaveOnly }: AddFoodSheetProps) {
-  const isNew = food.source !== "saved" && onSaveOnly !== undefined;
+export function AddFoodSheet({ food, initialGrams, initialTarget, pending, onClose, onAdd }: AddFoodSheetProps) {
+  const alreadySaved = food.source === "saved";
+  const [star, setStar] = useState(false);
   const presets = servingPresets(food.serving_size);
   const [grams, setGrams] = useState(initialGrams ?? presets[1]?.grams ?? 100);
   const [target, setTarget] = useState(initialTarget);
@@ -36,7 +36,21 @@ export function AddFoodSheet({ food, initialGrams, initialTarget, pending, onClo
     <Sheet open onOpenChange={(open) => !open && onClose()}>
       <SheetContent side="bottom" className="mx-auto max-h-[92dvh] max-w-md overflow-y-auto rounded-t-lg pb-[max(1rem,env(safe-area-inset-bottom))]">
         <SheetHeader>
-          <SheetTitle>{food.name}</SheetTitle>
+          <div className="flex items-start justify-between gap-2 pr-8">
+            <SheetTitle>{food.name}</SheetTitle>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="-mt-2 size-11 shrink-0"
+              aria-pressed={alreadySaved || star}
+              aria-label={alreadySaved ? "Saved" : "Save to favorites"}
+              disabled={alreadySaved}
+              onClick={() => setStar((value) => !value)}
+            >
+              <Star aria-hidden className={alreadySaved || star ? "fill-primary text-primary" : "text-muted-foreground"} />
+            </Button>
+          </div>
           <SheetDescription>
             {food.brand ? `${food.brand} · ` : ""}
             {food.calories_100g} kcal per 100 g
@@ -48,19 +62,9 @@ export function AddFoodSheet({ food, initialGrams, initialTarget, pending, onClo
           <DiaryTargetPicker value={target} onChange={setTarget} />
         </div>
         <SheetFooter>
-          <Button type="button" size="lg" className="h-11" disabled={!ready || pending} onClick={() => parsed.success && onAdd(food, parsed.data, target, true)}>
-            {pending ? "Adding…" : isNew ? "Save and add" : "Add to diary"}
+          <Button type="button" size="lg" className="h-11" disabled={!ready || pending} onClick={() => parsed.success && onAdd(food, parsed.data, target, alreadySaved || star)}>
+            {pending ? "Adding…" : "Add to diary"}
           </Button>
-          {isNew && (
-            <>
-              <Button type="button" variant="outline" size="lg" className="h-11" disabled={!ready || pending} onClick={() => parsed.success && onAdd(food, parsed.data, target, false)}>
-                Add only
-              </Button>
-              <Button type="button" variant="outline" size="lg" className="h-11" disabled={pending} onClick={() => onSaveOnly(food)}>
-                Save only
-              </Button>
-            </>
-          )}
         </SheetFooter>
       </SheetContent>
     </Sheet>

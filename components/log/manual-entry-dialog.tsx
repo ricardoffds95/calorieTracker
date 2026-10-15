@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { Star } from "lucide-react";
 import { DiaryTargetPicker } from "@/components/log/diary-target-picker";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -130,10 +131,15 @@ export function ManualEntryDialog({ initialTarget, pending, onClose, onAdd, erro
               )}
             </div>
           ))}
-          <label className="col-span-2 flex min-h-11 items-center gap-3 text-sm">
-            <input type="checkbox" className="size-5 accent-primary" checked={save} onChange={(e) => setSave(e.target.checked)} />
-            {isFood ? "Save to my foods" : "Save to my meals"}
-          </label>
+          <button
+            type="button"
+            aria-pressed={save}
+            onClick={() => setSave((value) => !value)}
+            className="col-span-2 flex min-h-11 items-center gap-3 rounded-sm text-left text-sm"
+          >
+            <Star aria-hidden className={cn("size-5 shrink-0", save ? "fill-primary text-primary" : "text-muted-foreground")} />
+            Save to favorites
+          </button>
           {touched && saveError && (
             <p role="alert" className="col-span-2 text-xs text-destructive">
               {saveError}

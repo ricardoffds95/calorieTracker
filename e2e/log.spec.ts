@@ -66,7 +66,7 @@ async function typeGrams(page: Page, grams: string) {
   await page.getByLabel("Grams", { exact: true }).fill(grams);
 }
 
-test("search → add 150 g: diary row, auto-saved food with times_used and the Today totals", async ({ page }) => {
+test("search → add 150 g with the star: diary row, saved food with times_used and the Today totals", async ({ page }) => {
   await mockOff(page);
   await login(page, "A");
   await openLog(page);
@@ -78,8 +78,9 @@ test("search → add 150 g: diary row, auto-saved food with times_used and the T
   await typeGrams(page, "150");
   await expect(page.getByTestId("grams-value")).toHaveText("150 g");
   await expect(page.getByTestId("nutrient-summary")).toContainText("195");
-  await page.getByRole("button", { name: "Save and add" }).click();
-  await expect(page.getByText(/Arroz Teste E2E added to lunch/)).toBeVisible();
+  await page.getByRole("button", { name: "Save to favorites" }).click(); // the star keeps it in Saved
+  await page.getByRole("button", { name: "Add to diary" }).click();
+  await expect(page.getByText(/Arroz Teste E2E added to lunch.* · saved/)).toBeVisible();
 
   const [row] = await fetchDiary("A", DAY);
   expect(row).toMatchObject({ meal: "lunch", kind: "food", quantity_g: 150, calories: 195, protein_g: 4.1, carbs_g: 42.3, fat_g: 0.5 });
@@ -203,41 +204,44 @@ test("scrolling the results closes the keyboard", async ({ page }) => {
   await expect(searchBox(page)).not.toBeFocused();
 });
 
-test("a food from Open Food Facts can be only saved, or saved and logged", async ({ page }) => {
+test("a food from Open Food Facts is kept in Saved only with the star; a saved food shows a filled star", async ({ page }) => {
   await mockOff(page);
   await login(page, "A");
   await openLog(page);
 
   await searchBox(page).fill("arroz teste e2e");
   await page.getByRole("button", { name: "Choose Arroz Teste E2E" }).click();
-  await page.getByRole("button", { name: "Save only" }).click();
-  await expect(page.getByText("Saved to foods")).toBeVisible();
-  const [saved] = await fetchSavedFoods("A");
-  expect(saved).toMatchObject({ name: "Arroz Teste E2E", off_code: "5601234567890", calories_100g: 130, times_used: 0 });
-  expect(await fetchDiary("A", DAY)).toHaveLength(0);
-
-  // already saved: nothing left to save, it can only be logged
-  await expect(savedTab(page)).toHaveText("Saved · 1");
-  await page.getByRole("button", { name: "Choose Arroz Teste E2E" }).click();
-  await expect(page.getByRole("button", { name: "Save only" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Save to favorites" }).click();
+  await expect(page.getByRole("button", { name: "Save to favorites" })).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Add to diary" }).click();
   await expect(page.getByText(/Arroz Teste E2E added to lunch/)).toBeVisible();
-  const [row] = await fetchDiary("A", DAY);
-  expect(row).toMatchObject({ saved_food_id: saved!.id, quantity_g: 100 }); // a saved food has no label serving
-  expect((await fetchSavedFoods("A"))[0]).toMatchObject({ times_used: 1 });
+  const [saved] = await fetchSavedFoods("A");
+  expect(saved).toMatchObject({ name: "Arroz Teste E2E", off_code: "5601234567890", calories_100g: 130, times_used: 1 });
+
+  // already saved: the star is filled and cannot be switched off here, and adding again counts another use
+  await expect(savedTab(page)).toHaveText("Saved · 1");
+  await page.getByRole("button", { name: "Choose Arroz Teste E2E" }).click();
+  await expect(page.getByRole("button", { name: "Saved", exact: true })).toBeDisabled();
+  await page.getByRole("button", { name: "Add to diary" }).click();
+  await expect(page.getByText(/Arroz Teste E2E added to lunch/)).toBeVisible();
+  const rows = await fetchDiary("A", DAY);
+  expect(rows).toHaveLength(2);
+  expect(rows[1]).toMatchObject({ saved_food_id: saved!.id, quantity_g: 100 }); // a saved food has no label serving
+  expect((await fetchSavedFoods("A"))[0]).toMatchObject({ times_used: 2 });
 });
 
-test("a new food can be logged without saving it: it only goes to the diary", async ({ page }) => {
+test("a new food has one button, Add to diary: without the star it only goes to the diary", async ({ page }) => {
   await mockOff(page);
   await login(page, "A");
   await openLog(page);
 
   await searchBox(page).fill("arroz teste e2e");
   await page.getByRole("button", { name: "Choose Arroz Teste E2E" }).click();
-  for (const name of ["Save and add", "Add only", "Save only"]) {
-    await expect(page.getByRole("button", { name, exact: true })).toBeVisible(); // the three choices
+  await expect(page.getByRole("button", { name: "Save to favorites" })).toHaveAttribute("aria-pressed", "false");
+  for (const gone of ["Save and add", "Add only", "Save only"]) {
+    await expect(page.getByRole("button", { name: gone, exact: true })).toHaveCount(0);
   }
-  await page.getByRole("button", { name: "Add only", exact: true }).click();
+  await page.getByRole("button", { name: "Add to diary" }).click();
   await expect(page.getByText(/Arroz Teste E2E added to lunch/)).toBeVisible();
 
   const [row] = await fetchDiary("A", DAY);
@@ -389,7 +393,7 @@ test("Add manually as a meal: one portion, saved to my meals and linked", async 
   await expect(dialog.getByLabel("Calories (kcal)")).toHaveValue("180");
   await expect(dialog.getByLabel("Amount (g)")).toHaveCount(0); // a meal has no grams
   await dialog.getByLabel("Protein (g)").fill("6");
-  await expect(dialog.getByText("Save to my meals")).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Save to favorites" })).toHaveAttribute("aria-pressed", "true"); // on by default here
   await dialog.getByRole("button", { name: "Add to diary" }).click();
   await expect(page.getByText(/Sopa E2E added to/)).toBeVisible();
 
@@ -407,7 +411,7 @@ test("Add manually as a meal without saving it: logged only, nothing in my meals
   await dialog.getByRole("radio", { name: "Meal" }).click();
   await dialog.getByLabel("Name").fill("Prato E2E");
   await dialog.getByLabel("Calories (kcal)").fill("650");
-  await dialog.getByLabel("Save to my meals").uncheck();
+  await dialog.getByRole("button", { name: "Save to favorites" }).click();
   await dialog.getByRole("button", { name: "Add to diary" }).click();
   await expect(page.getByText(/Prato E2E added to/)).toBeVisible();
   const [entry] = await fetchDiary("A", DAY);
@@ -425,7 +429,7 @@ test("Add manually as a meal: a saved name is refused inline and nothing is adde
   await dialog.getByRole("button", { name: "Add to diary" }).click();
   await expect(dialog.getByRole("alert").filter({ hasText: "Meal name already saved" })).toBeVisible();
   expect(await fetchDiary("A", DAY)).toHaveLength(0);
-  await dialog.getByLabel("Save to my meals").uncheck(); // it can still be only logged
+  await dialog.getByRole("button", { name: "Save to favorites" }).click(); // it can still be only logged
   await dialog.getByRole("button", { name: "Add to diary" }).click();
   await expect(page.getByText(/Sopa E2E added to/)).toBeVisible();
   expect(await fetchDiary("A", DAY)).toHaveLength(1);
@@ -595,7 +599,7 @@ async function analyzeText(page: Page) {
   await expect(page.getByRole("heading", { name: "Chicken and rice" })).toBeVisible();
 }
 
-test("AI from a photo → one meal → 'Guardar e adicionar' with 2 portions", async ({ page }) => {
+test("AI from a photo → one meal → star and Add to diary with 2 portions", async ({ page }) => {
   const sent = await mockAi(page);
   await login(page, "A");
   await openLog(page);
@@ -610,7 +614,8 @@ test("AI from a photo → one meal → 'Guardar e adicionar' with 2 portions", a
   await expect(page.getByTestId("nutrient-summary")).toContainText("443"); // 1 portion
 
   await page.getByRole("button", { name: "Use 2 portions" }).click();
-  await page.getByRole("button", { name: "Save and add" }).click();
+  await page.getByRole("button", { name: "Save to favorites" }).click();
+  await page.getByRole("button", { name: "Add to diary" }).click();
   await expect(page.getByText("Chicken and rice added to lunch")).toBeVisible();
 
   const [meal] = await fetchSavedMeals("A");
@@ -619,7 +624,7 @@ test("AI from a photo → one meal → 'Guardar e adicionar' with 2 portions", a
   expect(row).toMatchObject({ kind: "meal", saved_meal_id: meal!.id, doses: 2, calories: 886, protein_g: 101.2 });
 });
 
-test("AI 'Edit' corrects the values, then 'Save meal' saves without logging", async ({ page }) => {
+test("AI 'Edit' corrects the values, then the star keeps the meal and Add logs it", async ({ page }) => {
   await mockAi(page);
   await login(page, "A");
   await openLog(page);
@@ -632,25 +637,30 @@ test("AI 'Edit' corrects the values, then 'Save meal' saves without logging", as
   await expect(page.getByRole("heading", { name: "Frango com muito arroz" })).toBeVisible();
   await expect(page.getByTestId("nutrient-summary")).toContainText("638");
 
-  await page.getByRole("button", { name: "Save meal" }).click();
-  await expect(page.getByRole("button", { name: "Saved" })).toBeDisabled();
+  await page.getByRole("button", { name: "Save to favorites" }).click();
+  await page.getByRole("button", { name: "Add to diary" }).click();
+  await expect(page.getByText("Frango com muito arroz added to lunch")).toBeVisible();
   const [meal] = await fetchSavedMeals("A");
   expect(meal).toMatchObject({ name: "Frango com muito arroz", total_calories: 638 });
-  expect(await fetchDiary("A", DAY)).toHaveLength(0);
+  const [row] = await fetchDiary("A", DAY);
+  expect(row).toMatchObject({ kind: "meal", saved_meal_id: meal!.id, calories: 638 });
 });
 
-test("AI 'Add only' logs an unlinked meal; a duplicate name is explained inline", async ({ page }) => {
+test("AI meal without the star logs an unlinked meal; with a saved name the star explains it inline", async ({ page }) => {
   await seedSavedMeal("A", { name: "Chicken and rice", items: AI_MEAL.items, total_calories: 443, total_protein: 50.6, total_carbs: 42.3, total_fat: 5.9 });
   await mockAi(page);
   await login(page, "A");
   await openLog(page);
   await analyzeText(page);
 
-  await page.getByRole("button", { name: "Save meal" }).click();
+  await page.getByRole("button", { name: "Save to favorites" }).click();
+  await page.getByRole("button", { name: "Add to diary" }).click();
   await expect(page.getByRole("alert").filter({ hasText: "Meal name already saved" })).toBeVisible();
   expect(await fetchSavedMeals("A")).toHaveLength(1);
+  expect(await fetchDiary("A", DAY)).toHaveLength(0); // nothing was added either
 
-  await page.getByRole("button", { name: /Add only/ }).click();
+  await page.getByRole("button", { name: "Save to favorites" }).click(); // star off: only logged
+  await page.getByRole("button", { name: "Add to diary" }).click();
   await expect(page.getByText("Chicken and rice added to lunch")).toBeVisible();
   const [row] = await fetchDiary("A", DAY);
   expect(row).toMatchObject({ kind: "meal", saved_meal_id: null, doses: 1, calories: 443 });
@@ -717,13 +727,18 @@ test("the + of a meal on the day screen keeps its meal", async ({ page }) => {
   await expect(page).toHaveURL(new RegExp(`/add\\?meal=dinner&d=${DAY}`));
 });
 
-test("long lists of saved items scroll inside themselves", async ({ page }) => {
+test("long lists of saved items open on the five most used and scroll inside themselves", async ({ page }) => {
   for (let i = 1; i <= 14; i++) {
     await seedSavedFood("A", { name: `Alimento ${String(i).padStart(2, "0")}`, calories_100g: 100 + i, protein_100g: 1, carbs_100g: 1, fat_100g: 1 });
   }
   await login(page, "A");
   await openLog(page);
 
+  // the screen opens on the five most used; the rest comes with "Show all"
+  await expect(page.getByRole("heading", { name: "Most used" })).toBeVisible();
+  await expect(page.getByTestId("saved-all").getByRole("listitem")).toHaveCount(5);
+  await page.getByRole("button", { name: "Show all · 14" }).click();
+  await expect(page.getByTestId("saved-all").getByRole("listitem")).toHaveCount(14);
   const list = page.getByRole("region", { name: "Saved list" });
   await expect(list).toBeVisible();
   expect(await list.evaluate((el) => el.scrollHeight > el.clientHeight && getComputedStyle(el).overflowY === "auto")).toBe(true);
@@ -759,7 +774,7 @@ test("new meal by values per portion: 1.5 portions, shown without grams on Today
   await page.getByLabel("Calories (kcal)").fill("450");
   await page.getByLabel("Protein (g)").fill("25");
   await page.getByRole("button", { name: "Use 1.5 portions" }).click();
-  await page.getByRole("button", { name: "Save and add" }).click();
+  await page.getByRole("button", { name: "Add to diary" }).click(); // the star starts on in New meal
   await expect(page.getByText("Bifana added to dinner")).toBeVisible();
 
   const [meal] = await fetchSavedMeals("A");
@@ -810,7 +825,8 @@ test("AI knows a single food from a meal: it opens the food sheet with the estim
   await expect(page.getByRole("heading", { name: "Peito de frango grelhado" })).toBeVisible();
   await expect(page.getByTestId("nutrient-summary")).toContainText("248"); // the 150 g estimate
   await expect(page.getByRole("button", { name: "Save meal" })).toHaveCount(0);
-  await page.getByRole("button", { name: "Save and add" }).click();
+  await page.getByRole("button", { name: "Save to favorites" }).click();
+  await page.getByRole("button", { name: "Add to diary" }).click();
   await expect(page.getByText(/Peito de frango grelhado added to/)).toBeVisible();
 
   const [food] = await fetchSavedFoods("A");
@@ -862,8 +878,8 @@ test("new meal: tick several saved foods in one list (with a filter) and join th
   await expect(page.getByLabel("Amount of Aveia E2E (g)")).toHaveValue("100");
   await expect(page.getByLabel("Amount of Banana E2E (g)")).toHaveValue("100");
   await expect(page.getByTestId("nutrient-summary")).toContainText("220"); // 100 + 120
-  await page.getByRole("button", { name: "Save meal" }).click();
-  await expect(page.getByRole("button", { name: "Saved" })).toBeDisabled();
+  await page.getByRole("button", { name: "Add to diary" }).click(); // the star starts on in New meal: saved and logged
+  await expect(page.getByText(/Breakfast E2E added to/)).toBeVisible();
   const [meal] = await fetchSavedMeals("A");
   expect(meal).toMatchObject({ name: "Breakfast E2E", total_calories: 220 });
   expect((meal!.items as { name: string }[]).map((i) => i.name)).toEqual(["Aveia E2E", "Banana E2E"]);
@@ -910,7 +926,7 @@ test("new meal: every food can be removed, and the warning says exactly what is 
   await page.getByRole("checkbox", { name: "Leite E2E" }).click();
   await page.getByRole("button", { name: "Add 1 food" }).click();
   await expect(warning).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Save and add" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add to diary" })).toBeVisible();
 
   await page.getByLabel("Amount of Leite E2E (g)").fill("0");
   await expect(page.getByRole("status").filter({ hasText: "Needs a name and an amount" })).toBeVisible();
@@ -989,8 +1005,8 @@ test("new meal by joining saved foods: totals are the sum of the foods", async (
   await page.getByRole("button", { name: "Add to meal" }).click();
   await page.getByLabel("Amount of Leite E2E (g)").fill("250");
   await expect(page.getByTestId("nutrient-summary")).toContainText("343"); // 228 + 115
-  await page.getByRole("button", { name: "Save meal" }).click();
-  await expect(page.getByRole("button", { name: "Saved" })).toBeDisabled();
+  await page.getByRole("button", { name: "Add to diary" }).click(); // the star starts on in New meal: saved and logged
+  await expect(page.getByText(/Papas E2E added to/)).toBeVisible();
 
   const [meal] = await fetchSavedMeals("A");
   expect(meal).toMatchObject({ name: "Papas E2E", total_calories: 343, total_protein: 16.2 });

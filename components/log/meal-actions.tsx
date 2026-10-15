@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check } from "lucide-react";
+import { Check, Star } from "lucide-react";
 import { DiaryTargetPicker } from "@/components/log/diary-target-picker";
 import { NutrientSummary } from "@/components/log/nutrient-summary";
 import { PortionStepper } from "@/components/log/portion-stepper";
@@ -25,12 +25,15 @@ interface MealActionsProps {
   onSaved?: (meal: SavedMeal) => void;
   /** Shown as "Edit" when given (AI result). */
   onEdit?: () => void;
+  /** Whether the star (save the meal when adding it) starts marked. */
+  saveByDefault?: boolean;
 }
 
 const DUPLICATE_MESSAGE = "Meal name already saved";
 
-/** Save the meal, save and add it to the diary (in portions), edit it, or only add it. */
-export function MealActions({ userId, initialTarget, now = new Date(), name, items, onAdded, onSaved, onEdit }: MealActionsProps) {
+/** Add the meal to the diary (in portions), with a star to keep it in Saved too; or only save it (no day to add to). */
+export function MealActions({ userId, initialTarget, now = new Date(), name, items, onAdded, onSaved, onEdit, saveByDefault = false }: MealActionsProps) {
+  const [star, setStar] = useState(saveByDefault);
   const [portions, setPortions] = useState(1);
   const [target, setTarget] = useState(initialTarget);
   const [saved, setSaved] = useState<SavedMeal | null>(null);
@@ -82,47 +85,57 @@ export function MealActions({ userId, initialTarget, now = new Date(), name, ite
           {error}
         </p>
       )}
-      {target && (
-        <Button
-          type="button"
-          size="lg"
-          className="h-11"
-          disabled={pending || !isValidTarget(target)}
-          onClick={async () => {
-            const meal = await ensureSaved();
-            if (meal) await addToDiary(meal);
-          }}
-        >
-          {saved ? "Add to diary" : "Save and add"}
-        </Button>
-      )}
-      <div className={target ? "grid grid-cols-2 gap-2" : "flex flex-col"}>
-        <Button
-          type="button"
-          size={target ? "default" : "lg"}
-          variant={target ? "outline" : "default"}
-          className="h-11"
-          disabled={pending || saved !== null}
-          onClick={ensureSaved}
-        >
-          {saved ? (
-            <>
-              <Check aria-hidden /> Saved
-            </>
-          ) : (
-            "Save meal"
+      {target ? (
+        <>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="size-11 shrink-0"
+              aria-pressed={star || saved !== null}
+              aria-label={saved ? "Saved" : "Save to favorites"}
+              disabled={pending || saved !== null}
+              onClick={() => setStar((value) => !value)}
+            >
+              <Star aria-hidden className={star || saved ? "fill-primary text-primary" : "text-muted-foreground"} />
+            </Button>
+            <Button
+              type="button"
+              size="lg"
+              className="h-11 flex-1"
+              disabled={pending || !isValidTarget(target)}
+              onClick={async () => {
+                const meal = star || saved ? await ensureSaved() : { id: null, name, items };
+                if (meal) await addToDiary(meal);
+              }}
+            >
+              {pending ? "Adding…" : "Add to diary"}
+            </Button>
+          </div>
+          {onEdit && (
+            <Button type="button" variant="outline" className="h-11" disabled={pending || saved !== null} onClick={onEdit}>
+              Edit
+            </Button>
           )}
-        </Button>
-        {onEdit && (
-          <Button type="button" variant="outline" className="h-11" disabled={pending || saved !== null} onClick={onEdit}>
-            Edit
+        </>
+      ) : (
+        <div className="flex flex-col gap-2">
+          <Button type="button" size="lg" className="h-11" disabled={pending || saved !== null} onClick={ensureSaved}>
+            {saved ? (
+              <>
+                <Check aria-hidden /> Saved
+              </>
+            ) : (
+              "Save meal"
+            )}
           </Button>
-        )}
-      </div>
-      {target && !saved && (
-        <Button type="button" variant="link" className="h-11 text-muted-foreground" disabled={pending || !isValidTarget(target)} onClick={() => addToDiary({ id: null, name, items })}>
-          Add only
-        </Button>
+          {onEdit && (
+            <Button type="button" variant="outline" className="h-11" disabled={pending || saved !== null} onClick={onEdit}>
+              Edit
+            </Button>
+          )}
+        </div>
       )}
     </div>
   );

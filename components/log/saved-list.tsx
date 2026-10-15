@@ -10,6 +10,8 @@ import type { SavedFood } from "@/lib/food-search";
 import type { SavedMeal } from "@/lib/queries/saved";
 import { cn } from "@/lib/utils";
 
+/** The list opens on the few most used; "Show all" adds more, a page at a time. */
+const FIRST = 5;
 const PAGE = 15;
 
 interface SavedListProps {
@@ -25,7 +27,7 @@ type Entry = { kind: "food"; item: SavedFood } | { kind: "meal"; item: SavedMeal
 
 /** The user's saved foods and meals together, the most used first (the list shown before searching). */
 export function SavedList({ foods, meals, onPickFood, onPickMeal, onEditFood, onEditMeal }: SavedListProps) {
-  const [limit, setLimit] = useState(PAGE);
+  const [limit, setLimit] = useState(FIRST);
   const entries = useMemo<Entry[] | null>(() => {
     if (!foods || !meals) return null;
     const all: Entry[] = [...foods.map((item) => ({ kind: "food" as const, item })), ...meals.map((item) => ({ kind: "meal" as const, item }))];
@@ -34,7 +36,7 @@ export function SavedList({ foods, meals, onPickFood, onPickMeal, onEditFood, on
 
   return (
     <section aria-label="Saved" className="flex flex-col gap-2">
-      <h2 className="text-sm font-medium text-muted-foreground">Saved</h2>
+      <h2 className="text-sm font-medium text-muted-foreground">{entries && entries.length > FIRST ? "Most used" : "Saved"}</h2>
       {!entries && <Skeleton className="h-32 w-full" aria-label="Loading saved" />}
       {entries && entries.length === 0 && (
         <p className="py-2 text-sm text-muted-foreground">Nothing saved yet</p>
@@ -67,7 +69,7 @@ export function SavedList({ foods, meals, onPickFood, onPickMeal, onEditFood, on
       )}
       {entries && entries.length > limit && (
         <Button type="button" variant="ghost" className="h-11" onClick={() => setLimit((n) => n + PAGE)}>
-          Show more
+          Show all · {entries.length}
         </Button>
       )}
       <Link href="/saved" className={cn(buttonVariants({ variant: "link" }), "h-11 self-start px-1 text-muted-foreground")}>
