@@ -31,15 +31,19 @@ test("the account menu is the picture in the top corner of the Profile, with the
   }
 });
 
-test("the icon can be changed (6 choices) and stays after a reload", async ({ page }) => {
+test("the icon can be changed (6 shown, the rest behind Show more) and stays after a reload", async ({ page }) => {
   await openMenu(page);
   await sheet(page).getByRole("button", { name: "Change icon" }).click();
   const choices = sheet(page).getByRole("radio");
-  await expect(choices).toHaveCount(10);
-  await expect(sheet(page).getByRole("radio", { name: "Flame" })).toHaveAttribute("aria-checked", "false");
-  await sheet(page).getByRole("radio", { name: "Flame" }).click();
+  await expect(choices).toHaveCount(6);
+  await expect(sheet(page).getByRole("radio", { name: "Photo 7" })).toHaveCount(0);
+  await sheet(page).getByRole("button", { name: /^Show more/ }).click();
+  await expect(choices).toHaveCount(9);
+  await sheet(page).getByRole("radio", { name: "Photo 8" }).click();
   await expect(page.getByText("Icon saved")).toBeVisible();
-  await expect.poll(async () => (await fetchProfile("A")).avatar).toBe("icon-flame");
+  await expect.poll(async () => (await fetchProfile("A")).avatar).toBe("photo-8");
+  await sheet(page).getByRole("button", { name: "Show less" }).click();
+  await expect(choices).toHaveCount(6);
 
   await sheet(page).getByRole("radio", { name: "Photo 2" }).click();
   await expect.poll(async () => (await fetchProfile("A")).avatar).toBe("photo-2");

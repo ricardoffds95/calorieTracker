@@ -36,6 +36,7 @@ Calorie and macro tracking web app (PWA-style, used on an iPhone through Safari:
 - **Add** (`components/log/`): the saved list opens on the 5 most used ("Most used", "Show all · N" for more); search covers all saved. meal and day are chosen on this screen (`DiaryTargetPicker`); the `+` of a meal on Today preselects it (`?meal=&d=`); default is snacks. Food quantity: 10 g steps (10 to 500 g) with a "type grams" field; meals in portions (0.5 steps). No dialog or sheet focuses a field on open (`onOpenAutoFocus` is cancelled in `ui/dialog.tsx` and `ui/sheet.tsx`: iOS would open the keyboard).
 - **Saved**: library of foods and meals; a row opens a sheet with Add to diary / Edit / Delete. Editing a saved item asks: from today / whole history / don't update.
 - **Welcome** (first login, `/onboarding`, before the questionnaire): name (required, max 50) and icon (required); shown while `profiles.avatar` is null and not when redoing the plan from Profile. Skip leaves the whole onboarding.
+- Avatars: nine photos in `public/avatars` (256 px circles; the newer ones were cut out with rembg onto a coloured radial background, not all red). The picker shows the first six and the rest behind "Show more"; ids that are no longer listed (the old drawn icons) show a neutral person.
 - **Profile**: goals (calories, % and grams edited together), nutrition plan, avatar menu (Settings, User data, Log out, delete account) with an unsaved-changes guard. Onboarding questionnaire on first login, with an AI plan (`/api/ai/plan`).
 
 ## Food search

@@ -4,7 +4,7 @@ import { fetchProfile, resetProfileRow } from "./seed";
 
 // A new account: the welcome and then the questionnaire are shown on the first login. Every test starts with user A as
 // "never answered", already with an icon (so it starts at the questionnaire), and leaves A with a clean, finished profile.
-test.beforeEach(() => resetProfileRow("A", { onboardingDone: false, avatar: "icon-flame" }));
+test.beforeEach(() => resetProfileRow("A", { onboardingDone: false, avatar: "photo-1" }));
 test.afterEach(() => resetProfileRow("A", { onboardingDone: true }));
 test.afterAll(() => resetProfileRow("A", { onboardingDone: true }));
 
