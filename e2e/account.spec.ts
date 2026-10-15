@@ -35,7 +35,7 @@ test("the icon can be changed (6 choices) and stays after a reload", async ({ pa
   await openMenu(page);
   await sheet(page).getByRole("button", { name: "Change icon" }).click();
   const choices = sheet(page).getByRole("radio");
-  await expect(choices).toHaveCount(6);
+  await expect(choices).toHaveCount(10);
   await expect(sheet(page).getByRole("radio", { name: "Flame" })).toHaveAttribute("aria-checked", "false");
   await sheet(page).getByRole("radio", { name: "Flame" }).click();
   await expect(page.getByText("Icon saved")).toBeVisible();

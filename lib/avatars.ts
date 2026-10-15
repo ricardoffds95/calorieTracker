@@ -1,8 +1,12 @@
-/** The pictures a user can pick for their account: three photos (files in /public/avatars) and three drawn icons. */
+/** The pictures a user can pick for their account: seven photos (files in /public/avatars) and three drawn icons. */
 export const AVATARS = [
   { id: "photo-1", kind: "image", src: "/avatars/photo-1.png", label: "Photo 1" },
   { id: "photo-2", kind: "image", src: "/avatars/photo-2.png", label: "Photo 2" },
   { id: "photo-3", kind: "image", src: "/avatars/photo-3.png", label: "Photo 3" },
+  { id: "photo-4", kind: "image", src: "/avatars/photo-4.png", label: "Photo 4" },
+  { id: "photo-5", kind: "image", src: "/avatars/photo-5.png", label: "Photo 5" },
+  { id: "photo-6", kind: "image", src: "/avatars/photo-6.png", label: "Photo 6" },
+  { id: "photo-7", kind: "image", src: "/avatars/photo-7.png", label: "Photo 7" },
   { id: "icon-dumbbell", kind: "icon", icon: "dumbbell", label: "Dumbbell" },
   { id: "icon-apple", kind: "icon", icon: "apple", label: "Apple" },
   { id: "icon-flame", kind: "icon", icon: "flame", label: "Flame" },
