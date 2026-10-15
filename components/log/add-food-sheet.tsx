@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Star } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { DiaryTargetPicker } from "@/components/log/diary-target-picker";
 import { NutrientSummary } from "@/components/log/nutrient-summary";
 import { QuantityControl } from "@/components/log/quantity-control";
@@ -36,21 +37,7 @@ export function AddFoodSheet({ food, initialGrams, initialTarget, pending, onClo
     <Sheet open onOpenChange={(open) => !open && onClose()}>
       <SheetContent side="bottom" className="mx-auto max-h-[92dvh] max-w-md overflow-y-auto rounded-t-lg pb-[max(1rem,env(safe-area-inset-bottom))]">
         <SheetHeader>
-          <div className="flex items-start justify-between gap-2 pr-8">
-            <SheetTitle>{food.name}</SheetTitle>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="-mt-2 size-11 shrink-0"
-              aria-pressed={alreadySaved || star}
-              aria-label={alreadySaved ? "Saved" : "Save to favorites"}
-              disabled={alreadySaved}
-              onClick={() => setStar((value) => !value)}
-            >
-              <Star aria-hidden className={alreadySaved || star ? "fill-primary text-primary" : "text-muted-foreground"} />
-            </Button>
-          </div>
+          <SheetTitle>{food.name}</SheetTitle>
           <SheetDescription>
             {food.brand ? `${food.brand} · ` : ""}
             {food.calories_100g} kcal per 100 g
@@ -62,9 +49,23 @@ export function AddFoodSheet({ food, initialGrams, initialTarget, pending, onClo
           <DiaryTargetPicker value={target} onChange={setTarget} />
         </div>
         <SheetFooter>
-          <Button type="button" size="lg" className="h-11" disabled={!ready || pending} onClick={() => parsed.success && onAdd(food, parsed.data, target, alreadySaved || star)}>
-            {pending ? "Adding…" : "Add to diary"}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className={cn("size-12 shrink-0", (alreadySaved || star) && "border-primary bg-primary/10")}
+              aria-pressed={alreadySaved || star}
+              aria-label={alreadySaved ? "Saved" : "Save to favorites"}
+              disabled={alreadySaved}
+              onClick={() => setStar((value) => !value)}
+            >
+              <Star aria-hidden className={cn("size-7", alreadySaved || star ? "fill-primary text-primary" : "text-muted-foreground")} />
+            </Button>
+            <Button type="button" size="lg" className="h-12 flex-1" disabled={!ready || pending} onClick={() => parsed.success && onAdd(food, parsed.data, target, alreadySaved || star)}>
+              {pending ? "Adding…" : "Add to diary"}
+            </Button>
+          </div>
         </SheetFooter>
       </SheetContent>
     </Sheet>

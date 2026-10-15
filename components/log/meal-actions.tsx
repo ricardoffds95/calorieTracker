@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Check, Star } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { DiaryTargetPicker } from "@/components/log/diary-target-picker";
 import { NutrientSummary } from "@/components/log/nutrient-summary";
 import { PortionStepper } from "@/components/log/portion-stepper";
@@ -92,18 +93,18 @@ export function MealActions({ userId, initialTarget, now = new Date(), name, ite
               type="button"
               variant="outline"
               size="icon"
-              className="size-11 shrink-0"
+              className={cn("size-12 shrink-0", (star || saved) && "border-primary bg-primary/10")}
               aria-pressed={star || saved !== null}
               aria-label={saved ? "Saved" : "Save to favorites"}
               disabled={pending || saved !== null}
               onClick={() => setStar((value) => !value)}
             >
-              <Star aria-hidden className={star || saved ? "fill-primary text-primary" : "text-muted-foreground"} />
+              <Star aria-hidden className={cn("size-7", star || saved ? "fill-primary text-primary" : "text-muted-foreground")} />
             </Button>
             <Button
               type="button"
               size="lg"
-              className="h-11 flex-1"
+              className="h-12 flex-1"
               disabled={pending || !isValidTarget(target)}
               onClick={async () => {
                 const meal = star || saved ? await ensureSaved() : { id: null, name, items };

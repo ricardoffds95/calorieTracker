@@ -135,9 +135,9 @@ export function ManualEntryDialog({ initialTarget, pending, onClose, onAdd, erro
             type="button"
             aria-pressed={save}
             onClick={() => setSave((value) => !value)}
-            className="col-span-2 flex min-h-11 items-center gap-3 rounded-sm text-left text-sm"
+            className={cn("col-span-2 flex min-h-12 items-center gap-3 rounded-md border px-3 text-left text-sm font-medium", save ? "border-primary bg-primary/10" : "border-input text-muted-foreground")}
           >
-            <Star aria-hidden className={cn("size-5 shrink-0", save ? "fill-primary text-primary" : "text-muted-foreground")} />
+            <Star aria-hidden className={cn("size-7 shrink-0", save ? "fill-primary text-primary" : "text-muted-foreground")} />
             Save to favorites
           </button>
           {touched && saveError && (
