@@ -67,10 +67,19 @@ export function SavedList({ foods, meals, onPickFood, onPickMeal, onEditFood, on
           </ul>
         </ScrollList>
       )}
-      {entries && entries.length > limit && (
-        <Button type="button" variant="ghost" className="h-11" onClick={() => setLimit((n) => n + PAGE)}>
-          Show all · {entries.length}
-        </Button>
+      {entries && entries.length > FIRST && (
+        <div className="flex gap-2">
+          {entries.length > limit && (
+            <Button type="button" variant="ghost" className="h-11 flex-1" onClick={() => setLimit((n) => n + PAGE)}>
+              Show all · {entries.length}
+            </Button>
+          )}
+          {limit > FIRST && (
+            <Button type="button" variant="ghost" className="h-11 flex-1 text-muted-foreground" onClick={() => setLimit(FIRST)}>
+              Show less
+            </Button>
+          )}
+        </div>
       )}
       <Link href="/saved" className={cn(buttonVariants({ variant: "link" }), "h-11 self-start px-1 text-muted-foreground")}>
         Manage saved

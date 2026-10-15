@@ -737,6 +737,12 @@ test("long lists of saved items open on the five most used and scroll inside the
   // the screen opens on the five most used; the rest comes with "Show all"
   await expect(page.getByRole("heading", { name: "Most used" })).toBeVisible();
   await expect(page.getByTestId("saved-all").getByRole("listitem")).toHaveCount(5);
+  await expect(page.getByRole("button", { name: "Show less" })).toHaveCount(0); // nothing to close yet
+  await page.getByRole("button", { name: "Show all · 14" }).click();
+  await expect(page.getByTestId("saved-all").getByRole("listitem")).toHaveCount(14);
+  await expect(page.getByRole("button", { name: "Show all · 14" })).toHaveCount(0); // all of them are shown
+  await page.getByRole("button", { name: "Show less" }).click(); // back to the five most used
+  await expect(page.getByTestId("saved-all").getByRole("listitem")).toHaveCount(5);
   await page.getByRole("button", { name: "Show all · 14" }).click();
   await expect(page.getByTestId("saved-all").getByRole("listitem")).toHaveCount(14);
   const list = page.getByRole("region", { name: "Saved list" });
