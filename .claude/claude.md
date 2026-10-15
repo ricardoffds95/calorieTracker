@@ -11,7 +11,7 @@ Calorie and macro tracking web app (PWA-style, used on an iPhone through Safari:
 
 ## Environments
 - **Dev** Supabase project `eiyajwuauwqsoeckkdce`: used by the MCP, the E2E tests and local work.
-- **Prod** Supabase project `yvuiklqgtctnagxzjkua`: never connect the MCP to it. Migrations reach prod only when the user asks: `npx supabase db push --dry-run` first, check the project ref, then push. The CLI in this container is linked to prod; relink before dev-only CLI work.
+- **Prod** Supabase project `yvuiklqgtctnagxzjkua`: never connect the MCP to it. Migrations go straight to prod (the user authorised it, 2026-10-15) after testing on dev: `npx supabase db push --dry-run` first, check the project ref, then push and verify with `migration list`; say so afterwards. Destructive SQL still needs a heads-up. The CLI in this container is linked to prod; relink before dev-only CLI work.
 - Prod auth: email confirmation is currently **off** (users enter right after sign-up). Site URL and redirect list point to the Vercel domain above. Supabase's default SMTP is limited to 2 emails/hour: set up a custom SMTP before turning confirmation back on.
 - Schema changes only through versioned files in `supabase/migrations/` (never edit an applied one). After a migration, patch `lib/supabase/database.types.ts`.
 
