@@ -6,6 +6,7 @@ import { ChevronRight, Plus, X } from "lucide-react";
 import { WorkoutExerciseList } from "@/components/training/workout-exercise-list";
 import { ARROW_SLOT, KCAL, ROW_GRID } from "@/components/today/row-layout";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { formatDuration } from "@/lib/cardio";
 import { useDeleteTraining, useTrainingDay, type TrainingEntry } from "@/lib/queries/training";
 import { cn } from "@/lib/utils";
 
@@ -70,31 +71,52 @@ export function TrainingSection({ userId, dateKey, collapsed, onToggle }: Traini
 function TrainingRow({ entry, onRemove }: { entry: TrainingEntry; onRemove: () => void }) {
   const [expanded, setExpanded] = useState(false);
   const panelId = `training-items-${entry.id}`;
+  const cardio = entry.kind === "cardio";
+  // How much it was: the exercises of a strength training, the time of a sport.
+  const amount = cardio ? formatDuration(entry.duration_min ?? 0) : countLabel(entry.exercises.length);
+  // A sport only opens when there is something more to show (a note, an estimate of the calories).
+  const expandable = !cardio || Boolean(entry.notes || entry.calories_est);
   return (
-    <li data-testid="training-row">
+    <li data-testid="training-row" data-kind={entry.kind}>
       <div className={ROW_GRID}>
         <button
           type="button"
-          aria-expanded={expanded}
-          aria-controls={panelId}
-          aria-label={`${entry.name}, ${countLabel(entry.exercises.length)}`}
+          aria-expanded={expandable ? expanded : undefined}
+          aria-controls={expandable ? panelId : undefined}
+          aria-label={`${entry.name}, ${amount}`}
+          disabled={!expandable}
           onClick={() => setExpanded((value) => !value)}
-          className="grid min-h-11 min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-sm px-1 text-left"
+          className="grid min-h-11 min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-sm px-1 text-left disabled:cursor-default"
         >
           <span className="flex min-w-0 items-center gap-2">
-            <ChevronRight className={cn(ARROW_SLOT, "text-muted-foreground motion-safe:transition-transform", expanded && "rotate-90")} aria-hidden />
+            {expandable ? <ChevronRight className={cn(ARROW_SLOT, "text-muted-foreground motion-safe:transition-transform", expanded && "rotate-90")} aria-hidden /> : <span aria-hidden className={ARROW_SLOT} />}
             <span className="line-clamp-2 min-w-0 py-1 break-words">{entry.name}</span>
           </span>
-          <span className={cn(KCAL, "text-muted-foreground")}>{countLabel(entry.exercises.length)}</span>
+          <span className={cn(KCAL, "text-muted-foreground")}>{amount}</span>
         </button>
         <span aria-hidden />
         <Button type="button" variant="ghost" size="icon" className="size-11 text-muted-foreground" aria-label={`Remove ${entry.name}`} onClick={onRemove}>
           <X aria-hidden />
         </Button>
       </div>
-      {expanded && (
+      {expanded && expandable && (
         <div id={panelId} className="ml-6 border-l border-border pl-3">
-          <WorkoutExerciseList exercises={entry.exercises} />
+          {cardio ? (
+            <div className="flex flex-col gap-1 py-2 text-sm">
+              {entry.calories_est !== null && (
+                <p data-testid="training-kcal">
+                  ≈ {entry.calories_est} kcal <span className="text-muted-foreground">· estimate</span>
+                </p>
+              )}
+              {entry.notes && (
+                <p data-testid="training-notes" className="break-words whitespace-pre-wrap text-muted-foreground">
+                  {entry.notes}
+                </p>
+              )}
+            </div>
+          ) : (
+            <WorkoutExerciseList exercises={entry.exercises} />
+          )}
         </div>
       )}
     </li>

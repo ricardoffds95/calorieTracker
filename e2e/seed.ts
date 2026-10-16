@@ -262,3 +262,55 @@ export async function trainingCountsAs(user: TestUser, from: string, to: string)
   const supabase = await clientFor(user);
   return supabase.rpc("training_daily_counts", { p_from: from, p_to: to });
 }
+
+/** The weight in the profile of a test user (kcal of a sport are estimated from it); null takes it away. */
+export async function setProfileWeight(user: TestUser, weightKg: number | null) {
+  const supabase = await clientFor(user);
+  const { data: auth, error: authError } = await supabase.auth.getSession();
+  if (authError || !auth.session) throw authError ?? new Error("No session");
+  const { error } = await supabase.from("profiles").update({ weight_kg: weightKg }).eq("user_id", auth.session.user.id);
+  if (error) throw error;
+}
+
+/** The activities a user sees: the built-in ones and their own. */
+export async function fetchActivities(user: TestUser) {
+  const supabase = await clientFor(user);
+  const { data, error } = await supabase.from("activities").select("*").order("sort_order").order("name");
+  if (error) throw error;
+  return data;
+}
+
+/** The user's own activities go (the built-in ones are not theirs to delete). */
+export async function clearActivities(user: TestUser) {
+  const supabase = await clientFor(user);
+  const { error } = await supabase.from("activities").delete().not("user_id", "is", null);
+  if (error) throw error;
+}
+
+/** Tries to change a built-in activity as `user`: RLS must leave it alone (no row comes back). */
+export async function updateActivityAs(user: TestUser, id: string, met: number) {
+  const supabase = await clientFor(user);
+  return supabase.from("activities").update({ met }).eq("id", id).select("id");
+}
+
+export async function deleteActivityAs(user: TestUser, id: string) {
+  const supabase = await clientFor(user);
+  return supabase.from("activities").delete().eq("id", id).select("id");
+}
+
+type CardioRow = { entry_date: string; name?: string; duration_min?: number; notes?: string | null; activity_id?: string | null };
+
+/** Cardio trainings done on days, as the user. */
+export async function seedCardio(user: TestUser, rows: CardioRow[]) {
+  const supabase = await clientFor(user);
+  const { error } = await supabase.from("training_entries").insert(
+    rows.map((r) => ({ kind: "cardio", exercises: null, name: r.name ?? "Running", duration_min: r.duration_min ?? 30, notes: r.notes ?? null, activity_id: r.activity_id ?? null, entry_date: r.entry_date })),
+  );
+  if (error) throw error;
+}
+
+/** Inserts a cardio training as `user` (RLS and the activity check apply): returns the error, if any. */
+export async function insertCardioAs(user: TestUser, row: { entry_date: string; activity_id: string | null }) {
+  const supabase = await clientFor(user);
+  return supabase.from("training_entries").insert({ kind: "cardio", exercises: null, name: "Running", duration_min: 30, entry_date: row.entry_date, activity_id: row.activity_id });
+}

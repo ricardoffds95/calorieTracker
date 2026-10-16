@@ -5,14 +5,17 @@ import { toast } from "sonner";
 import { toastSaveError } from "@/lib/queries/errors";
 import { historyKey } from "@/lib/queries/history";
 import { createClient } from "@/lib/supabase/client";
-import type { Json, Tables } from "@/lib/supabase/database.types";
+import type { Json, Tables, TablesInsert } from "@/lib/supabase/database.types";
 import { parseWorkoutExercises, type Exercise, type WorkoutExercise } from "@/lib/training";
 
 export interface SavedWorkout extends Omit<Tables<"saved_workouts">, "exercises"> {
   exercises: WorkoutExercise[];
 }
 
-export interface TrainingEntry extends Omit<Tables<"training_entries">, "exercises"> {
+/** A training done on a day: strength (a list of exercises) or cardio (a sport, for some minutes). */
+export interface TrainingEntry extends Omit<Tables<"training_entries">, "exercises" | "kind"> {
+  kind: "strength" | "cardio";
+  /** Empty for cardio. */
   exercises: WorkoutExercise[];
 }
 
@@ -122,7 +125,7 @@ export function useDeleteWorkout(userId: string) {
 }
 
 function toEntry(row: Tables<"training_entries">): TrainingEntry {
-  return { ...row, exercises: parseWorkoutExercises(row.exercises) };
+  return { ...row, kind: row.kind === "cardio" ? "cardio" : "strength", exercises: parseWorkoutExercises(row.exercises) };
 }
 
 function byCreatedAt(a: TrainingEntry, b: TrainingEntry) {
@@ -135,9 +138,29 @@ export function useTrainingDay(userId: string, dateKey: string) {
     queryFn: async (): Promise<TrainingEntry[]> => {
       const { data, error } = await createClient().from("training_entries").select("*").eq("entry_date", dateKey).order("created_at", { ascending: true });
       if (error) throw error;
-      return data.map(toEntry).filter((e) => e.exercises.length > 0);
+      // A corrupt strength row (no valid exercises) must not take the day down; a cardio one has none by design.
+      return data.map(toEntry).filter((e) => e.kind === "cardio" || e.exercises.length > 0);
     },
   });
+}
+
+/** The columns of a training entry (without its id and time), strength or cardio. */
+function entryRow(entry: Pick<TrainingEntry, "kind" | "entry_date" | "name" | "exercises" | "saved_workout_id" | "activity_id" | "duration_min" | "met" | "weight_kg" | "calories_est" | "notes">): TablesInsert<"training_entries"> {
+  if (entry.kind === "cardio") {
+    return {
+      kind: "cardio",
+      entry_date: entry.entry_date,
+      name: entry.name,
+      exercises: null,
+      activity_id: entry.activity_id,
+      duration_min: entry.duration_min,
+      met: entry.met,
+      weight_kg: entry.weight_kg,
+      calories_est: entry.calories_est,
+      notes: entry.notes,
+    };
+  }
+  return { kind: "strength", entry_date: entry.entry_date, name: entry.name, exercises: toJson(entry.exercises), saved_workout_id: entry.saved_workout_id };
 }
 
 export interface NewTraining {
@@ -154,7 +177,7 @@ export function useAddTraining(userId: string) {
     mutationFn: async (training: NewTraining): Promise<TrainingEntry> => {
       const { data, error } = await createClient()
         .from("training_entries")
-        .insert({ entry_date: training.entry_date, name: training.name.trim(), exercises: toJson(training.exercises), saved_workout_id: training.saved_workout_id })
+        .insert({ entry_date: training.entry_date, name: training.name.trim(), exercises: toJson(training.exercises), saved_workout_id: training.saved_workout_id, kind: "strength" })
         .select()
         .single();
       if (error) throw error;
@@ -183,7 +206,7 @@ export function useDeleteTraining(userId: string) {
   async function restore(entry: TrainingEntry) {
     const { error } = await createClient()
       .from("training_entries")
-      .insert({ id: entry.id, entry_date: entry.entry_date, name: entry.name, exercises: toJson(entry.exercises), saved_workout_id: entry.saved_workout_id, created_at: entry.created_at });
+      .insert({ ...entryRow(entry), id: entry.id, created_at: entry.created_at });
     if (error) {
       toastSaveError(error);
       return;
@@ -217,6 +240,45 @@ export function useDeleteTraining(userId: string) {
       Promise.all([
         queryClient.invalidateQueries({ queryKey: trainingDayKey(userId, entry.entry_date) }),
         queryClient.invalidateQueries({ queryKey: savedWorkoutsKey(userId) }),
+        queryClient.invalidateQueries({ queryKey: historyKey(userId) }),
+      ]),
+  });
+}
+
+export interface NewCardio {
+  entry_date: string;
+  /** The sport: the activity's name, or what the user wrote for "Other". */
+  name: string;
+  activity_id: string | null;
+  duration_min: number;
+  met: number | null;
+  weight_kg: number | null;
+  calories_est: number | null;
+  notes: string | null;
+}
+
+/** Write-through insert of a cardio training (a sport for some minutes). */
+export function useAddCardio(userId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (cardio: NewCardio): Promise<TrainingEntry> => {
+      const { data, error } = await createClient()
+        .from("training_entries")
+        .insert(entryRow({ ...cardio, kind: "cardio", exercises: [], saved_workout_id: null }))
+        .select()
+        .single();
+      if (error) throw error;
+      return toEntry(data);
+    },
+    onSuccess: (entry) => {
+      queryClient.setQueryData<TrainingEntry[]>(trainingDayKey(userId, entry.entry_date), (current) =>
+        current && !current.some((e) => e.id === entry.id) ? [...current, entry].sort(byCreatedAt) : current,
+      );
+    },
+    onError: (error: { message?: string }) => toastSaveError(error),
+    onSettled: (entry) =>
+      Promise.all([
+        entry ? queryClient.invalidateQueries({ queryKey: trainingDayKey(userId, entry.entry_date) }) : queryClient.invalidateQueries({ queryKey: allTrainingKey(userId) }),
         queryClient.invalidateQueries({ queryKey: historyKey(userId) }),
       ]),
   });

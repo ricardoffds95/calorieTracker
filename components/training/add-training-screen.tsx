@@ -6,6 +6,8 @@ import { ChevronLeft, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { LogHeader, dayHref } from "@/components/log/log-header";
 import { AddWorkoutSheet } from "@/components/training/add-workout-sheet";
+import { CardioSection } from "@/components/training/cardio-section";
+import { CardioSheet, type CardioValues } from "@/components/training/cardio-sheet";
 import { ExerciseBrowser } from "@/components/training/exercise-browser";
 import { useBodyGender } from "@/components/training/use-body-gender";
 import { FinishWorkoutSheet } from "@/components/training/finish-workout-sheet";
@@ -14,7 +16,8 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMounted } from "@/components/use-mounted";
 import { dateKeyOrToday, formatDayLabel } from "@/lib/dates";
-import { DUPLICATE_WORKOUT, useAddTraining, useCreateWorkout, useSavedWorkouts, type SavedWorkout } from "@/lib/queries/training";
+import { DUPLICATE_ACTIVITY, useCreateActivity, type Activity } from "@/lib/queries/activities";
+import { DUPLICATE_WORKOUT, useAddCardio, useAddTraining, useCreateWorkout, useSavedWorkouts, type SavedWorkout } from "@/lib/queries/training";
 import type { WorkoutExercise } from "@/lib/training";
 
 const FIRST = 5;
@@ -33,6 +36,10 @@ function AddTrainingDay({ userId }: { userId: string }) {
   const workouts = useSavedWorkouts(userId);
   const add = useAddTraining(userId);
   const createWorkout = useCreateWorkout(userId);
+  const addCardio = useAddCardio(userId);
+  const createActivity = useCreateActivity(userId);
+  const [cardio, setCardio] = useState<{ activity: Activity | null } | null>(null);
+  const [cardioError, setCardioError] = useState<string | null>(null);
   const [limit, setLimit] = useState(FIRST);
   const [open, setOpen] = useState<SavedWorkout | null>(null);
   const [building, setBuilding] = useState(false);
@@ -66,6 +73,37 @@ function AddTrainingDay({ userId }: { userId: string }) {
       }
     }
     add.mutate({ entry_date: date, name, exercises, saved_workout_id: savedId }, { onSuccess: () => added(name, date) });
+  }
+
+  async function addCardioTraining(activity: Activity | null, values: CardioValues) {
+    setCardioError(null);
+    let activityId = activity?.id ?? null;
+    if (!activity && values.save) {
+      try {
+        activityId = (await createActivity.mutateAsync(values.name)).id;
+      } catch (e) {
+        if ((e as { code?: string }).code === DUPLICATE_ACTIVITY) setCardioError("Sport name already saved");
+        return; // any other error was already shown as a toast
+      }
+    }
+    addCardio.mutate(
+      {
+        entry_date: values.date,
+        name: values.name,
+        activity_id: activityId,
+        duration_min: values.minutes,
+        met: activity?.met ?? null,
+        weight_kg: activity?.met ? values.weightKg : null,
+        calories_est: values.calories,
+        notes: values.notes,
+      },
+      {
+        onSuccess: () => {
+          setCardio(null);
+          toast.success(`${values.name} added to ${formatDayLabel(values.date, now).toLowerCase()}`, { action: { label: "View day", onClick: () => router.push(dayHref(values.date, now)) } });
+        },
+      },
+    );
   }
 
   const list = workouts.data ?? [];
@@ -131,7 +169,21 @@ function AddTrainingDay({ userId }: { userId: string }) {
               </div>
             )}
           </section>
+          <CardioSection userId={userId} onChoose={(activity) => { setCardioError(null); setCardio({ activity }); }} />
         </>
+      )}
+
+      {cardio && (
+        <CardioSheet
+          key={cardio.activity?.id ?? "other"}
+          userId={userId}
+          activity={cardio.activity}
+          initialDate={dateKey}
+          pending={addCardio.isPending || createActivity.isPending}
+          error={cardioError}
+          onAdd={(values) => void addCardioTraining(cardio.activity, values)}
+          onClose={() => setCardio(null)}
+        />
       )}
 
       {open && <AddWorkoutSheet workout={open} initialDate={dateKey} pending={add.isPending} onAdd={addSaved} onClose={() => setOpen(null)} />}

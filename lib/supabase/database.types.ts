@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      activities: {
+        Row: {
+          created_at: string
+          id: string
+          met: number | null
+          name: string
+          sort_order: number
+          source: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          met?: number | null
+          name: string
+          sort_order?: number
+          source?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          met?: number | null
+          name?: string
+          sort_order?: number
+          source?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       diary_entries: {
         Row: {
           calories: number
@@ -292,33 +322,61 @@ export type Database = {
       }
       training_entries: {
         Row: {
+          activity_id: string | null
+          calories_est: number | null
           created_at: string
+          duration_min: number | null
           entry_date: string
-          exercises: Json
+          exercises: Json | null
           id: string
+          kind: string
+          met: number | null
           name: string
+          notes: string | null
           saved_workout_id: string | null
           user_id: string
+          weight_kg: number | null
         }
         Insert: {
+          activity_id?: string | null
+          calories_est?: number | null
           created_at?: string
+          duration_min?: number | null
           entry_date: string
-          exercises: Json
+          exercises?: Json | null
           id?: string
+          kind?: string
+          met?: number | null
           name: string
+          notes?: string | null
           saved_workout_id?: string | null
           user_id?: string
+          weight_kg?: number | null
         }
         Update: {
+          activity_id?: string | null
+          calories_est?: number | null
           created_at?: string
+          duration_min?: number | null
           entry_date?: string
-          exercises?: Json
+          exercises?: Json | null
           id?: string
+          kind?: string
+          met?: number | null
           name?: string
+          notes?: string | null
           saved_workout_id?: string | null
           user_id?: string
+          weight_kg?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "training_entries_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "activities"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "training_entries_user_id_saved_workout_id_fkey"
             columns: ["user_id", "saved_workout_id"]
